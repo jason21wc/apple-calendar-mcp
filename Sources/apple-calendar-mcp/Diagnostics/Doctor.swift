@@ -47,12 +47,12 @@ enum Doctor {
         // 2. Are we our own responsible process? If not, any access we appear to have
         //    belongs to whoever launched us and vanishes under a different host.
         let verified = Reexec.disclaimStateIsVerified
-        checks.append(("privacy identity", disclaimMode == "disclaimed-child"
+        checks.append(("privacy identity", Runtime.ownsPrivacyIdentity
             ? (verified
                 ? .ok("disclaimed-child -- confirmed with the kernel, not inferred")
                 : .warn("disclaimed-child, but UNVERIFIED (responsibility API unavailable)"))
             : .warn("""
-                \(disclaimMode) -- running under the LAUNCHING app's identity. Any Calendar \
+                \(Runtime.disclaimMode) -- running under the LAUNCHING app's identity. Any Calendar \
                 access shown below is inherited and will disappear under a different host.
                 """)))
 
@@ -67,11 +67,11 @@ enum Doctor {
         // does not have and should not ask for. It is attempted only as corroboration and
         // its absence is not a problem.
         let state = AuthorizationState.current
-        let owned = (disclaimMode == "disclaimed-child") && state.canReadEvents
+        let owned = (Runtime.ownsPrivacyIdentity) && state.canReadEvents
 
         if owned {
             checks.append(("grant ownership", .ok("this binary's own grant (disclaimed identity + full access)")))
-        } else if disclaimMode == "disclaimed-child" {
+        } else if Runtime.ownsPrivacyIdentity {
             checks.append(("grant ownership", .fail("""
                 no usable grant of our own (status: \(state.rawValue)). Run --setup from \
                 this exact path: \(path)

@@ -19,8 +19,8 @@ enum SetupFlow {
         // Refuse to proceed under inherited identity. Granting here would attach the
         // permission to the launching app, which is the exact failure this project spent
         // Phase 1 diagnosing -- it looks like success and breaks under a different host.
-        if disclaimMode != "disclaimed-child" {
-            log("[FAIL] cannot claim an independent privacy identity (\(disclaimMode)).")
+        if !Runtime.ownsPrivacyIdentity {
+            log("[FAIL] cannot claim an independent privacy identity (\(Runtime.disclaimMode)).")
             log("       Granting now would attach Calendar access to whatever launched this")
             log("       process, not to apple-calendar-mcp. Run --doctor for detail.")
             return 1

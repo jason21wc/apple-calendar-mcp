@@ -26,16 +26,10 @@ import Darwin
 // A closed stderr pipe would otherwise kill us on the first diagnostic write.
 signal(SIGPIPE, SIG_IGN)
 
-let disclaimMode: String
-if Reexec.isDisclaimedChild {
-    disclaimMode = "disclaimed-child"          // we are the re-spawned, self-responsible process
-} else if Reexec.respawnDisclaimed() {
-    disclaimMode = "unreachable"               // respawnDisclaimed() exits on success
-} else {
-    disclaimMode = Reexec.disclaimAvailable
-        ? "inherited-respawn-failed"
-        : "inherited-symbol-missing"           // private API gone; degrade, do not crash
-}
+// Claim our own privacy identity BEFORE touching EventKit. Once EventKit is used under
+// inherited responsibility the grant is already attributed to the host. Does not return if
+// the respawn succeeds -- the supervisor waits for the child and exits with its status.
+Runtime.establishPrivacyIdentity()
 
 // MARK: - Authorization states
 //
@@ -70,9 +64,6 @@ func log(_ message: String) {
 
 // MARK: - Probe record
 
-let stateDir = FileManager.default.homeDirectoryForCurrentUser
-    .appendingPathComponent(".local/state/apple-calendar-mcp", isDirectory: true)
-
 /// Labels become filenames, so anything outside a safe set is replaced.
 ///
 /// Two things this deliberately does NOT promise:
@@ -104,12 +95,7 @@ func sanitize(_ label: String) -> String {
 
 func writeProbe(label rawLabel: String, status: EKAuthorizationStatus, note: String) {
     let label = sanitize(rawLabel)
-    // 0700 now, before Phase 5 puts the mutation journal and full per-event pre-state
-    // snapshots here -- real calendar content, notes and attendee names. Default attributes
-    // would give 0755, and Data.write gives 0644.
-    try? FileManager.default.createDirectory(
-        at: stateDir, withIntermediateDirectories: true,
-        attributes: [.posixPermissions: 0o700])
+    Runtime.ensureStateDirectory()
 
     let ppid = getppid()
     let record: [String: Any] = [
@@ -123,11 +109,11 @@ func writeProbe(label rawLabel: String, status: EKAuthorizationStatus, note: Str
         "usage_description_present":
             Bundle.main.object(forInfoDictionaryKey: "NSCalendarsFullAccessUsageDescription") != nil,
         "note": note,
-        "disclaim_mode": disclaimMode,
+        "disclaim_mode": Runtime.disclaimMode,
         "disclaim_symbol_available": Reexec.disclaimAvailable,
     ]
 
-    let file = stateDir.appendingPathComponent("probe-\(label).json")
+    let file = Runtime.stateDirectory.appendingPathComponent("probe-\(label).json")
     do {
         let data = try JSONSerialization.data(withJSONObject: record,
                                               options: [.prettyPrinted, .sortedKeys])
@@ -140,7 +126,7 @@ func writeProbe(label rawLabel: String, status: EKAuthorizationStatus, note: Str
         // invert its purpose.
         log("probe write FAILED (\(file.path)): \(error.localizedDescription)")
     }
-    log("status=\(describe(status)) parent=\(processPath(ppid)) mode=\(disclaimMode)")
+    log("status=\(describe(status)) parent=\(processPath(ppid)) mode=\(Runtime.disclaimMode)")
 }
 
 // MARK: - Dispatch

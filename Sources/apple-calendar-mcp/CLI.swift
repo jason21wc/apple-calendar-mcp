@@ -72,6 +72,6 @@ func printVersion() {
         apple-calendar-mcp \(Meta.version)
           identifier: \(Meta.bundleIdentifier)
           path:       \(Meta.executablePath)
-          mode:       \(disclaimMode)
+          mode:       \(Runtime.disclaimMode)
         """)
 }
