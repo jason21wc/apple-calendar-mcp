@@ -8,6 +8,12 @@
 
 set -euo pipefail
 
+# Pin PATH. This script invokes codesign, security and plutil; a shimmed `codesign` earlier
+# in PATH would own the signing operation outright. User-writable directories (npm,
+# homebrew, conda) commonly precede /usr/bin on a developer machine.
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export PATH
+
 # Resolve the argument against the caller's cwd BEFORE moving to the repo root, so a
 # relative path still means what the caller meant.
 if [ $# -ge 1 ]; then
@@ -37,11 +43,12 @@ if [ ! -w "$BIN" ]; then
     echo "signature, so a binary signed before copying is still correctly signed. Verify"
     echo "with:  codesign --verify --strict \"$BIN\""
     echo
-    echo "If you really do need to re-sign in place, use: sudo $0 \"$BIN\""
+    echo "If you really do need to re-sign in place, use: sudo \"$0\" \"$BIN\""
     exit 1
 fi
 
-if ! security find-identity -v -p codesigning | grep -q "$CERT_NAME"; then
+IDENTITIES="$(security find-identity -v -p codesigning 2>&1 || true)"
+if ! printf '%s' "$IDENTITIES" | grep -q "$CERT_NAME"; then
     echo "No valid signing identity found."
     echo "Run ./scripts/make-signing-cert.sh, then ./scripts/trust-signing-cert.sh"
     exit 1

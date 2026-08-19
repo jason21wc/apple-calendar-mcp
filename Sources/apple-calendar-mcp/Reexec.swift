@@ -60,17 +60,19 @@ enum Reexec {
     /// process that was NOT disclaimed reports its ancestor app as responsible, no matter
     /// what any environment variable claims.
     static var isDisclaimedChild: Bool {
-        guard let responsible = responsibleProcess(of: getpid()) else {
-            // Symbol unavailable: fall back to the environment hint, and treat the reported
-            // mode as unverified rather than asserting an identity we cannot confirm.
-            guard let raw = ProcessInfo.processInfo.environment[marker],
-                  let claimedParent = pid_t(raw) else { return false }
-            return claimedParent == getppid()
-        }
+        // No fallback, deliberately. An earlier version fell back to the environment marker
+        // when this symbol was unavailable -- which quietly reinstated the one-line forgery
+        // the kernel check exists to remove, on the one path no test on a working machine
+        // can reach. Failing to `false` here is safe: a genuinely disclaimed child then
+        // attempts a respawn, hits the depth guard, and reports `inherited-respawn-failed`,
+        // after which --setup refuses and --doctor fails. Loud and wrong beats quiet and
+        // wrong. Both symbols live in the same private subsystem, so one being absent while
+        // the other works is close to impossible anyway.
+        guard let responsible = responsibleProcess(of: getpid()) else { return false }
         return responsible == getpid()
     }
 
-    /// True when disclaim state was established from the kernel rather than inferred.
+    /// True when the responsibility API is answerable at all.
     static var disclaimStateIsVerified: Bool { responsibleProcess(of: getpid()) != nil }
 
     private typealias ResponsibleFn = @convention(c) (pid_t) -> pid_t
@@ -157,11 +159,9 @@ enum Reexec {
         sigfillset(&allSignalsDefaulted)
         posix_spawnattr_setsigmask(&attr, &noSignalsBlocked)
         posix_spawnattr_setsigdefault(&attr, &allSignalsDefaulted)
-        // 0x4000 is POSIX_SPAWN_CLOEXEC_DEFAULT (Darwin-only; not exposed in Swift's
-        // Darwin module, hence the literal).
-        let cloexecDefault: Int32 = 0x4000
+        // Close every inherited descriptor except the stdio exempted above.
         posix_spawnattr_setflags(&attr,
-            Int16(POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF | cloexecDefault))
+            Int16(POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_CLOEXEC_DEFAULT))
 
         // argv, NULL-terminated
         var argv: [UnsafeMutablePointer<CChar>?] = CommandLine.arguments.map { strdup($0) }
@@ -169,15 +169,19 @@ enum Reexec {
         defer { for p in argv where p != nil { free(p) } }
 
         // envp: our environment plus the marker, NULL-terminated
-        var env = ProcessInfo.processInfo.environment
-
-        // The hardened runtime strips DYLD_* already, but that protection exists only if
-        // sign.sh was actually run -- nothing in the build enforces it. Strip them here so
-        // the code is safe independently of the signing step.
-        for key in env.keys where key.hasPrefix("DYLD_") || key.hasPrefix("LD_")
-            || key.hasPrefix("NSZombie") || key.hasPrefix("Malloc") {
-            env.removeValue(forKey: key)
-        }
+        // Allowlist rather than blocklist. A prefix blocklist is unbounded by construction
+        // and this one previously missed HOME and CFFIXED_USER_HOME, both of which retarget
+        // every path we derive from the home directory -- the state directory, the journal,
+        // the setup record. The child is our own binary and needs very little.
+        //
+        // Note this is defence in depth, not independence from signing: if DYLD_ injection
+        // were honoured at all, the library is already loaded in THIS process and could
+        // re-set anything here. The hardened runtime is what actually prevents that.
+        let allowedKeys: Set<String> = [
+            "HOME", "PATH", "TMPDIR", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TERM",
+        ]
+        let parentEnv = ProcessInfo.processInfo.environment
+        var env = parentEnv.filter { allowedKeys.contains($0.key) }
         env[marker] = String(getpid())          // recursion hint only; never trusted as proof
         env[depthKey] = String(reexecDepth + 1)
         var envp: [UnsafeMutablePointer<CChar>?] = env.map { strdup("\($0.key)=\($0.value)") }
@@ -189,23 +193,51 @@ enum Reexec {
         // client left open without O_CLOEXEC. adddup2(fd, fd) is the documented idiom for
         // exempting a descriptor from POSIX_SPAWN_CLOEXEC_DEFAULT, so stdio still passes
         // through byte-identically and the MCP stream is untouched.
+        // An unchecked init is dangerous here rather than merely untidy: Darwin's
+        // posix_spawn null-checks the actions pointer, so a failed init would let the spawn
+        // proceed with CLOEXEC_DEFAULT set and NO exemptions -- handing the child a process
+        // with stdin, stdout and stderr closed. For a stdio protocol that is unrecoverable,
+        // and the child's first open() would silently become fd 0.
         var fileActions: posix_spawn_file_actions_t?
-        posix_spawn_file_actions_init(&fileActions)
+        guard posix_spawn_file_actions_init(&fileActions) == 0 else { return false }
         defer { posix_spawn_file_actions_destroy(&fileActions) }
-        for fd in Int32(0)...Int32(2) {
-            posix_spawn_file_actions_adddup2(&fileActions, fd, fd)
+
+        // Only exempt descriptors that are actually open. File actions run in the child, so
+        // requesting an action on a closed fd makes posix_spawn fail with EBADF -- which
+        // would disable the disclaim entirely for anything launched without stdio
+        // (`--doctor 0<&-`, launchd, cron).
+        for fd in Int32(0)...Int32(2) where fcntl(fd, F_GETFD) != -1 {
+            guard posix_spawn_file_actions_addinherit_np(&fileActions, fd) == 0 else {
+                return false
+            }
         }
-        // Installed BEFORE the spawn: a SIGTERM arriving between spawn and handler
-        // installation would kill the supervisor at default disposition and orphan a
-        // TCC-privileged child still holding the client's stdio. The handler no-ops while
-        // supervisedChild is still 0.
         installSignalForwarding()
+
+        // Block the forwarded signals across the spawn. Installing the handlers early only
+        // shrinks the orphan window -- it does not close it, because `supervisedChild` is
+        // not set until posix_spawn returns, and a handler that runs before then forwards
+        // nothing and lets the supervisor die on top of a live, TCC-privileged child still
+        // holding the client's stdio. Blocking is safe: posix_spawnattr_setsigmask above
+        // already forces an empty mask in the child, so the child never inherits this.
+        var blocked = sigset_t()
+        sigemptyset(&blocked)
+        for sig in [SIGTERM, SIGINT, SIGHUP] { sigaddset(&blocked, sig) }
+        var previousMask = sigset_t()
+        sigprocmask(SIG_BLOCK, &blocked, &previousMask)
 
         var pid: pid_t = 0
         let rc = posix_spawn(&pid, selfPath(), &fileActions, &attr, argv, envp)
-        guard rc == 0 else { return false }
+        guard rc == 0 else {
+            // Restore default dispositions: this process now continues as an ordinary
+            // non-supervisor, and leaving forwarding handlers installed would silently
+            // pre-empt the graceful shutdown the Phase 4 server loop needs.
+            for sig in [SIGTERM, SIGINT, SIGHUP] { signal(sig, SIG_DFL) }
+            sigprocmask(SIG_SETMASK, &previousMask, nil)
+            return false
+        }
 
         supervisedChild = pid
+        sigprocmask(SIG_SETMASK, &previousMask, nil)
 
         var status: Int32 = 0
         var reaped: pid_t

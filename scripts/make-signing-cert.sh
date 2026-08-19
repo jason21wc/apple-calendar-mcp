@@ -72,7 +72,9 @@ echo "Generating self-signed code-signing certificate..."
 # Security framework disagree on how to encode it when computing the PKCS12 MAC, which
 # surfaces as "MAC verification failed (wrong password?)". The bundle is deleted seconds
 # later either way.
-P12PASS="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
+# No pipe: `tr </dev/urandom | head -c 32` makes head exit first, tr takes SIGPIPE (141),
+# and `set -o pipefail` aborts the whole script -- silently, right after "Generating...".
+P12PASS="$("$OPENSSL" rand -hex 16)"
 
 echo "Packaging..."
 # -passout fd:3 instead of pass:VALUE -- an argument vector is world-readable to every
@@ -98,7 +100,9 @@ echo "Certificate saved to ~/.local/state/apple-calendar-mcp/signing-cert.pem"
 
 echo "Marking it trusted for code signing..."
 security add-trusted-cert -r trustRoot -p codeSign -k "$KEYCHAIN" "$WORK/cert.pem" 2>/dev/null || {
-    echo "  (trust settings not applied automatically -- usually fine for local signing)"
+    echo "  WARNING: trust settings were NOT applied."
+    echo "  codesign will report CSSMERR_TP_NOT_TRUSTED and refuse the identity."
+    echo "  Run ./scripts/trust-signing-cert.sh to apply them interactively."
 }
 
 echo

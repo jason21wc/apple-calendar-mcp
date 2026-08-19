@@ -23,6 +23,9 @@ cd "$(dirname "$0")/.."
 PATH=/usr/bin:/bin:/usr/sbin:/sbin
 export PATH
 
+# Must match CERT_NAME in make-signing-cert.sh AND the CN in its openssl config: macOS
+# derives the imported key's label from one of them, and -l below matches on that label.
+# Change one without the other and the partition-list update silently matches zero keys.
 CERT_NAME="apple-calendar-mcp local signing"
 KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 CERT_PEM="$HOME/.local/state/apple-calendar-mcp/signing-cert.pem"

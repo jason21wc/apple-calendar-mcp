@@ -90,7 +90,12 @@ enum SetupFlow {
     private static func recordSetup(path: String) {
         let dir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".local/state/apple-calendar-mcp", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        // 0700 must match main.swift's state directory. createDirectory on an EXISTING
+        // directory succeeds without touching attributes, so whichever path creates it first
+        // wins permanently -- an accidental dependency on install order.
+        try? FileManager.default.createDirectory(
+            at: dir, withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700])
         let record: [String: Any] = [
             "granted_path": path,
             "bundle_identifier": Meta.bundleIdentifier,
@@ -99,7 +104,10 @@ enum SetupFlow {
         ]
         if let data = try? JSONSerialization.data(withJSONObject: record,
                                                   options: [.prettyPrinted, .sortedKeys]) {
-            try? data.write(to: dir.appendingPathComponent("setup.json"))
+            let file = dir.appendingPathComponent("setup.json")
+            try? data.write(to: file, options: [.atomic])
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600],
+                                                   ofItemAtPath: file.path)
         }
     }
 }

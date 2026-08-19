@@ -88,6 +88,18 @@ only tested the passing case I would have shipped a build gate that blocks every
 build. **Rule:** test a new guard in BOTH directions — that it passes what should pass and
 fires on what should fail — before trusting it.
 
+**2026-08-19 — I tested a security fix on the only path that could not be vulnerable.** The
+forgery fix asked the kernel, but fell back to the forgeable check when the symbol was
+missing. On this machine the symbol exists, so my test exercised the safe path and passed,
+while the vulnerable path was unreachable and unverifiable. A fresh review caught it.
+**Rule:** when a fix has a fallback, the fallback is the part that needs testing — and if it
+cannot be reached, prefer failing closed to degrading.
+
+**2026-08-19 — Memory ran ahead of the code.** Three gotchas recorded lessons as *learned
+and fixed* while the same bug sat in two other files: the `pipefail`/`grep -q` trap was
+written up the moment I hit it, then left live in both signing scripts. **Rule:** after
+recording a lesson, grep the whole repo for the pattern before writing it down as fixed.
+
 ---
 
 ## Graduated Patterns
