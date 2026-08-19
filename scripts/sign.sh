@@ -27,6 +27,20 @@ ENTITLEMENTS="Sources/apple-calendar-mcp/Entitlements.plist"
 
 [ -f "$BIN" ] || { echo "No binary at $BIN. Run: swift build -c release"; exit 1; }
 
+# codesign rewrites the file in place, so an unwritable target fails with
+# "internal error in Code Signing subsystem" -- which names neither the cause nor the fix.
+# Say it plainly instead.
+if [ ! -w "$BIN" ]; then
+    echo "Cannot write to $BIN (owned by $(stat -f '%Su' "$BIN"))."
+    echo
+    echo "You usually do NOT need to sign after installing: cp preserves the embedded"
+    echo "signature, so a binary signed before copying is still correctly signed. Verify"
+    echo "with:  codesign --verify --strict \"$BIN\""
+    echo
+    echo "If you really do need to re-sign in place, use: sudo $0 \"$BIN\""
+    exit 1
+fi
+
 if ! security find-identity -v -p codesigning | grep -q "$CERT_NAME"; then
     echo "No valid signing identity found."
     echo "Run ./scripts/make-signing-cert.sh, then ./scripts/trust-signing-cert.sh"

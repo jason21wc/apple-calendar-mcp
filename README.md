@@ -79,10 +79,15 @@ keys the calendar grant to the binary's *absolute path* — granting from `.buil
 moving the binary silently loses access.
 
 ```bash
-sudo cp .build/release/apple-calendar-mcp /usr/local/bin/
-./scripts/sign.sh /usr/local/bin/apple-calendar-mcp
-/usr/local/bin/apple-calendar-mcp --grant
+./scripts/sign.sh                                        # sign FIRST, while you still own the file
+sudo cp .build/release/apple-calendar-mcp /usr/local/bin/ # cp preserves the signature
+/usr/local/bin/apple-calendar-mcp --setup                 # grant at the final path
 ```
+
+Sign before copying, not after. `cp` carries the embedded signature across, and once the
+binary is owned by root, `codesign` cannot rewrite it in place — it fails with `internal
+error in Code Signing subsystem`, which does not hint at permissions. Confirm the installed
+copy with `codesign --verify --strict /usr/local/bin/apple-calendar-mcp`.
 
 ### Why the signing dance
 
