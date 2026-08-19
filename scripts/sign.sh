@@ -47,12 +47,20 @@ if [ ! -w "$BIN" ]; then
     exit 1
 fi
 
+# NOTE: `case`, not `grep -q`. Any pipeline ending in `grep -q` can invert under
+# `set -o pipefail`: grep exits on first match, the upstream command takes SIGPIPE (141),
+# and pipefail makes that the pipeline's status -- so a SUCCESSFUL match reads as failure.
+# Capturing to a variable first does NOT fix it; the pipeline is still there. Measured.
+# `case` does no I/O and cannot be raced.
 IDENTITIES="$(security find-identity -v -p codesigning 2>&1 || true)"
-if ! printf '%s' "$IDENTITIES" | grep -q "$CERT_NAME"; then
-    echo "No valid signing identity found."
-    echo "Run ./scripts/make-signing-cert.sh, then ./scripts/trust-signing-cert.sh"
-    exit 1
-fi
+case "$IDENTITIES" in
+    *"$CERT_NAME"*) ;;
+    *)
+        echo "No valid signing identity found."
+        echo "Run ./scripts/make-signing-cert.sh, then ./scripts/trust-signing-cert.sh"
+        exit 1
+        ;;
+esac
 
 echo "==> Signing $BIN"
 codesign --force --options runtime --timestamp=none \
@@ -71,17 +79,23 @@ codesign --verify --strict --verbose=2 "$BIN"
 # SIGPIPE -- and under `set -o pipefail` that turns a SUCCESSFUL check into a failed
 # pipeline, firing the guard on a correctly signed binary.
 SIGNED_ENTITLEMENTS="$(codesign -d --entitlements - --xml "$BIN" 2>/dev/null | plutil -p - 2>/dev/null || true)"
-if ! printf '%s' "$SIGNED_ENTITLEMENTS" | grep -q "com.apple.security.personal-information.calendars"; then
-    echo "FAILED: the calendars entitlement is missing from the signed binary."
-    echo "Without it, macOS will silently refuse to ever show a Calendar prompt."
-    exit 1
-fi
+case "$SIGNED_ENTITLEMENTS" in
+    *"com.apple.security.personal-information.calendars"*) ;;
+    *)
+        echo "FAILED: the calendars entitlement is missing from the signed binary."
+        echo "Without it, macOS will silently refuse to ever show a Calendar prompt."
+        exit 1
+        ;;
+esac
 
 SIGNED_FLAGS="$(codesign -dv "$BIN" 2>&1 || true)"
-if ! printf '%s' "$SIGNED_FLAGS" | grep -q "flags=.*runtime"; then
-    echo "FAILED: the hardened runtime is not enabled on the signed binary."
-    exit 1
-fi
+case "$SIGNED_FLAGS" in
+    *"flags="*"runtime"*) ;;
+    *)
+        echo "FAILED: the hardened runtime is not enabled on the signed binary."
+        exit 1
+        ;;
+esac
 echo "    entitlement and hardened runtime asserted"
 
 echo

@@ -37,11 +37,23 @@ KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 # macOS LibreSSL produces a bundle the keychain imports natively.
 OPENSSL=/usr/bin/openssl
 
-if security find-identity -v -p codesigning 2>/dev/null | grep -q "$CERT_NAME"; then
-    echo "Identity already present: $CERT_NAME"
-    security find-identity -v -p codesigning | grep "$CERT_NAME"
-    exit 0
-fi
+# NOTE: `case`, not `grep -q`. Any pipeline ending in `grep -q` can invert under
+# `set -o pipefail`: grep exits on first match, the upstream command takes SIGPIPE (141),
+# and pipefail makes that the pipeline's status -- so a SUCCESSFUL match reads as failure.
+# Capturing to a variable first does NOT fix it; the pipeline is still there. Measured.
+# `case` does no I/O and cannot be raced.
+#
+# This site was a real defect: it reported a PRESENT identity as absent, so a second run
+# minted a SECOND certificate. The existing Calendar grant's designated requirement names
+# the FIRST certificate's root, so the effect was silent loss of Calendar access.
+EXISTING_IDS="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+case "$EXISTING_IDS" in
+    *"$CERT_NAME"*)
+        echo "Identity already present: $CERT_NAME"
+        printf '%s\n' "$EXISTING_IDS" | sed -n "/$CERT_NAME/p" || true
+        exit 0
+        ;;
+esac
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT INT TERM HUP

@@ -36,6 +36,31 @@ let package = Package(
                     "-Xlinker", "Sources/apple-calendar-mcp/Info.plist",
                 ])
             ]
-        )
+        ),
+
+        // A test target CAN depend on this executable target, and that was worth checking
+        // rather than assuming: the `unsafeFlags` above only bar this package from being
+        // resolved as somebody else's DEPENDENCY. They place no restriction on a target
+        // inside this same package, so no library-extraction restructure is needed.
+        // Verified by building AND running, not by reading the manifest documentation.
+        //
+        // WHAT THIS LINKAGE DOES NOT BUY. main.swift is top-level code, so its globals
+        // (`disclaimMode`, `stateDir`, `store`) are initialised by `main` -- which never
+        // runs in a test host. They are also @MainActor-isolated, so the compiler happily
+        // lets a @MainActor test read them and the process then SEGVs (measured: signal 11,
+        // whole run lost). Everything that touches them -- Doctor.run, SetupFlow.run,
+        // printVersion, writeProbe -- is reachable only through a real subprocess. See
+        // Tests/AppleCalendarMCPTests/ReexecProcessTests.swift.
+        //
+        // FRAMEWORK NOTE. `import Testing` needs no package dependency on Swift 6.3, but on
+        // a Command Line Tools-only machine Testing.framework is not on SwiftPM's default
+        // search path and plain `swift test` cannot find the module. Use ./scripts/test.sh,
+        // which derives the paths from `xcode-select -p` rather than hardcoding them.
+        // XCTest is not an alternative: Command Line Tools ships no XCTest.swiftmodule.
+        .testTarget(
+            name: "AppleCalendarMCPTests",
+            dependencies: ["apple-calendar-mcp"],
+            path: "Tests/AppleCalendarMCPTests"
+        ),
     ]
 )

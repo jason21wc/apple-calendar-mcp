@@ -73,12 +73,33 @@ func log(_ message: String) {
 let stateDir = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent(".local/state/apple-calendar-mcp", isDirectory: true)
 
-/// Labels become filenames, so anything outside a safe set is replaced rather than trusted.
+/// Labels become filenames, so anything outside a safe set is replaced.
+///
+/// Two things this deliberately does NOT promise:
+///   - `.` survives, so `sanitize("..") == ".."`. That is contained only because the caller
+///     wraps the result as `probe-<label>.json`; a future caller that drops the prefix
+///     reintroduces a parent reference.
+///   - the cap is on BYTES, not characters. `prefix(64)` counts grapheme clusters, and a
+///     single Character can carry hundreds of combining marks -- measured at ~1 kB from one
+///     visible character, which exceeds the filesystem's name limit and makes the write
+///     fail. Since the probe JSON is this tool's entire deliverable, that matters.
 func sanitize(_ label: String) -> String {
-    let safe = label.map { c -> Character in
-        c.isLetter || c.isNumber || c == "." || c == "_" || c == "-" ? c : "-"
+    var out = ""
+    var bytes = 0
+    for c in label {
+        let replacement: Character =
+            (c.isLetter || c.isNumber || c == "." || c == "_" || c == "-") ? c : "-"
+        let width = String(replacement).utf8.count
+        if bytes + width > 64 { break }
+        out.append(replacement)
+        bytes += width
     }
-    return String(safe.prefix(64))
+    // An empty result is left empty rather than substituted with a placeholder. A single
+    // grapheme CAN exhaust the whole budget on its own (one letter carrying hundreds of
+    // combining marks is ~1 kB), yielding "probe-.json". A default would not restore the
+    // distinguishability that was lost -- every stripped label would collapse to the same
+    // placeholder -- so it would add a magic value and buy nothing.
+    return out
 }
 
 func writeProbe(label rawLabel: String, status: EKAuthorizationStatus, note: String) {

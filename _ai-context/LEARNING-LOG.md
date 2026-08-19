@@ -100,6 +100,26 @@ and fixed* while the same bug sat in two other files: the `pipefail`/`grep -q` t
 written up the moment I hit it, then left live in both signing scripts. **Rule:** after
 recording a lesson, grep the whole repo for the pattern before writing it down as fixed.
 
+**2026-08-19 — I recorded a fix that was not one, then applied it three times.** Gotcha 34
+prescribed "capture to a variable, then match" for the `pipefail`/`grep -q` trap. That is
+still a pipeline and still inverts; it only moves the threshold. The real bug meanwhile sat
+untouched in another script, where it reported a present signing certificate as absent —
+which would have minted a second certificate and silently destroyed Calendar access.
+**Rule:** when recording a remedy, verify the remedy, not just the diagnosis.
+
+**2026-08-19 — Mutation testing is the only evidence a test suite works.** 17 deliberate
+defects were injected and 17 were caught — and the exercise found a bug in the tests
+themselves: subprocess tests referenced `Reexec.depthKey`, so renaming the constant renamed
+it in the test too and the guard tests passed against a binary that no longer honoured the
+documented variable. **Rule:** tests that assert an external contract must hardcode the
+literal, not import the constant, or they only prove the code agrees with itself.
+
+**2026-08-19 — The tests caught me adding unnecessary behaviour.** Fixing the byte cap, I
+added an "unnamed" placeholder for labels that sanitise away entirely. Two existing tests
+failed, and they were right: the placeholder restored no distinguishability and only added
+a magic value. **Rule:** when a test disagrees with a change, establish which is correct
+before changing the test — here the test was.
+
 ---
 
 ## Graduated Patterns
