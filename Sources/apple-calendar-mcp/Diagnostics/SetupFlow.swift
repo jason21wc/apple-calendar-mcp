@@ -37,9 +37,10 @@ enum SetupFlow {
                 return 0
             }
             log("Status reads fullAccess but no grant exists for this path, so it is")
-            log("inherited from the launching app. Reset and grant it properly with:")
-            log("  tccutil reset Calendar \(Meta.bundleIdentifier)")
-            log("then run --setup again.")
+            log("inherited from the launching app rather than owned by this binary.")
+            log("Clear the inherited grant in System Settings > Privacy & Security >")
+            log("Calendars (remove the entry for whichever app launched this), then run")
+            log("--setup again from a terminal.")
             return 1
 
         case .denied, .restricted, .writeOnly:

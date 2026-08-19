@@ -48,9 +48,13 @@ enum AuthorizationState: String, CaseIterable {
         case .denied:
             return """
                 Access was denied. Re-enable it in System Settings > Privacy & Security > \
-                Calendars, or reset the decision entirely with:
-                  tccutil reset Calendar \(Meta.bundleIdentifier)
-                then run --setup again.
+                Calendars, then run --setup again.
+
+                Note: `tccutil reset Calendar <bundle-id>` does NOT work for this tool. \
+                tccutil only accepts bundle identifiers, and our grant is keyed to the \
+                binary's absolute PATH, so it cannot find it. `tccutil reset Calendar` with \
+                no argument does work but resets EVERY app's calendar access, so prefer \
+                System Settings.
                 """
         case .writeOnly:
             return """
