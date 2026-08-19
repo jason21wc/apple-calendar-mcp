@@ -47,6 +47,17 @@
   `--grant` today, which is accurate but will go stale the moment the command is renamed.
   A published README describing a flag that no longer exists is worse than no README.
 
+- **#15 — CI on a macOS runner, once tests exist.** GitHub Actions running `swift build`,
+  `swift test`, `bash -n` on every script, and a grep gate for the recurring traps
+  (unguarded `| grep -q` under `pipefail`, unpinned PATH in scripts that invoke `codesign`
+  or `security`). Every defect found so far was caught by a human or an agent reading code;
+  none by automation. Signing and Calendar access cannot run in CI, so the matrix stops at
+  "builds, unit-tests pass, scripts parse".
+- **#16 — The `security-scan` skill is broken.** Invoking it fails with
+  `command not found: cmd` — a malformed shell substitution in the skill definition, not in
+  this project. It has never actually run here; the security coverage to date came from the
+  `security-auditor` agent instead. Either repair the skill or stop reaching for it.
+
 ## Deferred/Future — Discussion
 
 - **#4 — Bulk mutation.** Explicitly out of v1 (decision C5). Revisit only after the

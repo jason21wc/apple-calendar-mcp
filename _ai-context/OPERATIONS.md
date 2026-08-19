@@ -10,6 +10,7 @@
 
 | Cadence | What | Last run |
 |---|---|---|
+| Before every push (once tests exist) | `swift test` and `bash -n scripts/*.sh`. Three review rounds each found real defects in hand-verified code; the consistent failure was exercising only the path the author built |
 | Before every push | Re-run the sanitisation sweep across tracked files: the author's macOS username and absolute home paths, personal email addresses, the host terminal app's bundle identifier, other apps observed in the TCC database, and this machine's code-signing fingerprint. None belong in a public repo, and `_ai-context/` ships with it. Keep the search terms out of this file — a checklist that names what it scrubs leaks it |
 | Every phase exit | Re-read the phase's exit criteria in `docs/IMPLEMENTATION-PLAN.md` §15 and confirm each is objectively met before moving on | — |
 | Every EventKit claim | Verify against the local SDK headers and cite `file:line`. Never against Apple's web docs — they are JavaScript-rendered and unreadable to tooling | 2026-08-18 |
