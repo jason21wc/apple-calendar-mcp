@@ -62,6 +62,25 @@ observed zero children because the probe exits in milliseconds, which demonstrat
 It would have been easy to record it as green. **Rule:** when a test cannot exercise the
 condition, say so and carry it forward — a test that cannot fail is not evidence.
 
+**2026-08-19 — I wrote a security comment asserting a property the code did not have.**
+`// pid-bound, so it cannot be forged` sat on a check any parent defeats with `VAR=$$`. A
+security audit found it; the code review before it did not, because I had pointed that
+review at password handling. **Rule:** a comment claiming something *cannot* be done is a
+claim requiring proof. Write the bypass and run it before writing the comment.
+
+**2026-08-19 — An environment variable can never authenticate its own setter.** Every
+attempt to make one trustworthy (constants, then pid-binding) failed to the same one-line
+bypass. The fix was to stop asking the environment and ask the kernel. **Rule:** when state
+must be trusted, get it from the subsystem that owns it, not from something the caller
+hands you.
+
+**2026-08-19 — A flag that "works" may be working by accident.**
+`set-key-partition-list -s "$KEYCHAIN"` looked like `-s <keychain>`; `-s` actually takes no
+argument and the keychain was landing on a trailing positional. It worked, so it went
+unexamined — while silently rewriting every other signing key on the machine. **Rule:**
+read the usage string for any command touching keychains, signing, or permissions, even
+when the command already appears to work.
+
 ---
 
 ## Graduated Patterns

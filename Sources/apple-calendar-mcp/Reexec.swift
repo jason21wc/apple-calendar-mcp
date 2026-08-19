@@ -36,20 +36,56 @@ nonisolated(unsafe) private var supervisedChild: pid_t = 0
 
 enum Reexec {
 
-    /// Set in the child so it knows not to re-spawn again. The VALUE is the supervisor's
-    /// pid, and the child accepts it only when it matches its actual parent -- an ambient
-    /// `APPLE_CALENDAR_MCP_DISCLAIMED=1` left in a shell profile would otherwise make us
-    /// skip the re-exec and then report `disclaimed-child` while running under inherited
-    /// host responsibility. The probe's whole output would be a confident lie.
+    /// Recursion guard ONLY. This is not, and cannot be, evidence of disclaim state.
+    ///
+    /// An earlier version bound the value to the supervisor's pid and claimed that made it
+    /// unforgeable. That was wrong: every parent knows its own pid, so
+    /// `APPLE_CALENDAR_MCP_DISCLAIMED=$$` defeats it in one line. Worse, the delivery path is
+    /// exactly the actor the threat model names -- both Claude Code and Codex accept an
+    /// `env` block in their MCP server config, and those files are same-uid writable by the
+    /// coding agent this server talks to. A manipulated model could force inherited mode and
+    /// the tool would still report `disclaimed-child`, which would defeat the user's
+    /// revocation switch: turning off Calendar access for this binary would not stop it,
+    /// because it would be using the HOST's grant instead.
     static let marker = "APPLE_CALENDAR_MCP_DISCLAIMED"
 
-    /// Fork-bomb backstop, independent of the marker above.
+    /// Fork-bomb backstop. Also environment-controlled and therefore also untrusted, but a
+    /// parent that sets it only downgrades us to inherited mode, which `isDisclaimedChild`
+    /// then reports HONESTLY.
     static let depthKey = "APPLE_CALENDAR_MCP_REEXEC_DEPTH"
 
+    /// Are we our own responsible process? Asked of the kernel, not of the environment.
+    ///
+    /// This consults the same subsystem the disclaim manipulates, so it is ground truth: a
+    /// process that was NOT disclaimed reports its ancestor app as responsible, no matter
+    /// what any environment variable claims.
     static var isDisclaimedChild: Bool {
-        guard let raw = ProcessInfo.processInfo.environment[marker],
-              let claimedParent = pid_t(raw) else { return false }
-        return claimedParent == getppid()
+        guard let responsible = responsibleProcess(of: getpid()) else {
+            // Symbol unavailable: fall back to the environment hint, and treat the reported
+            // mode as unverified rather than asserting an identity we cannot confirm.
+            guard let raw = ProcessInfo.processInfo.environment[marker],
+                  let claimedParent = pid_t(raw) else { return false }
+            return claimedParent == getppid()
+        }
+        return responsible == getpid()
+    }
+
+    /// True when disclaim state was established from the kernel rather than inferred.
+    static var disclaimStateIsVerified: Bool { responsibleProcess(of: getpid()) != nil }
+
+    private typealias ResponsibleFn = @convention(c) (pid_t) -> pid_t
+
+    private static let responsibleFn: ResponsibleFn? = {
+        guard let handle = UnsafeMutableRawPointer(bitPattern: -2),
+              let sym = dlsym(handle, "responsibility_get_pid_responsible_for_pid")
+        else { return nil }
+        return unsafeBitCast(sym, to: ResponsibleFn.self)
+    }()
+
+    static func responsibleProcess(of pid: pid_t) -> pid_t? {
+        guard let fn = responsibleFn else { return nil }
+        let result = fn(pid)
+        return result > 0 ? result : nil
     }
 
     private static var reexecDepth: Int {
@@ -121,8 +157,11 @@ enum Reexec {
         sigfillset(&allSignalsDefaulted)
         posix_spawnattr_setsigmask(&attr, &noSignalsBlocked)
         posix_spawnattr_setsigdefault(&attr, &allSignalsDefaulted)
+        // 0x4000 is POSIX_SPAWN_CLOEXEC_DEFAULT (Darwin-only; not exposed in Swift's
+        // Darwin module, hence the literal).
+        let cloexecDefault: Int32 = 0x4000
         posix_spawnattr_setflags(&attr,
-            Int16(POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF))
+            Int16(POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF | cloexecDefault))
 
         // argv, NULL-terminated
         var argv: [UnsafeMutablePointer<CChar>?] = CommandLine.arguments.map { strdup($0) }
@@ -131,20 +170,42 @@ enum Reexec {
 
         // envp: our environment plus the marker, NULL-terminated
         var env = ProcessInfo.processInfo.environment
-        env[marker] = String(getpid())          // pid-bound, so it cannot be forged
+
+        // The hardened runtime strips DYLD_* already, but that protection exists only if
+        // sign.sh was actually run -- nothing in the build enforces it. Strip them here so
+        // the code is safe independently of the signing step.
+        for key in env.keys where key.hasPrefix("DYLD_") || key.hasPrefix("LD_")
+            || key.hasPrefix("NSZombie") || key.hasPrefix("Malloc") {
+            env.removeValue(forKey: key)
+        }
+        env[marker] = String(getpid())          // recursion hint only; never trusted as proof
         env[depthKey] = String(reexecDepth + 1)
         var envp: [UnsafeMutablePointer<CChar>?] = env.map { strdup("\($0.key)=\($0.value)") }
         envp.append(nil)
         defer { for p in envp where p != nil { free(p) } }
 
-        // No file actions: the child inherits our stdin/stdout/stderr directly, so the MCP
-        // stream passes through untouched.
+        // Close every inherited descriptor EXCEPT stdio. Without this the child -- which is
+        // about to acquire an independent Calendar identity -- inherits whatever the MCP
+        // client left open without O_CLOEXEC. adddup2(fd, fd) is the documented idiom for
+        // exempting a descriptor from POSIX_SPAWN_CLOEXEC_DEFAULT, so stdio still passes
+        // through byte-identically and the MCP stream is untouched.
+        var fileActions: posix_spawn_file_actions_t?
+        posix_spawn_file_actions_init(&fileActions)
+        defer { posix_spawn_file_actions_destroy(&fileActions) }
+        for fd in Int32(0)...Int32(2) {
+            posix_spawn_file_actions_adddup2(&fileActions, fd, fd)
+        }
+        // Installed BEFORE the spawn: a SIGTERM arriving between spawn and handler
+        // installation would kill the supervisor at default disposition and orphan a
+        // TCC-privileged child still holding the client's stdio. The handler no-ops while
+        // supervisedChild is still 0.
+        installSignalForwarding()
+
         var pid: pid_t = 0
-        let rc = posix_spawn(&pid, selfPath(), nil, &attr, argv, envp)
+        let rc = posix_spawn(&pid, selfPath(), &fileActions, &attr, argv, envp)
         guard rc == 0 else { return false }
 
         supervisedChild = pid
-        installSignalForwarding()
 
         var status: Int32 = 0
         var reaped: pid_t

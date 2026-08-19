@@ -23,11 +23,25 @@ credentials.
 > lands in the model's context. The safeguards below reduce the blast radius of a mistaken
 > or manipulated model and make each change reviewable. **They do not prevent it.**
 >
-> **The safeguards do not defend against a compromised machine.** The allowlist, the
-> journal and its snapshots are ordinary files owned by your user account. Anything running
-> as you — including the coding agent this server talks to — can edit or delete them
-> without going through this server at all. Same-uid containment is not achievable without
-> a privilege boundary this project does not have.
+> **The safeguards do not defend against a compromised machine — and the consequence is
+> worse than "they bypass the server".** The allowlist, the journal and its snapshots are
+> ordinary files owned by your user account. Anything running as you — including the coding
+> agent this server talks to — can edit or delete them without going through this server.
+>
+> More seriously, anything running as you can **become** this server. Setup installs a
+> code-signing certificate that signs without a password prompt, and macOS checks the
+> calendar grant against *identity plus path*, both of which are attacker-supplied. A
+> same-uid process can therefore compile its own binary, sign it silently with your
+> certificate, write it to the granted path, and hold Calendar access under this tool's
+> name — with no prompt, no journal entry, and nothing unusual in System Settings.
+>
+> **Install the binary somewhere only root can write** (`/usr/local/bin` is root-owned on
+> Apple Silicon; on Intel Macs with Homebrew it is often user-owned, which removes this
+> protection entirely — check with `ls -ld`). Never grant access to a binary inside
+> `.build`, which every `swift build` rewrites.
+>
+> Same-uid containment is not achievable without a privilege boundary this project does not
+> have.
 
 ## Status
 

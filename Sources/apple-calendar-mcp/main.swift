@@ -83,7 +83,12 @@ func sanitize(_ label: String) -> String {
 
 func writeProbe(label rawLabel: String, status: EKAuthorizationStatus, note: String) {
     let label = sanitize(rawLabel)
-    try? FileManager.default.createDirectory(at: stateDir, withIntermediateDirectories: true)
+    // 0700 now, before Phase 5 puts the mutation journal and full per-event pre-state
+    // snapshots here -- real calendar content, notes and attendee names. Default attributes
+    // would give 0755, and Data.write gives 0644.
+    try? FileManager.default.createDirectory(
+        at: stateDir, withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700])
 
     let ppid = getppid()
     let record: [String: Any] = [
@@ -105,7 +110,9 @@ func writeProbe(label rawLabel: String, status: EKAuthorizationStatus, note: Str
     do {
         let data = try JSONSerialization.data(withJSONObject: record,
                                               options: [.prettyPrinted, .sortedKeys])
-        try data.write(to: file)
+        try data.write(to: file, options: [.atomic])
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600],
+                                               ofItemAtPath: file.path)
         log("probe written -> \(file.path)")
     } catch {
         // The JSON file IS this tool's deliverable. Claiming one that does not exist would

@@ -128,6 +128,20 @@ agent that has filesystem write access and can reach them without going through 
 server at all. They defend against a *mistaken or manipulated* model, not a *compromised*
 one. Recorded rather than left implicit, per `meta-safety-transparent-limitations`.
 
+**Same-uid write means impersonation, not merely bypass.** Recorded 2026-08-19 after a
+security audit; this is a residual risk larger than the one previously named, and it was
+not among those accepted in `gov-cec3bcaf6e71` or `gov-f551d84f9142`. The setup chain
+assembles a silent code-signing oracle: `make-signing-cert.sh` installs a **trusted root
+for code signing**, `trust-signing-cert.sh` puts `codesign` on the key's partition list so
+signing needs **no password and no dialog**, the TCC designated requirement is
+**identity-based** (gotcha 26), and the grant is keyed to an **absolute path** (gotcha 25).
+Both halves of the requirement are attacker-supplied. Any same-uid process can compile,
+sign silently, write to the granted path, and hold Calendar access attributed to this
+tool — no prompt, no journal, nothing unusual in System Settings. The property that makes
+the design work (rebuilds keep the grant) is exactly what makes the grant stealable.
+Mitigation is deployment, not code: **install at a root-owned path and never grant to a
+binary inside `.build`.**
+
 **Host-side approval is not a control.** It is an assumption about the user's
 configuration that the server cannot observe. If a commit tool is allowlisted in
 `/permissions`, or the session runs with approvals bypassed, there is no prompt at all.
@@ -179,6 +193,8 @@ caching in v1.
 | 27 | The user TCC database at `~/Library/Application Support/com.apple.TCC/TCC.db` is readable with plain sqlite3 — no Full Disk Access needed — and is the **only** trustworthy way to tell whether a grant belongs to us or is inherited. `EKEventStore.authorizationStatus` cannot distinguish them. | 2026-08-19 |
 | 28 | **Gotcha 27 was wrong for our own process.** `TCC.db` is readable from a *terminal* because the terminal app has Full Disk Access, not because the file is generally readable. Our disclaimed binary holds only a Calendar grant, so it **cannot** read `TCC.db`. Any diagnostic depending on it degrades to "skipped". Same error class as gotchas 19-26: measured from a privileged context and assumed to generalise. | 2026-08-19 |
 | 29 | **The permission-free ownership test:** a disclaimed process is its own responsible process, so the authorization status it observes is its OWN grant and nothing inherited. Therefore `disclaimMode == "disclaimed-child" && status == .fullAccess` is proof of ownership, requiring no special privilege. This is what `--doctor` and `--setup` use; the `TCC.db` read is corroboration only. Proven in Phase 1: pre-grant the disclaimed child read `notDetermined` while the inherited path read `fullAccess`. | 2026-08-19 |
+| 30 | **An environment variable can never prove disclaim state.** A first attempt bound the marker to the supervisor's pid and claimed it was unforgeable; every parent knows its own pid, so `VAR=$$` defeated it in one line — and both Claude Code and Codex accept an `env` block in MCP server config, files a same-uid agent can write. Ground truth is `responsibility_get_pid_responsible_for_pid(getpid()) == getpid()`, asked of the kernel via `dlsym`. Verified: an environment-controlling attacker can now **downgrade** us to inherited mode but can no longer make us **lie** about it. | 2026-08-19 |
+| 31 | `security set-key-partition-list -s` is a boolean match filter taking **no argument**; the keychain is the trailing positional. Without `-l <label>` it matches **every** sign-capable key in the keychain and **replaces** each partition list rather than appending — silently breaking other applications' access to their own signing keys. Always scope with `-l`. | 2026-08-19 |
 
 | # | Gotcha | Date |
 |---|--------|------|

@@ -17,6 +17,12 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
+# Pin PATH: this script establishes a code-signing trust anchor. A user-writable directory
+# ahead of /usr/bin (npm, homebrew, conda all install there) could shim `security` and own
+# the operation outright.
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export PATH
+
 CERT_NAME="apple-calendar-mcp local signing"
 KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 CERT_PEM="$HOME/.local/state/apple-calendar-mcp/signing-cert.pem"
@@ -35,8 +41,17 @@ echo "    (security will ask for your login password itself)"
 # Deliberately NOT passing -k "$password". An argument vector is readable by every process
 # running as this user, and the login keychain password is the highest-value secret on the
 # machine. Letting `security` prompt on its own tty keeps it out of argv entirely.
+# -l "$CERT_NAME" scopes this to OUR key. Without it, -s matches EVERY sign-capable key in
+# the login keychain, and set-key-partition-list REPLACES a partition list rather than
+# appending -- so an unscoped run rewrites the partition lists of every other signing key
+# you own (Developer ID, S/MIME, client-auth), breaking other applications' access to their
+# own keys and granting codesign promptless access to keys unrelated to this project.
+#
+# Subtlety worth preserving: -s is a boolean match filter that takes NO argument. "$KEYCHAIN"
+# is consumed by the trailing positional [keychain] parameter, not by -s. Do not "fix" the
+# apparent mismatch.
 if PARTITION_ERR=$(security set-key-partition-list \
-        -S apple-tool:,apple:,codesign: -s "$KEYCHAIN" 2>&1 >/dev/null); then
+        -S apple-tool:,apple:,codesign: -s -l "$CERT_NAME" "$KEYCHAIN" 2>&1 >/dev/null); then
     echo "    partition list updated"
 else
     echo "    FAILED:"

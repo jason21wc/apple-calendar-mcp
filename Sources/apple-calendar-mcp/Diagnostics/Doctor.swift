@@ -46,8 +46,11 @@ enum Doctor {
 
         // 2. Are we our own responsible process? If not, any access we appear to have
         //    belongs to whoever launched us and vanishes under a different host.
+        let verified = Reexec.disclaimStateIsVerified
         checks.append(("privacy identity", disclaimMode == "disclaimed-child"
-            ? .ok("disclaimed-child -- this binary owns its own TCC identity")
+            ? (verified
+                ? .ok("disclaimed-child -- confirmed with the kernel, not inferred")
+                : .warn("disclaimed-child, but UNVERIFIED (responsibility API unavailable)"))
             : .warn("""
                 \(disclaimMode) -- running under the LAUNCHING app's identity. Any Calendar \
                 access shown below is inherited and will disappear under a different host.

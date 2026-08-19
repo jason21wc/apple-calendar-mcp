@@ -22,6 +22,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Pin PATH: this script creates the machine's code-signing trust anchor for this tool. A
+# shimmed `security`, `codesign` or `install` earlier in PATH would compromise it. (This is
+# also why OPENSSL below is an absolute path -- see the OpenSSL 3 note there.)
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export PATH
+
 CERT_NAME="apple-calendar-mcp local signing"
 KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 
