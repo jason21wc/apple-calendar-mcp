@@ -10,6 +10,7 @@
 
 | Cadence | What | Last run |
 |---|---|---|
+| Before every push | Re-run the sanitisation sweep: `grep -rniE "jasoncollier|@me\.com|warp|omnifocus|<cert-fingerprint>|/Users/"` across tracked files. The repo is public and `_ai-context/` ships with it |
 | Every phase exit | Re-read the phase's exit criteria in `docs/IMPLEMENTATION-PLAN.md` §15 and confirm each is objectively met before moving on | — |
 | Every EventKit claim | Verify against the local SDK headers and cite `file:line`. Never against Apple's web docs — they are JavaScript-rendered and unreadable to tooling | 2026-08-18 |
 | Every containment-control change | Run `evaluate_governance`, then write the amendment back to `PROJECT-MEMORY.md` **in the same turn**. Three controls once drifted because this was left for "later" | 2026-08-18 |

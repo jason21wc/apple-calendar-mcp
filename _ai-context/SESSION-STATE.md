@@ -12,9 +12,11 @@
 
 ## Current Position
 
-- **Phase:** **Phase 1 COMPLETE (gate passed after a design change).** Ready for Phase 2.
+- **Phase:** Phases 1 and 2 complete and published. **Phase 3 is next.**
 - **Mode:** Standard
-- **Active Task:** None in flight.
+- **Repo:** https://github.com/jason21wc/apple-calendar-mcp (public, Apache-2.0)
+- **Active Task:** None in flight. Phase 3 is the permission lifecycle: `AuthorizationState`,
+  `SetupFlow` (promote `--grant` to `--setup`), and `--doctor`.
 
 ## Quick Reference
 
@@ -55,7 +57,39 @@ attribute, making the child its own responsible process. Verified end to end.
 Binary currently granted at `<repo>/.build/arm64-apple-macosx/release/apple-calendar-mcp`.
 **Installing elsewhere will require a fresh `--setup` at the final path.**
 
-## Carry Into Phase 2
+## Published 2026-08-19
+
+Public at `github.com/jason21wc/apple-calendar-mcp`, Apache-2.0, copyright Jason Collier
+(personal, not Collier HMG). `_ai-context/` is published deliberately — the gotchas are the
+most valuable content in the repo. **Sanitised before publishing**: absolute home paths, the
+host terminal's bundle identifier, and this machine's certificate fingerprint were
+generalised. Keep it that way — re-check before each push.
+
+A code review before publishing found two real security defects in the setup scripts (the
+login password reaching argv, and a private key surviving Ctrl-C) plus a broken handoff
+between two scripts. All fixed; see LEARNING-LOG.
+
+## Phase 2 Result — gate passed
+
+Skeleton complete. `Command` enum with dispatch (`serve` / `--grant` / `--probe` /
+`--version` / `--help`), metadata read from the embedded Info.plist rather than hardcoded,
+and honest exit codes: 64 for a bad flag, 69 for `serve` (not implemented until Phase 4), so
+a client sees a real failure rather than a silent exit that looks like a crash.
+
+Gate: `__TEXT,__info_plist` present, entitlement verified on the signed binary, signature
+valid, stdout clean.
+
+## Carry Into Phase 3
+
+- `--doctor` must read `TCC.db` for a row matching **our own path**. `authorizationStatus`
+  cannot distinguish our grant from an inherited one, so a status-based check is worthless.
+- `--doctor` must report `disclaim_mode`; `inherited-*` means the re-exec is not working and
+  Calendar access belongs to the host.
+- `--grant` becomes `--setup`; it already warns that the grant is path-keyed.
+- Handle all **five** authorization states (`Authorized` is a deprecated alias for
+  `FullAccess`, runtime-indistinguishable).
+
+## Carry Into Phase 2 (complete)
 
 - `--setup` must run at the **final installed path**, never from `.build`.
 - Client configs must name that exact absolute path.

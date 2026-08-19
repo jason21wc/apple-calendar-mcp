@@ -115,17 +115,16 @@ func writeProbe(label rawLabel: String, status: EKAuthorizationStatus, note: Str
     log("status=\(describe(status)) parent=\(processPath(ppid)) mode=\(disclaimMode)")
 }
 
-// MARK: - Modes
+// MARK: - Dispatch
 
-let args = Array(CommandLine.arguments.dropFirst())
 let store = EKEventStore()
 
-switch args.first {
+switch Command.parse(Array(CommandLine.arguments.dropFirst())) {
 
-case "--grant":
-    // Run this from Terminal, in the foreground. A TCC prompt needs a foreground process;
-    // a stdio-spawned server cannot reliably present one, which is why permission setup is
-    // a CLI command and never an MCP tool.
+case .grant:
+    // Must run in a foreground terminal. A TCC prompt cannot be presented reliably by a
+    // process an MCP client spawned over stdio, which is why this is a command and not a
+    // tool.
     let before = EKEventStore.authorizationStatus(for: .event)
     log("status before request: \(describe(before))")
 
@@ -138,32 +137,41 @@ case "--grant":
         }
     } else {
         log("not requesting -- status is already decided. Reset with:")
-        let bundleID = Bundle.main.bundleIdentifier ?? "<unknown>"
-        log("  tccutil reset Calendar \(bundleID)")
+        log("  tccutil reset Calendar \(Meta.bundleIdentifier)")
     }
 
     let after = EKEventStore.authorizationStatus(for: .event)
     writeProbe(label: "grant", status: after, note: "interactive grant attempt from a terminal")
     log("status after request: \(describe(after))")
 
-case "--probe":
-    let label = args.count > 1 ? args[1] : "manual"
+    // The grant is keyed to this exact path; saying so here is cheaper than diagnosing it
+    // later, when the failure will be silent.
+    log("granted to: \(Meta.executablePath)")
+    log("moving or reinstalling this binary requires running --grant again")
+
+case .probe(let label):
     writeProbe(label: label,
                status: EKEventStore.authorizationStatus(for: .event),
                note: "explicit probe; no permission request made")
 
-case .some(let unknown) where unknown.hasPrefix("-"):
-    log("unknown option: \(unknown)")
-    log("usage: apple-calendar-mcp [--grant | --probe <label>]")
-    log("note: --setup and --doctor are Phase 3; they do not exist yet")
+case .version:
+    printVersion()
+
+case .help:
+    printHelp()
+
+case .unknown(let flag):
+    log("unknown option: \(flag)")
+    printHelp()
     exit(64)   // EX_USAGE
 
-default:
-    // No arguments is how an MCP client launches us. The real server will speak JSON-RPC
-    // here. For now: record who spawned us and exit. The client will report a failed
-    // connection -- expected, and not what we are measuring.
+case .serve:
+    // Phase 4 replaces this with the MCP server loop. When it does, that loop MUST treat
+    // stdin EOF as unconditional shutdown -- it is the only defence against the supervisor
+    // being SIGKILLed, which no signal handler can cover (BACKLOG #12).
     writeProbe(label: "spawned",
                status: EKEventStore.authorizationStatus(for: .event),
-               note: "launched with no arguments, as an MCP client would; not yet a server")
-    log("Phase 1 probe only -- no MCP server yet. Exiting.")
+               note: "launched with no arguments, as an MCP client would; server not yet implemented")
+    log("no MCP server yet -- this is Phase 2 of 7. Run --help for available commands.")
+    exit(69)   // EX_UNAVAILABLE: honest failure, rather than a silent exit a client reads as a crash
 }
