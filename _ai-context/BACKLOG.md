@@ -29,11 +29,11 @@
 
 - **#11 — Verify supervisor/child orphan behaviour under SIGTERM and SIGKILL.** Signal
   forwarding is implemented in `Reexec.swift` but **could not be empirically confirmed** —
-  the Phase 1 probe exits in milliseconds, so there is no live child to observe. Test in
-  Phase 2 with a long-running server: `kill -TERM` and `kill -KILL` the supervisor, then
+  the probe exits in milliseconds, so there is no live child to observe. Requires a
+  long-running process, so test in **Phase 4** when the server loop exists: `kill -TERM` and `kill -KILL` the supervisor, then
   check with `ps -o pid,ppid,pgid` that no child survives holding the client's stdout pipe.
   A surviving orphan means a Calendar-authorized process the client thinks is dead.
-- **#12 — Phase 2 server loop MUST treat stdin EOF as unconditional shutdown.** This is the
+- **#12 — The Phase 4 server loop MUST treat stdin EOF as unconditional shutdown.** This is the
   only defence against the SIGKILL case, which no signal handler can cover: stdin is
   inherited directly, so the client's pipe closure reaches the child even when the
   supervisor is already gone.
@@ -42,6 +42,10 @@
   consumed via `.package(url:)` — clone-and-build only. Fine if that is the intended
   distribution, but it should be a stated decision, and the `-sectcreate` path is relative
   to the invoker's cwd so builds must run from the package root.
+
+- **#14 — Update README when `--grant` becomes `--setup` in Phase 3.** The README documents
+  `--grant` today, which is accurate but will go stale the moment the command is renamed.
+  A published README describing a flag that no longer exists is worse than no README.
 
 ## Deferred/Future — Discussion
 
