@@ -12,7 +12,7 @@
 
 ## Current Position
 
-- **Phase:** Phases 1-3 complete and published. **Phase 4 is next** (read surface).
+- **Phase:** Phases 1-3 complete, published, and security-audited. **Phase 4 is next.**
 - **Mode:** Standard
 - **Repo:** https://github.com/jason21wc/apple-calendar-mcp (public, Apache-2.0)
 - **Active Task:** None in flight. Phase 4 is the read surface: DTOs, schemas,
@@ -23,7 +23,9 @@
 | Metric | Value |
 |--------|-------|
 | Project | **apple-calendar-mcp** |
-| Code written | Phase 1 probe + `Reexec.swift` + 3 scripts |
+| Code written | Probe, `Reexec`, `CLI`, `AuthorizationState`, `TCCInspector`, `Doctor`, `SetupFlow`, 3 scripts |
+| Installed at | `/usr/local/bin/apple-calendar-mcp` (root:wheel), granted, `--doctor` clean |
+| Security audit | Complete — 3 HIGH, 4 MEDIUM, 5 LOW; all HIGH and MEDIUM fixed |
 | Builds | Clean, no warnings |
 | Signed | Yes — stable self-signed cert, entitlement, hardened runtime |
 | TCC identity | **Own row confirmed** (path-keyed) |
@@ -123,6 +125,20 @@ naming the path to fix it; `--setup` under inherited identity → refuses.
   our own path (read `TCC.db`, not `authorizationStatus` — status cannot tell them apart),
   and say plainly when the grant belongs to a different path.
 - Signing needs one interactive keychain setup per machine before it works unattended.
+
+## Open Cleanup (needs the GUI, cannot be scripted)
+
+A stale Calendar grant still points at
+`<repo>/.build/arm64-apple-macosx/release/apple-calendar-mcp`. That path is user-writable
+and rewritten by every build, so while the row exists any same-uid process can drop a binary
+there, sign it silently with the local certificate, and hold Calendar access under this
+tool's name.
+
+**Remove it in System Settings > Privacy & Security > Calendars.** `tccutil` cannot: the
+grant is path-keyed and tccutil accepts bundle identifiers only (gotcha 32). The bare
+`tccutil reset Calendar` form works but wipes every application's calendar access.
+
+The good grant — `/usr/local/bin/apple-calendar-mcp` — is unaffected and should stay.
 
 ## Blocked On (human decisions)
 
