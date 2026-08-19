@@ -121,33 +121,11 @@ let store = EKEventStore()
 
 switch Command.parse(Array(CommandLine.arguments.dropFirst())) {
 
-case .grant:
-    // Must run in a foreground terminal. A TCC prompt cannot be presented reliably by a
-    // process an MCP client spawned over stdio, which is why this is a command and not a
-    // tool.
-    let before = EKEventStore.authorizationStatus(for: .event)
-    log("status before request: \(describe(before))")
+case .setup:
+    exit(await SetupFlow.run(store: store))
 
-    if before == .notDetermined {
-        do {
-            let granted = try await store.requestFullAccessToEvents()
-            log("requestFullAccessToEvents returned granted=\(granted)")
-        } catch {
-            log("requestFullAccessToEvents threw: \(error.localizedDescription)")
-        }
-    } else {
-        log("not requesting -- status is already decided. Reset with:")
-        log("  tccutil reset Calendar \(Meta.bundleIdentifier)")
-    }
-
-    let after = EKEventStore.authorizationStatus(for: .event)
-    writeProbe(label: "grant", status: after, note: "interactive grant attempt from a terminal")
-    log("status after request: \(describe(after))")
-
-    // The grant is keyed to this exact path; saying so here is cheaper than diagnosing it
-    // later, when the failure will be silent.
-    log("granted to: \(Meta.executablePath)")
-    log("moving or reinstalling this binary requires running --grant again")
+case .doctor:
+    exit(Doctor.run())
 
 case .probe(let label):
     writeProbe(label: label,

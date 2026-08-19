@@ -10,7 +10,8 @@ import Foundation
 
 enum Command {
     case serve                    // default; how an MCP client launches us
-    case grant                    // interactive permission request (Phase 3: --setup)
+    case setup                    // interactive permission request; must run in a terminal
+    case doctor                   // explain why access is or is not working
     case probe(label: String)     // diagnostic record, used to answer Phase 1
     case version
     case help
@@ -19,7 +20,9 @@ enum Command {
     static func parse(_ args: [String]) -> Command {
         guard let first = args.first else { return .serve }
         switch first {
-        case "--grant":            return .grant
+        case "--setup":            return .setup
+        case "--grant":            return .setup   // pre-0.2 name, kept working
+        case "--doctor":           return .doctor
         case "--probe":            return .probe(label: args.count > 1 ? args[1] : "manual")
         case "--version", "-v":    return .version
         case "--help", "-h":       return .help
@@ -53,7 +56,8 @@ func printHelp() {
         stdio -- that is how Claude Code and Codex launch it.
 
           (no arguments)     serve over stdio
-          --grant            request Calendar access (run this in a terminal)
+          --setup            request Calendar access (run this in a terminal)
+          --doctor           diagnose why access is or is not working
           --probe <label>    write a diagnostic record to ~/.local/state/apple-calendar-mcp
           --version          print version and identity
           --help             this text

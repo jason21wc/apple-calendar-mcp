@@ -12,11 +12,11 @@
 
 ## Current Position
 
-- **Phase:** Phases 1 and 2 complete and published. **Phase 3 is next.**
+- **Phase:** Phases 1-3 complete and published. **Phase 4 is next** (read surface).
 - **Mode:** Standard
 - **Repo:** https://github.com/jason21wc/apple-calendar-mcp (public, Apache-2.0)
-- **Active Task:** None in flight. Phase 3 is the permission lifecycle: `AuthorizationState`,
-  `SetupFlow` (promote `--grant` to `--setup`), and `--doctor`.
+- **Active Task:** None in flight. Phase 4 is the read surface: DTOs, schemas,
+  `CalendarStore` actor, `TimeSemantics`, `Limits`, and five read tools.
 
 ## Quick Reference
 
@@ -79,7 +79,33 @@ a client sees a real failure rather than a silent exit that looks like a crash.
 Gate: `__TEXT,__info_plist` present, entitlement verified on the signed binary, signature
 valid, stdout clean.
 
-## Carry Into Phase 3
+## Phase 3 Result — gate passed
+
+`AuthorizationState` (five states, `.writeOnly` handled distinctly), `TCCInspector`,
+`Doctor`, `SetupFlow`. `--grant` is now `--setup` and the old name still works.
+
+**Design correction found while building:** the plan had `--doctor` compare cdhashes. That
+is the wrong check — rebuilds keep the grant; what breaks it is the **path** changing. And
+`TCC.db` turned out to be unreadable by our own binary (needs Full Disk Access, which the
+terminal has and we do not). The replacement is better and needs no privilege: a disclaimed
+process sees only its own grant, so `disclaimed-child` + `fullAccess` **is** proof of
+ownership. See gotchas 28-29.
+
+`--setup` refuses to proceed under inherited identity, which structurally prevents the exact
+Phase 1 failure — granting to the terminal instead of to us.
+
+Verified failure paths: inherited identity → exit 1; binary at an ungranted path → exit 1
+naming the path to fix it; `--setup` under inherited identity → refuses.
+
+## Carry Into Phase 4
+
+- Server loop MUST treat stdin EOF as unconditional shutdown (BACKLOG #12).
+- Orphan behaviour under SIGTERM/SIGKILL is still **unverified** — needs the long-running
+  server to test (BACKLOG #11).
+- Refuse to serve when `--doctor` would fail: serving without an owned grant produces
+  silent, confusing failures for the user.
+
+## Carry Into Phase 3 (complete)
 
 - `--doctor` must read `TCC.db` for a row matching **our own path**. `authorizationStatus`
   cannot distinguish our grant from an inherited one, so a status-based check is worthless.
