@@ -1,0 +1,22 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved.bak
+*.xcodeproj
+
+# Local Claude Code settings (machine-specific permissions etc.)
+.claude/
+
+# macOS
+.DS_Store
+
+# Local signing material. The private key lives in the login keychain, never here, but
+# keep exported certificates out of the repo regardless -- each machine generates its own
+# via scripts/make-signing-cert.sh.
+*.p12
+*.pem
+signing-cert.*
+
+# Runtime state: probe records, mutation journal, setup fingerprints. These contain
+# calendar-derived data and absolute paths. They belong in ~/.local/state, never in git.
+probe-*.json

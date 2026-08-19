@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    DO NOT REMOVE com.apple.security.personal-information.calendars.
+
+    On macOS 26.5, tccd refuses to show ANY Calendar prompt for a hardened-runtime binary
+    that lacks this entitlement. The log reads:
+
+        Prompting policy for hardened runtime; service: kTCCServiceCalendar
+        requires entitlement com.apple.security.personal-information.calendars
+        but it is missing. Policy disallows prompt, access denied.
+
+    The failure is SILENT and PERMANENT. The re-prompt is policy-blocked while every
+    authorization-status API still reports green. This entitlement is unrestricted: no
+    provisioning profile and no special notarization are required.
+
+    Note for editors: XML comments may not contain a double hyphen. AMFI's entitlement
+    parser rejects the whole file if one appears, with only a line number to go on.
+
+    Source: incident notes in PsychQuant/che-ical-mcp Entitlements.plist (MIT). Reasoning
+    adopted as an idea; no code copied.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
+</dict>
+</plist>
