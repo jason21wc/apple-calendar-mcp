@@ -1,11 +1,21 @@
 #!/bin/bash
 # Create a STABLE self-signed code-signing certificate in the login keychain.
 #
-# Why not ad-hoc (`codesign -s -`)? TCC pins the Calendar grant to the binary's cdhash via
-# its designated requirement. An ad-hoc signature carries no stable identity, so every
-# `swift build` produces a binary macOS treats as a different program -- and the grant is
-# lost. Silently, per the note in Entitlements.plist. Hundreds of lost grants during
-# development, and one on every consumer's `git pull && swift build`.
+# Why not ad-hoc (`codesign -s -`)? Because of what the Calendar grant is checked against.
+# TCC stores a designated requirement alongside the grant. Signed with a certificate, that
+# requirement reads:
+#
+#     identifier "<bundle id>" and certificate root = H"<cert hash>"
+#
+# which is IDENTITY-based, so any later build signed by the same certificate still
+# satisfies it and the grant survives rebuilds (measured across a real cdhash change).
+# An ad-hoc signature has no certificate, so the requirement falls back to the cdhash --
+# which changes on every `swift build`. The grant is then lost silently, per the note in
+# Entitlements.plist: hundreds of times during development, and once on every consumer's
+# `git pull && swift build`.
+#
+# Separately: the grant is keyed to the binary's ABSOLUTE PATH, so a stable certificate
+# does not save you from moving or reinstalling the binary. Re-run --grant at the new path.
 #
 # Run once per machine. Idempotent.
 
