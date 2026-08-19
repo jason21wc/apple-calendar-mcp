@@ -81,6 +81,13 @@ unexamined — while silently rewriting every other signing key on the machine. 
 read the usage string for any command touching keychains, signing, or permissions, even
 when the command already appears to work.
 
+**2026-08-19 — A broken assertion is worse than no assertion.** Converting `sign.sh` from
+printing the entitlement to asserting it introduced a check that failed on correctly signed
+binaries, because `grep -q` plus `pipefail` turns a match into a non-zero pipeline. Had I
+only tested the passing case I would have shipped a build gate that blocks every good
+build. **Rule:** test a new guard in BOTH directions — that it passes what should pass and
+fires on what should fail — before trusting it.
+
 ---
 
 ## Graduated Patterns

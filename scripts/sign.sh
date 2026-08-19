@@ -56,6 +56,27 @@ codesign --force --options runtime --timestamp=none \
 echo "==> Verifying"
 codesign --verify --strict --verbose=2 "$BIN"
 
+# ASSERT, do not merely display. A hardened-runtime binary missing the calendars
+# entitlement gets no Calendar prompt at all on macOS 26.5 -- silently and permanently,
+# while every status API still reports green. A build that signs wrongly must fail loudly
+# here rather than surface hours later as an unexplained denial.
+# Capture first, then match. `grep -q` closes the pipe early, which hands codesign a
+# SIGPIPE -- and under `set -o pipefail` that turns a SUCCESSFUL check into a failed
+# pipeline, firing the guard on a correctly signed binary.
+SIGNED_ENTITLEMENTS="$(codesign -d --entitlements - --xml "$BIN" 2>/dev/null | plutil -p - 2>/dev/null || true)"
+if ! printf '%s' "$SIGNED_ENTITLEMENTS" | grep -q "com.apple.security.personal-information.calendars"; then
+    echo "FAILED: the calendars entitlement is missing from the signed binary."
+    echo "Without it, macOS will silently refuse to ever show a Calendar prompt."
+    exit 1
+fi
+
+SIGNED_FLAGS="$(codesign -dv "$BIN" 2>&1 || true)"
+if ! printf '%s' "$SIGNED_FLAGS" | grep -q "flags=.*runtime"; then
+    echo "FAILED: the hardened runtime is not enabled on the signed binary."
+    exit 1
+fi
+echo "    entitlement and hardened runtime asserted"
+
 echo
 echo "--- identity ---"
 codesign -dv "$BIN" 2>&1 | grep -E "Identifier|Authority|CodeDirectory|TeamIdentifier" || true
