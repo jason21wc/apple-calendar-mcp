@@ -5,11 +5,14 @@
 **Framework:** AI Coding Methods (current version)
 **Mode:** Standard
 
-> **Start here.** Nothing is built yet — planning only. Read
-> `_ai-context/PROJECT-MEMORY.md` (containment controls C1-C6, 18 header-verified gotchas,
-> open questions), then `docs/IMPLEMENTATION-PLAN.md` (rev. 3, approved). Next work is
-> Phase 1: the TCC spawn-path gate. Four human decisions are pending — see
-> `_ai-context/SESSION-STATE.md` → Blocked On.
+> **Start here.** Phases 1-3 are built, tested and published; **Phase 4 (read surface) is
+> next**. Read `_ai-context/PROJECT-MEMORY.md` (containment controls C1-C6, 43 gotchas — most
+> of them measured platform behaviour that will cost you hours if rediscovered), then
+> `docs/IMPLEMENTATION-PLAN.md` (rev. 5).
+>
+> Two things to know before touching anything: the Calendar grant is keyed to the binary's
+> **absolute path**, and the server only owns that grant because it re-spawns itself with a
+> disclaim attribute at startup. Run `./scripts/test.sh`, not `swift test`.
 
 ## Memory Files
 

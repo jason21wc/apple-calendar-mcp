@@ -17,8 +17,8 @@
 |------|--------|------|-------|
 | Specify | Complete | 2026-08-17 | Founding context + containment controls |
 | Plan | Complete | 2026-08-18 | rev. 3 approved; 3 independent reviews folded in |
-| Implement | Pending | | |
-| Validate | Pending | | |
+| Implement | In progress | 2026-08-19 | Phases 1-3 complete and published; Phase 4 next |
+| Validate | In progress | 2026-08-19 | 63 tests green; security audit closed |
 
 ## Founding Context
 
@@ -60,8 +60,9 @@ the write-capability decision below on that basis.
 ## Spec Summary
 
 Native Swift stdio MCP server over EventKit, three internal layers — **`MCPLayer` →
-`CalendarKit` → `EventKitAdapter`** (these names become directory names; use them
-consistently). EventKit framework objects never leave the adapter boundary and are
+`CalendarKit` → `EventKitAdapter`** as conceptual layers. On disk they are
+`Sources/apple-calendar-mcp/{MCP,Calendar,EventKit,Diagnostics}` — the directory names do NOT
+mirror the layer names, and the on-disk scheme wins. EventKit framework objects never leave the adapter boundary and are
 converted to immutable DTOs before crossing it. `EKEventStore` is confined to one
 dedicated thread behind an actor.
 
@@ -88,7 +89,8 @@ dedicated thread behind an actor.
 | Undo stays model-callable rather than CLI-only | 2026-08-18 | Adversarial review recommended demoting undo to a CLI command outside the model's reach. Overruled by the human: it must work in Cowork, where there is no terminal, and model-driven undo is already in use for QuickBooks and Excel. Kept behind guards (see C4a) rather than removed. **Premise still unverified — see Open Questions.** |
 | Occurrence addressing uses `occurrenceDate`, not start date | 2026-08-18 | Header-verified: `occurrenceDate` "will remain the same even if the event has been detached and its start date has changed". Using start would break exactly the detached-occurrence case. Composite key is `(eventIdentifier, occurrenceDate)`. `eventIdentifier` is chosen because it is the only identifier with a store lookup API — **not** because it is stable; it too can change on calendar move and on sync. |
 | Every mutation, including create, is proposed then committed | 2026-08-18 | An earlier draft left `create` outside the guarded path while claiming there was only one destructive call. Creating an event with attendees sends invitations — the same irreversible outbound act C6 exists to prevent. One guarded `commit()` implementation, reached through four thin separately-allowlistable tool names so a single "always allow" cannot authorize every destructive operation at once. |
-| **Self-disclaiming re-exec is required architecture** | 2026-08-19 | Human decision after Phase 1 measured that a plain executable never earns its own TCC identity, and that an `.app` wrapper does not fix it either (gotcha 19). Alternatives considered: accept inherited permission from the host app (simplest, but grants calendar access to the whole terminal, needs a separate grant per client, and depends on the host having a calendar usage string); ship read-only (does not help — attribution applies to reads too). Chosen because it is the only option where "grant access to apple-calendar-mcp" means what it says, which matters most for the public-release audience whose hosts we cannot predict. Cost: one private API behind `dlsym`, a thin supervisor process, and stdio passed through untouched. | | Implementation sourced from Apple's own guidance; reference repos used for comparison only | 2026-08-17 | Build against Apple documentation as the primary source. Consult `che-ical-mcp` / `orchard-mcp` only to find concerns Apple's guidance does not cover, and to compare approaches. Adopting an *idea* is unrestricted; copying *expression* creates an obligation. Any actual borrowing must be flagged to the human at the time, with attribution and license implications, before it lands. |
+| **Self-disclaiming re-exec is required architecture** | 2026-08-19 | Human decision after Phase 1 measured that a plain executable never earns its own TCC identity, and that an `.app` wrapper does not fix it either (gotcha 19). Alternatives considered: accept inherited permission from the host app (simplest, but grants calendar access to the whole terminal, needs a separate grant per client, and depends on the host having a calendar usage string); ship read-only (does not help — attribution applies to reads too). Chosen because it is the only option where "grant access to apple-calendar-mcp" means what it says, which matters most for the public-release audience whose hosts we cannot predict. Cost: one private API behind `dlsym`, a thin supervisor process, and stdio passed through untouched. |
+| Implementation sourced from Apple's own guidance; reference repos used for comparison only | 2026-08-17 | Build against Apple documentation as the primary source. Consult `che-ical-mcp` / `orchard-mcp` only to find concerns Apple's guidance does not cover, and to compare approaches. Adopting an *idea* is unrestricted; copying *expression* creates an obligation. Any actual borrowing must be flagged to the human at the time, with attribution and license implications, before it lands. |
 
 ## Tech Stack
 

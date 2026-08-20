@@ -43,10 +43,6 @@
   distribution, but it should be a stated decision, and the `-sectcreate` path is relative
   to the invoker's cwd so builds must run from the package root.
 
-- **#14 — Update README when `--grant` becomes `--setup` in Phase 3.** The README documents
-  `--grant` today, which is accurate but will go stale the moment the command is renamed.
-  A published README describing a flag that no longer exists is worse than no README.
-
 - **#15 — CI on a macOS runner, once tests exist.** GitHub Actions running `swift build`,
   `swift test`, `bash -n` on every script, and a grep gate for the recurring traps
   (unguarded `| grep -q` under `pipefail`, unpinned PATH in scripts that invoke `codesign`

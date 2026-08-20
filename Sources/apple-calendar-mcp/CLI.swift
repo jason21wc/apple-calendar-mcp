@@ -69,8 +69,11 @@ func printHelp() {
           --version          print version and identity
           --help             this text
 
+        --grant is accepted as the former name for --setup, so existing scripts keep working.
+        Prefer --setup.
+
         Calendar access is granted to this binary at its ABSOLUTE PATH. Install it where it
-        will live permanently, then run --grant there; moving it afterwards loses access.
+        will live permanently, then run --setup there; moving it afterwards loses access.
         """)
 }
 

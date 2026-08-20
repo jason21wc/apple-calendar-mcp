@@ -29,7 +29,7 @@
 | Builds | Clean, no warnings |
 | Signed | Yes — stable self-signed cert, entitlement, hardened runtime |
 | TCC identity | **Own row confirmed** (path-keyed) |
-| Plan | rev. 3, approved 2026-08-18 |
+| Plan | rev. 5, approved 2026-08-19 |
 | Containment controls | C1-C6 (C6 pending confirmation) |
 | Governance audits | 5 logged; latest `gov-f551d84f9142` |
 | Tool surface | 14 (6 read, 4 propose, 4 commit) |
@@ -56,8 +56,9 @@ attribute, making the child its own responsible process. Verified end to end.
 | Rebuild, same path, new cdhash | Grant **survives** (identity-based designated requirement) |
 | Same binary, different path | Grant **lost** (`client_type=1`, path-keyed) |
 
-Binary currently granted at `<repo>/.build/arm64-apple-macosx/release/apple-calendar-mcp`.
-**Installing elsewhere will require a fresh `--setup` at the final path.**
+**Superseded:** the `.build` grant was revoked 2026-08-19. The only live grant is
+`/usr/local/bin/apple-calendar-mcp` (root-owned). Installing elsewhere requires a fresh
+`--setup` at that path — the grant is path-keyed.
 
 ## Published 2026-08-19
 
@@ -153,15 +154,15 @@ round that found the first fix had reinstated the bypass it replaced.
 
 **`docs/IMPLEMENTATION-PLAN.md`** (rev. 3) — approved 2026-08-18, copied into the repo so
 it survives session restarts. Read it before touching code: tool contract, field-level
-schemas, the nine guards, recurrence semantics, phase gates. Summaries live in
+schemas, the guard set (under review — see plan §4), recurrence semantics, phase gates. Summaries live in
 `ARCHITECTURE.md` and `SPECIFICATION.md`; the plan is authoritative where they differ.
 
 ## Resuming After a Restart
 
-1. Read `AGENTS.md` → `_ai-context/PROJECT-MEMORY.md` (controls C1-C6, 18 gotchas, open
+1. Read `AGENTS.md` → `_ai-context/PROJECT-MEMORY.md` (controls C1-C6, 43 gotchas, open
    questions) → `docs/IMPLEMENTATION-PLAN.md`.
-2. Nothing is built yet. No `Package.swift`, no sources. Next work is Phase 1.
-3. Four decisions are waiting on the human — see Blocked On below.
+2. Phases 1-3 are built, tested and published. Next work is **Phase 4** (read surface).
+3. See Blocked On below for what needs a human.
 
 ## Session Summary
 
@@ -185,6 +186,11 @@ approval under C1-C5 · `gov-f551d84f9142` REVIEW amending C1/C2/C3, carving out
 C6, and recording the same-uid residual risk. Reasoning traces logged against each ID.
 
 ## Next Actions
+
+1. **Phase 4 — read surface.** Five read tools, DTOs, schemas, the CalendarStore actor,
+   time semantics, and stdin-EOF shutdown. See plan §5.
+
+<details><summary>Superseded next-actions</summary>
 
 1. **Phase 2 — Skeleton.** Promote the probe into the real package: arg dispatch,
    `--version`, and keep `Reexec` as the first thing `main` does. Gate: `otool -s __TEXT

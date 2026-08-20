@@ -1,8 +1,8 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # Architecture
 
-**Status:** Designed, not yet built. Full detail in `docs/IMPLEMENTATION-PLAN.md` (rev. 3,
-approved 2026-08-18). This file is the summary; the plan is authoritative.
+**Status:** Phases 1-3 built, tested and published; Phase 4 (read surface) next. Full detail
+in `docs/IMPLEMENTATION-PLAN.md` (rev. 5). This file is the summary; the plan is authoritative.
 
 ---
 

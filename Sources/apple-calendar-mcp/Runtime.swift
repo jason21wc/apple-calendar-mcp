@@ -52,10 +52,18 @@ enum Runtime {
     /// configuration rather than of model behaviour -- the model cannot argue its way past a
     /// value it never sees and cannot set.
     ///
-    /// This exists because the human approval prompt is the only real gate, and some hosts
-    /// do not have one. Scheduled and autonomous surfaces (Cowork tasks) can run with no
-    /// human present, so "the host will ask" is not true there. Configure those hosts
-    /// read-only and the question does not arise.
+    /// What this IS: a real reduction against a mistaken or manipulated model. Withheld tools
+    /// never appear in `tools/list`, so injected calendar text has nothing to name.
+    ///
+    /// What this is NOT: a boundary. argv comes from client config files
+    /// (`claude_desktop_config.json`, `.mcp.json`, `~/.codex/config.toml`) that a same-uid
+    /// agent can write, and clients respawn stdio servers with no human action -- so an
+    /// attacker edits the config, drops the flag, and waits. If a host must be truly
+    /// write-incapable, the honest mechanism is a separate install with write support
+    /// compiled out, at its own path (the TCC grant is path-keyed, so it needs its own grant).
+    ///
+    /// An earlier version of this comment claimed configuring a host read-only meant "the
+    /// question does not arise". It arises.
     ///
     /// Deliberately shipped BEFORE any write tool exists: a client configured today keeps
     /// its restriction when write tools arrive, instead of silently gaining them.
