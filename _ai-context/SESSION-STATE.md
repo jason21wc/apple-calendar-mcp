@@ -126,19 +126,19 @@ naming the path to fix it; `--setup` under inherited identity → refuses.
   and say plainly when the grant belongs to a different path.
 - Signing needs one interactive keychain setup per machine before it works unattended.
 
-## Open Cleanup (needs the GUI, cannot be scripted)
+## Security Posture (closed 2026-08-19)
 
-A stale Calendar grant still points at
-`<repo>/.build/arm64-apple-macosx/release/apple-calendar-mcp`. That path is user-writable
-and rewritten by every build, so while the row exists any same-uid process can drop a binary
-there, sign it silently with the local certificate, and hold Calendar access under this
-tool's name.
+The stale `.build` Calendar grant is **revoked** (auth_value 0); `/usr/local/bin/apple-calendar-mcp`
+holds the only live grant. That closes the impersonation exposure the audit found: a
+user-writable path with a Calendar grant, combined with a certificate that signs without a
+prompt, let any same-uid process hold calendar access under this tool's name.
 
-**Remove it in System Settings > Privacy & Security > Calendars.** `tccutil` cannot: the
-grant is path-keyed and tccutil accepts bundle identifiers only (gotcha 32). The bare
-`tccutil reset Calendar` form works but wipes every application's calendar access.
+Note for anyone repeating this: System Settings shows the display name only, so two grants
+for the same binary at different paths are visually identical. Distinguish them by querying
+`TCC.db`; `tccutil` cannot target either (gotcha 32).
 
-The good grant — `/usr/local/bin/apple-calendar-mcp` — is unaffected and should stay.
+Audit outcome: 3 HIGH, 4 MEDIUM, 5 LOW — all HIGH and MEDIUM fixed, plus a second review
+round that found the first fix had reinstated the bypass it replaced.
 
 ## Blocked On (human decisions)
 
