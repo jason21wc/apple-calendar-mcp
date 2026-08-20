@@ -81,10 +81,10 @@ actor CalendarStore {
                 includeFields: Set<String>, zone: TimeZone,
                 limit: Int) -> (items: [EventDTO], total: Int) {
         let all = store.calendars(for: .event)
-        let scoped = calendarIds.map { ids in all.filter { ids.contains($0.calendarIdentifier) } }
-        // nil means "every calendar"; an EMPTY array must mean "none", not "every". Passing
-        // an empty array to the predicate would silently widen the search.
-        if let scoped, scoped.isEmpty { return ([], 0) }
+        let scope = CalendarScope.resolve(requested: calendarIds,
+                                          available: all.map(\.calendarIdentifier))
+        if scope.matchesNothing { return ([], 0) }
+        let scoped = scope.selectedIds.map { ids in all.filter { ids.contains($0.calendarIdentifier) } }
 
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: scoped ?? all)
         let matched = store.events(matching: predicate)
@@ -106,8 +106,10 @@ actor CalendarStore {
     /// Merged busy periods. Titles never leave this function.
     func busyIntervals(start: Date, end: Date, calendarIds: [String]?) -> [BusyInterval] {
         let all = store.calendars(for: .event)
-        let scoped = calendarIds.map { ids in all.filter { ids.contains($0.calendarIdentifier) } }
-        if let scoped, scoped.isEmpty { return [] }
+        let scope = CalendarScope.resolve(requested: calendarIds,
+                                          available: all.map(\.calendarIdentifier))
+        if scope.matchesNothing { return [] }
+        let scoped = scope.selectedIds.map { ids in all.filter { ids.contains($0.calendarIdentifier) } }
 
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: scoped ?? all)
 

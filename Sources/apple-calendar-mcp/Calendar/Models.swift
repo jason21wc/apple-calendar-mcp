@@ -64,11 +64,25 @@ struct EventDTO: Codable, Sendable, Hashable {
     let occurrenceDate: String?
     let calendarId: String
     let title: String
-    /// RFC 3339 with an explicit offset. Always an instant, including for all-day events.
+    /// RFC 3339 with an explicit offset, rendered in the machine's current zone.
+    ///
+    /// TWO CONVENTIONS MEET HERE, so read carefully. Query windows are half-open --
+    /// `[start, end)` -- but EventKit stores an all-day event's `end` INCLUSIVELY, as
+    /// 23:59:59 on the final day. A one-day all-day event on the 20th therefore reports
+    /// `end: 2026-08-20T23:59:59-06:00`, not midnight on the 21st.
+    ///
+    /// This is reported as EventKit stores it rather than normalised, because rewriting it to
+    /// an exclusive midnight would misstate what is actually in the user's calendar. Anything
+    /// computing durations across all-day events must account for the missing second.
     let start: String
     let end: String
     let isAllDay: Bool
     /// For all-day events ONLY: the calendar date in the effective time zone, `YYYY-MM-DD`.
+    ///
+    /// `all_day_end_date` is the LAST day the event covers, inclusive -- an event spanning
+    /// the 20th to the 22nd reports `2026-08-22`, matching how a human reads "20th-22nd" and
+    /// how EventKit stores it. Deliberately NOT the exclusive convention used by query
+    /// windows; a consumer that assumes exclusivity will be a day short.
     ///
     /// Both are provided because neither alone is safe. The instant is machine-comparable but
     /// renders as the wrong DAY for anyone in a different zone -- the classic all-day bug,
