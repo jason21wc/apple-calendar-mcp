@@ -159,12 +159,6 @@ case .unknown(let flag):
     exit(64)   // EX_USAGE
 
 case .serve:
-    // Phase 4 replaces this with the MCP server loop. When it does, that loop MUST treat
-    // stdin EOF as unconditional shutdown -- it is the only defence against the supervisor
-    // being SIGKILLed, which no signal handler can cover (BACKLOG #12).
-    writeProbe(label: "spawned",
-               status: EKEventStore.authorizationStatus(for: .event),
-               note: "launched with no arguments, as an MCP client would; server not yet implemented")
-    log("no MCP server yet -- this is Phase 2 of 7. Run --help for available commands.")
-    exit(69)   // EX_UNAVAILABLE: honest failure, rather than a silent exit a client reads as a crash
+    // How an MCP client launches us. ServerBootstrap parks until stdin reaches EOF.
+    try await ServerBootstrap.run()
 }

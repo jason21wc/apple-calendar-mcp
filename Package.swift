@@ -12,9 +12,15 @@ import PackageDescription
 let package = Package(
     name: "apple-calendar-mcp",
     platforms: [.macOS(.v14)],
+    dependencies: [
+        // EXACT pin, not a range. The SDK is pre-1.0, so minor versions may break; an
+        // upgrade should be a deliberate act with the contract tests re-run.
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", exact: "0.12.1")
+    ],
     targets: [
         .executableTarget(
             name: "apple-calendar-mcp",
+            dependencies: [.product(name: "MCP", package: "swift-sdk")],
             path: "Sources/apple-calendar-mcp",
             exclude: ["Info.plist", "Entitlements.plist"],
             linkerSettings: [
