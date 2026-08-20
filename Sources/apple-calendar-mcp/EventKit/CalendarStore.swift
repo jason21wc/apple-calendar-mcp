@@ -64,6 +64,9 @@ actor CalendarStore {
                 allowsContentModifications: permitted,
                 isSubscribed: cal.isSubscribed,
                 writable: permitted && writableIds.contains(cal.calendarIdentifier),
+                writableReason: Self.writableReason(
+                    permitted: permitted,
+                    allowlisted: writableIds.contains(cal.calendarIdentifier)),
                 trust: untrustedMarker)
         }
     }
@@ -75,7 +78,8 @@ actor CalendarStore {
     /// Returns everything matching plus the total, so the caller can distinguish "nothing
     /// found" from "stopped counting".
     func events(start: Date, end: Date, calendarIds: [String]?,
-                includeFields: Set<String>, limit: Int) -> (items: [EventDTO], total: Int) {
+                includeFields: Set<String>, zone: TimeZone,
+                limit: Int) -> (items: [EventDTO], total: Int) {
         let all = store.calendars(for: .event)
         let scoped = calendarIds.map { ids in all.filter { ids.contains($0.calendarIdentifier) } }
         // nil means "every calendar"; an EMPTY array must mean "none", not "every". Passing
@@ -95,7 +99,7 @@ actor CalendarStore {
             return (a.eventIdentifier ?? "") < (b.eventIdentifier ?? "")
         }
 
-        return (sorted.prefix(limit).map { dto(from: $0, includeFields: includeFields) },
+        return (sorted.prefix(limit).map { dto(from: $0, includeFields: includeFields, zone: zone) },
                 sorted.count)
     }
 
@@ -121,33 +125,44 @@ actor CalendarStore {
         let periods = busy.map { (start: $0.startDate!, end: $0.endDate!) }
             .sorted { $0.start < $1.start }
 
-        var merged: [BusyInterval] = []
+        // Merge on Date, format once at the end. Merging formatted strings would mean
+        // parsing them back to compare, which is how a formatting choice quietly becomes a
+        // correctness bug.
+        var merged: [(start: Date, end: Date, count: Int)] = []
         for p in periods {
             if let last = merged.last, p.start <= last.end {
-                merged[merged.count - 1] = BusyInterval(
-                    start: last.start,
-                    end: max(last.end, p.end),
-                    eventCount: last.eventCount + 1)
+                merged[merged.count - 1] = (last.start, max(last.end, p.end), last.count + 1)
             } else {
-                merged.append(BusyInterval(start: p.start, end: p.end, eventCount: 1))
+                merged.append((p.start, p.end, 1))
             }
         }
-        return merged
+        return merged.map {
+            BusyInterval(start: TimeSemantics.format($0.start),
+                         end: TimeSemantics.format($0.end),
+                         eventCount: $0.count)
+        }
     }
 
     // MARK: - Conversion
 
-    private func dto(from event: EKEvent, includeFields: Set<String>) -> EventDTO {
-        let zone = event.isAllDay ? nil : (event.timeZone?.identifier ?? TimeZone.current.identifier)
+    private func dto(from event: EKEvent, includeFields: Set<String>, zone: TimeZone) -> EventDTO {
+        let eventZone = event.isAllDay ? nil : (event.timeZone?.identifier ?? TimeZone.current.identifier)
+        let occurrence = event.hasRecurrenceRules ? event.occurrenceDate : nil
         return EventDTO(
             id: event.eventIdentifier ?? "",
-            occurrenceDate: event.hasRecurrenceRules ? event.occurrenceDate : nil,
+            // Explicitly nil, never absent -- a missing key and a null are different things to
+            // a schema validator, and only one of them matches ["string","null"].
+            occurrenceDate: occurrence.map(TimeSemantics.format),
             calendarId: event.calendar?.calendarIdentifier ?? "",
             title: event.title ?? "",
-            start: event.startDate,
-            end: event.endDate,
+            start: TimeSemantics.format(event.startDate),
+            end: TimeSemantics.format(event.endDate),
             isAllDay: event.isAllDay,
-            timeZone: zone,
+            allDayStartDate: event.isAllDay
+                ? TimeSemantics.formatAllDay(event.startDate, in: zone) : nil,
+            allDayEndDate: event.isAllDay
+                ? TimeSemantics.formatAllDay(event.endDate, in: zone) : nil,
+            timeZone: eventZone,
             status: Self.describe(event.status),
             availability: Self.describe(event.availability),
             isRecurring: event.hasRecurrenceRules,
@@ -159,6 +174,15 @@ actor CalendarStore {
             attendeeCount: includeFields.contains("attendee_count") ? (event.attendees?.count ?? 0) : nil,
             organizerName: includeFields.contains("organizer_name") ? event.organizer?.name : nil,
             trust: untrustedMarker)
+    }
+
+    private static func writableReason(permitted: Bool, allowlisted: Bool) -> String {
+        switch (permitted, allowlisted) {
+        case (true, true):   return "writable"
+        case (true, false):  return "EventKit permits writing, but this calendar is not in the allowlist"
+        case (false, true):  return "in the allowlist, but EventKit itself does not permit writing here"
+        case (false, false): return "EventKit does not permit writing here (subscribed, holiday or birthday calendar)"
+        }
     }
 
     private static func describe(_ status: EKEventStatus) -> String {

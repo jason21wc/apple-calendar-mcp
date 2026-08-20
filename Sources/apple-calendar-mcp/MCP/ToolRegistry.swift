@@ -200,9 +200,23 @@ enum ToolRegistry {
                 ]),
                 "calendar_id": .object(["type": .string("string")]),
                 "title": .object(["type": .string("string")]),
-                "start": .object(["type": .string("string")]),
-                "end": .object(["type": .string("string")]),
+                "start": .object([
+                    "type": .string("string"),
+                    "format": .string("date-time"),
+                    "description": .string("RFC 3339 instant with an explicit offset."),
+                ]),
+                "end": .object(["type": .string("string"), "format": .string("date-time")]),
                 "is_all_day": .object(["type": .string("boolean")]),
+                "all_day_start_date": .object([
+                    "type": .array([.string("string"), .string("null")]),
+                    "description": .string(
+                        "All-day events only: the calendar date (YYYY-MM-DD) in the effective "
+                        + "time zone. Display THIS for all-day events -- the instant in `start` "
+                        + "renders as the wrong day for a reader in another zone."),
+                ]),
+                "all_day_end_date": .object([
+                    "type": .array([.string("string"), .string("null")]),
+                ]),
                 "time_zone": .object([
                     "type": .array([.string("string"), .string("null")]),
                     "description": .string("Null for all-day events, which have no time zone."),
@@ -221,8 +235,8 @@ enum ToolRegistry {
         envelope(itemSchema: .object([
             "type": .string("object"),
             "properties": .object([
-                "start": .object(["type": .string("string")]),
-                "end": .object(["type": .string("string")]),
+                "start": .object(["type": .string("string"), "format": .string("date-time")]),
+                "end": .object(["type": .string("string"), "format": .string("date-time")]),
                 "event_count": .object(["type": .string("integer")]),
             ]),
         ]))

@@ -83,7 +83,7 @@ enum ToolHandlers {
 
         let (items, total) = await store.events(
             start: w.start, end: w.end, calendarIds: w.calendarIds,
-            includeFields: include, limit: limit)
+            includeFields: include, zone: w.zone, limit: limit)
 
         return try result(
             ReadEnvelope(items: items, truncated: total > items.count, totalMatched: total,
@@ -107,7 +107,7 @@ enum ToolHandlers {
         let needed: Set<String> = searchFields.union(fieldSet(params.arguments?["include_fields"]))
         let (candidates, _) = await store.events(
             start: w.start, end: w.end, calendarIds: w.calendarIds,
-            includeFields: needed, limit: Limits.maxResultLimit)
+            includeFields: needed, zone: w.zone, limit: Limits.maxResultLimit)
 
         let needle = query.lowercased()
         let matched = candidates.filter { e in
@@ -169,6 +169,7 @@ enum ToolHandlers {
         EventDTO(
             id: e.id, occurrenceDate: e.occurrenceDate, calendarId: e.calendarId,
             title: e.title, start: e.start, end: e.end, isAllDay: e.isAllDay,
+            allDayStartDate: e.allDayStartDate, allDayEndDate: e.allDayEndDate,
             timeZone: e.timeZone, status: e.status, availability: e.availability,
             isRecurring: e.isRecurring, isDetached: e.isDetached, hasAttendees: e.hasAttendees,
             notes: keeping.contains("notes") ? e.notes : nil,

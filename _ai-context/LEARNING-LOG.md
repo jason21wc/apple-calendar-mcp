@@ -133,6 +133,22 @@ contradictions that prompted the rewrite, one level up: the work moved, the trac
 **Rule:** verify a checklist by grepping for the defect, never by remembering that you fixed
 it.
 
+**2026-08-20 — I verified the protocol and never verified a payload.** Phase 4 shipped with
+every event tool returning numbers where its own schema promised strings. `tools/list`
+passed, the handshake passed, 73 tests passed, and every real query failed at the client.
+The gap: nothing ever encoded a result and compared it against the schema the server
+advertises — which needs **no calendar access and no permission**, only synthetic objects.
+I skipped it because the dev binary had no grant, and treated that as a reason to test less
+rather than a reason to test differently. **Rule:** for any contract you publish, assert your
+own output against it with synthetic data; the absence of a live dependency is never the
+reason not to.
+
+**2026-08-20 — A bug report from real use beat four review agents.** Contrarian, validator,
+coherence and security reviews all read this code and none caught it, because it is invisible
+in source: `let start: Date` looks right, and only the encoder's default behaviour makes it
+wrong. **Rule:** reviews catch reasoning errors; running the thing catches runtime ones.
+Neither substitutes for the other.
+
 ---
 
 ## Graduated Patterns
