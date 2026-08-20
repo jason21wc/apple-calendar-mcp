@@ -100,6 +100,17 @@ Phase 1 failure — granting to the terminal instead of to us.
 Verified failure paths: inherited identity → exit 1; binary at an ungranted path → exit 1
 naming the path to fix it; `--setup` under inherited identity → refuses.
 
+## Verified 2026-08-20 — the last Phase 1 gap is closed
+
+The disclaim was only ever tested from a shell. It is now verified under a real MCP client:
+Claude Desktop spawned `/usr/local/bin/apple-calendar-mcp` and the probe recorded
+`mode=disclaimed-child`, `status=fullAccess`, `parent=/Applications/Claude.app/Contents/Helpers/disclaimer`.
+
+Claude Desktop ships its own Anthropic-signed `disclaimer` helper using the same private API
+(gotcha 44), so it had already made us self-responsible and our re-exec correctly did not
+fire. The connection then closed as designed — there is no server loop until Phase 4, so the
+binary writes its probe and exits 69.
+
 ## Carry Into Phase 4
 
 - Server loop MUST treat stdin EOF as unconditional shutdown (BACKLOG #12).
