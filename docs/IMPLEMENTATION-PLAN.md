@@ -207,46 +207,99 @@ untestable for three phases because nothing ran long enough to observe.
 
 ---
 
-## 6. Phase 6 — the write surface is DEFERRED
+## 6. The write surface — measured, not designed around
 
-Three write designs were proposed and all three were refuted before any code was written: a
-propose/commit ceremony that is model-satisfiable; an archive-instead-of-delete scheme derived
-from a premise the same document falsified; and a "no destructive verb" design whose own title
-was false because it exposed unrestricted `update`.
+### What was refuted, and how
 
-**The pattern is the finding.** Each rested on an assumption about EventKit or host behaviour
-that nobody had measured, and two were refuted by facts already in this project's memory. A
-fourth attempt fails the same way, because the missing input is data, not design effort.
+An earlier draft of this section proposed building `create` **in order to measure** whether
+Claude Desktop shows the human an approval prompt. That premise was false, and the answer was
+already on this machine. Verified in Claude Desktop's own bundle:
 
-### What must be measured first
+```
+"Allow once"  /  "Allow for this task"  /  "Allow for all tasks"
+"running unattended — nobody is present to approve it. It can be retried in an attended session."
+readOnlyHint: 35 refs    destructiveHint: 30 refs    toolPolicy: 5 refs
+```
 
-1. Does Claude Desktop actually prompt for a mutating MCP tool, and does Cowork prompt at all?
-   The reference library says *"verify it fires for your tool type"*; nobody has.
-2. Does moving an event between calendars notify anyone? Observable only from a second account.
-3. Does `availability` survive a cross-source move? `supportedEventAvailabilities` differs by
-   source — header-checkable today.
-4. What do people actually ask for? *"Cancel my 3pm"* is a delete of an event the model did
-   not create — the most likely request, and the one every design so far refuses.
+**Desktop prompts, consumes the annotations, treats data-modifying tools specially, and
+refuses per-call approvals when no human is present.** `apple-mail` — already installed, with
+`delete_messages` and `create_draft` — has been traversing that exact path for months.
 
-### Constraints any future design must honour
+The failure was filing this as an *open question* rather than an *assumption*. Open questions
+get designed around; assumptions get checked. Three previous write designs died of unmeasured
+premises, and this was a fourth wearing a lab coat: a write tool with an experiment attached
+as justification.
 
-- **`update` is destructive.** It overwrites in place and carries the same stale-save hazard
-  used to disqualify archive. Any design treating it as the safe verb is wrong.
-- **File-based authorship is not evidence.** The journal is `0600` and append-only *by
-  convention*; §7 already concedes an attacker can truncate it. Where the model has filesystem
-  tools, a journal entry proves nothing. The non-forgeable alternative is an **in-memory** set
-  of mutations this process made, which also bounds the window naturally at process lifetime —
-  at the cost that it dies on respawn, and clients respawn without warning.
-- **Undo of an update has no path** in any design so far, while `update` is the verb most
-  likely to be used. Solve that before solving delete.
-- **A refusal returning a shell command is useless on mobile.** It must offer something
-  actionable there.
-- **C6 stands** regardless.
+### The control that was missing: `toolPolicy`
 
-Phase 5 (allowlist, tokens, journal, guards) may proceed independently, since it is substrate
-rather than surface — but its guard set cannot be finalised until the surface is.
+Desktop accepts a per-server policy map — `blocked` > `ask` > `ask-session` > `allow`,
+strictest wins. **`"ask"` requires approval on every call, with Allow-once and Deny only — no
+persistent always-allow**, so it cannot be worn down into a standing grant.
 
----
+This is the first control in this project **the model cannot satisfy by itself**. Every other
+one is reachable: `confirm_summary` is a token the model holds and echoes; the allowlist, the
+journal and the snapshots are same-uid files. `toolPolicy` is enforced in the host process.
+
+§4's line — *"host-side approval is not a control, it is an assumption the server cannot
+observe"* — is true and was defeatist. The user configures that file. Setting it converts an
+unobservable assumption into a set fact, and the README can require the same of anyone else.
+
+**Set on the `apple-calendar` server now, while it is still `--read-only`.** Verifying it with
+zero write capability in existence is the whole point.
+
+### Status
+
+**Built:** `Journal.swift` — write-ahead, intent before the save and outcome after, so an
+interrupted write leaves a visible orphan. Tri-state outcome (`saved` / `noChangeNeeded` /
+`failed`), because `saveEvent` returning NO with a **nil** error is a success. Concurrency-safe
+via `O_APPEND` plus in-process serialisation, after parallel tests reproduced the interleaved-
+write corruption that concurrent tool handlers would cause. 95 tests.
+
+**Gated on, before `calendar_create_event` is written:**
+
+1. `toolPolicy: {"*": "ask"}` verified prompting on the read-only server.
+2. **A `source_type` guard.** "Additive and cannot mail anyone" is a non-sequitur: `attendees`
+   being readonly closes the *invitation* path, not the *propagation* path. C1 already admits
+   a shared iCloud calendar is writable if allowlisted, EventKit exposes no `isShared`, and an
+   event on one propagates over CalDAV to every subscriber's devices without touching
+   attendees. `EKSource.sourceType == .local` is the only source that provably cannot
+   propagate. "Start with Jason, not Family" is an instruction to a human, not a guard — and
+   this project has repeatedly found that class of protection worthless.
+3. **Explicit rejection of `alarms` and `recurrence`**, alongside `attendees`. `alarms` is
+   read-write and is the one field that makes a created event actively interrupt a human on
+   every device. Rejecting it by omission means a later revision adds it as "just another
+   optional field".
+4. **Reversal keys recorded by content, not identifier alone.** `eventIdentifier` changes on
+   sync, and EventKit re-syncs the event immediately after a successful save — so the id in
+   the outcome entry can be stale within seconds on a CalDAV calendar. Record
+   `(calendar_id, title, start, end, creationDate)` so a reversal can re-find by content.
+5. **All-day construction tested before written.** Setting `isAllDay = true` does not
+   normalise the dates, and EventKit stores all-day `end` inclusively — so a naive
+   `[midnight, midnight+24h)` produces a **two-day** event.
+
+**Idempotency, corrected.** An in-memory dedupe does not stop the realistic retry: clients
+respawn stdio servers without warning, so the retry arrives at a fresh process with an empty
+set. And returning the prior identifier silently reports success for work not done — two
+identical 30-minute blocks is a legitimate request. Return a distinct `DUPLICATE_SUPPRESSED`
+outcome carrying the prior id, and key it on the journal tail so it survives a respawn.
+
+**What the journal is not.** An earlier line claimed it "holds enough to reverse it". Nothing
+reverses anything — undo is deferred and `calendar_recent_mutations` is not built. The honest
+claim is that a human can reverse one additive event by hand in Calendar.app, which was true
+before the journal existed. It is substrate and a user-facing record, not safety currency.
+
+### EventKit specifics to honour when create is written
+
+`event.calendar` must be assigned from the refetched allowlisted calendar or the save fails.
+`EKEvent` must be constructed on the store's confined thread, or EventKit objects cross the
+adapter boundary the architecture forbids. `title` is nullable and EventKit will happily save
+an empty one, producing a near-invisible event the user cannot find to delete. `timeZone` does
+not move the event — `startDate` is the instant — so setting one without the other is a silent
+offset error. `url` is an `NSURL` and a malformed string becomes nil rather than erroring.
+`span` is required and meaningless on a new event; pass `EKSpanThisEvent`. Use
+`saveEvent:span:error:`, not the `commit:NO` variant, or write-ahead ordering is fiction.
+Set `availability` explicitly — a silent `.busy` default changes the user's free/busy for
+anyone querying it.
 
 ## 7. Trust boundary and privacy
 

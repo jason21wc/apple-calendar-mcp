@@ -149,6 +149,20 @@ in source: `let start: Date` looks right, and only the encoder's default behavio
 wrong. **Rule:** reviews catch reasoning errors; running the thing catches runtime ones.
 Neither substitutes for the other.
 
+**2026-08-20 — I filed a checkable fact as an "open question" and designed around it for a
+whole phase.** The premise justifying a write tool — "nobody has verified whether Claude
+Desktop prompts" — was answered in the app's own bundle, and by an already-installed MCP
+server with delete tools that had been traversing that path for months. Open questions get
+designed around; assumptions get checked. **Rule:** before building anything to answer a
+question, spend ten minutes trying to answer it for free — read the binary, check what is
+already installed, grep the config.
+
+**2026-08-20 — Calling something "an experiment" made it survive scrutiny it should not
+have.** Three write designs were refuted for resting on unmeasured premises. The fourth rested
+on one too, but the word "measurement" made it read as the cure rather than the disease.
+**Rule:** an experiment that also ships the capability it is measuring is not an experiment.
+If the measurement can be taken without the capability, it must be.
+
 ---
 
 ## Graduated Patterns
