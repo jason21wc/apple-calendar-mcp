@@ -364,19 +364,16 @@ green. `docs/IMPLEMENTATION-PLAN.md` matches this file.
 3. **Adopt C6 formally** — currently recorded as pending human confirmation.
 4. **Any borrowing of expression** from the MIT reference repos — flagged case by case.
 
-## 14. Cleanup owed (post-approval, outside plan mode)
+## 14. Cleanup — complete 2026-08-20
 
-- ~~Replace `docs/IMPLEMENTATION-PLAN.md` from this file~~ — **done.** The repo copy is now
-  rev. 5. This was the most dangerous item: the repo held rev. 3 while `OPERATIONS.md` named
-  it authoritative, so an agent following the operating rules would have built a design that
-  had been withdrawn twice. Re-copy on every future revision; the split recurs silently.
-- `Runtime.swift:55-58` — the shipped comment carries the refuted "configure those hosts
-  read-only and the question does not arise" framing. It is public.
-- `CLI.swift:73` — help text still advertises the deprecated `--grant`.
-- `SESSION-STATE.md` — three self-contradictions: "nothing is built yet", a live `.build`
-  grant that was revoked, and a stale gotcha count.
-- `PROJECT-MEMORY.md` — Phase Gates table never advanced past "Pending"; two decision rows
-  merged onto one line; empty duplicate gotcha table.
-- `ARCHITECTURE.md` — says "Designed, not yet built".
-- `BACKLOG.md` #14 — complete, should be removed.
-- Memory's layer-name directive (`MCPLayer`/`CalendarKit`) does not match the on-disk layout.
+All items done and verified by grep, not by memory: the repo plan copy replaced (it was rev. 3
+while `OPERATIONS.md` named it authoritative); `Runtime.swift`'s public comment no longer
+claims read-only configuration means "the question does not arise"; `CLI.swift` names
+`--setup` and documents `--grant` as the former name; `SESSION-STATE` no longer says nothing
+is built nor describes a revoked grant as live; `PROJECT-MEMORY`'s phase gates advanced and
+its merged decision rows split; `ARCHITECTURE.md` reflects built state; `BACKLOG` #14 removed;
+the layer-name directive now defers to the on-disk layout.
+
+Worth noting how this list nearly rotted: the work was done and the list tracking it was not
+updated, which is the same drift that produced the 11 contradictions this revision fixed —
+one level up. **Re-verify a cleanup list by grep before believing it.**

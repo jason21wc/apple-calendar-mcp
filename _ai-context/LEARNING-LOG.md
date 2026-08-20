@@ -120,6 +120,19 @@ failed, and they were right: the placeholder restored no distinguishability and 
 a magic value. **Rule:** when a test disagrees with a change, establish which is correct
 before changing the test — here the test was.
 
+**2026-08-20 — "Verified" meant "I ran it from my own shell."** The Phase 1 gate said *have
+Claude Code spawn the binary*; what I did was invoke it from a Bash tool and inspect the
+parent process, then carried it as verified for three phases. A real MCP-client spawn told a
+richer story immediately — Claude Desktop disclaims servers itself, so our re-exec correctly
+idled. **Rule:** when a gate names a specific actor, that actor has to perform the action; a
+convenient proxy is a different test with a different result.
+
+**2026-08-20 — I fixed eight things and left the list saying they were owed.** The plan's
+cleanup section still listed seven completed items as outstanding. Same drift as the eleven
+contradictions that prompted the rewrite, one level up: the work moved, the tracker did not.
+**Rule:** verify a checklist by grepping for the defect, never by remembering that you fixed
+it.
+
 ---
 
 ## Graduated Patterns

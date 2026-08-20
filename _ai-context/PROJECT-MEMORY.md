@@ -220,8 +220,8 @@ caching in v1.
 
 | # | Question | Why it matters | Gate |
 |---|----------|----------------|------|
-| 1 | **Does Cowork run on the user's Mac or in a remote sandbox?** | A remote sandbox cannot reach a local `EKEventStore` at all. Keeping undo model-callable was justified by Cowork having no terminal — if Cowork is remote that justification evaporates and undo could return to a CLI, removing several guards and a whole class of bugs. A settled decision currently rests on an unverified premise. | Before Phase 5 |
-| 2 | Bundle identifier — proposed `com.collierhmg.apple-calendar-mcp` | Fixed at Phase 1; changing it later re-issues the TCC grant | Before Phase 1 |
+| ~~1~~ | ~~Does Cowork run locally or remotely?~~ **ANSWERED 2026-08-19: locally.** Cowork runs inside Claude Desktop on this Mac, so the server reaches EventKit; mobile is only the remote control. Confirms the human has no terminal when driving from a phone, which is why undo capability must be model-reachable. | closed |
+| ~~2~~ | ~~Bundle identifier~~ **SETTLED: `com.collierhmg.apple-calendar-mcp`**, now baked into the TCC designated requirement, so changing it means re-granting. | closed |
 | 3 | Default allowlist empty ⇒ all writes fail closed on a fresh install | Confirm, or name a default writable calendar | Before Phase 5 |
 | 4 | Adopt C6 (attendee refusal) formally | Currently recorded as pending human confirmation | Before Phase 6 |
 | 5 | Does `calshow:` open Calendar.app at a date? | Would let the C6 refusal hand the user a clickable jump | Optional |
