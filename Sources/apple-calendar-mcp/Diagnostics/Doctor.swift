@@ -97,6 +97,10 @@ enum Doctor {
             checks.append(("TCC row (extra)", .ok("skipped -- needs Full Disk Access, which this tool does not request")))
         }
 
+        checks.append(("tool surface", Runtime.isReadOnly
+            ? .ok("read-only -- no mutating tool is exposed on this connection")
+            : .ok("read and write")))
+
         // 4. Raw status, listed last: on its own it cannot distinguish an owned grant from
         //    an inherited one, which is why ownership above is the check that matters.
         checks.append(("authorization status", state.canReadEvents

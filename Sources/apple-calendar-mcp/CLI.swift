@@ -17,7 +17,13 @@ enum Command {
     case help
     case unknown(String)
 
-    static func parse(_ args: [String]) -> Command {
+    /// Flags that modify how a command runs rather than selecting one. Stripped before the
+    /// command is read, so `--read-only --version` still reports the version instead of
+    /// being swallowed as a command in its own right.
+    static let modifiers: Set<String> = ["--read-only"]
+
+    static func parse(_ rawArgs: [String]) -> Command {
+        let args = rawArgs.filter { !modifiers.contains($0) }
         guard let first = args.first else { return .serve }
         switch first {
         case "--setup":            return .setup
@@ -58,6 +64,7 @@ func printHelp() {
           (no arguments)     serve over stdio
           --setup            request Calendar access (run this in a terminal)
           --doctor           diagnose why access is or is not working
+          --read-only        serve with every mutating tool withheld (see below)
           --probe <label>    write a diagnostic record to ~/.local/state/apple-calendar-mcp
           --version          print version and identity
           --help             this text
@@ -73,5 +80,6 @@ func printVersion() {
           identifier: \(Meta.bundleIdentifier)
           path:       \(Meta.executablePath)
           mode:       \(Runtime.disclaimMode)
+          tools:      \(Runtime.isReadOnly ? "read-only (--read-only)" : "read and write")
         """)
 }

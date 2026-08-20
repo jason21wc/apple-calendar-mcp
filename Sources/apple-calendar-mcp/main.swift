@@ -29,6 +29,7 @@ signal(SIGPIPE, SIG_IGN)
 // Claim our own privacy identity BEFORE touching EventKit. Once EventKit is used under
 // inherited responsibility the grant is already attributed to the host. Does not return if
 // the respawn succeeds -- the supervisor waits for the child and exits with its status.
+Runtime.applyStartupFlags(Array(CommandLine.arguments.dropFirst()))
 Runtime.establishPrivacyIdentity()
 
 // MARK: - Authorization states

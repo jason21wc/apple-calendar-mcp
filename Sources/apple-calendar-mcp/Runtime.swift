@@ -46,6 +46,27 @@ enum Runtime {
     /// True only when the process owns its privacy identity.
     static var ownsPrivacyIdentity: Bool { disclaimMode == "disclaimed-child" }
 
+    /// Whether this process may expose any mutating tool at all.
+    ///
+    /// Read ONCE from argv at startup and never re-read, so it is a property of the client's
+    /// configuration rather than of model behaviour -- the model cannot argue its way past a
+    /// value it never sees and cannot set.
+    ///
+    /// This exists because the human approval prompt is the only real gate, and some hosts
+    /// do not have one. Scheduled and autonomous surfaces (Cowork tasks) can run with no
+    /// human present, so "the host will ask" is not true there. Configure those hosts
+    /// read-only and the question does not arise.
+    ///
+    /// Deliberately shipped BEFORE any write tool exists: a client configured today keeps
+    /// its restriction when write tools arrive, instead of silently gaining them.
+    nonisolated(unsafe) private static var readOnlyRequested = false
+
+    static var isReadOnly: Bool { readOnlyRequested }
+
+    static func applyStartupFlags(_ args: [String]) {
+        readOnlyRequested = args.contains("--read-only")
+    }
+
     /// Probe records, the setup fingerprint and (from Phase 5) the mutation journal.
     /// 0700 because Phase 5 puts real calendar content here.
     static let stateDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
