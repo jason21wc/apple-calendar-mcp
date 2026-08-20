@@ -35,6 +35,15 @@ enum TimeError: Error, CustomStringConvertible {
 
 enum TimeSemantics {
 
+    /// The machine's current time zone, tracked LIVE.
+    ///
+    /// `TimeZone.current` is a snapshot taken at first access. This server is long-running --
+    /// a client keeps it alive for the whole session -- so with `.current` a user who flies
+    /// from Denver to London would keep seeing times in Denver's offset until the process was
+    /// restarted, with nothing to indicate it. `autoupdatingCurrent` follows the OS, so
+    /// crossing a time zone (or a DST boundary) is picked up with no action from anyone.
+    static var systemZone: TimeZone { TimeZone.autoupdatingCurrent }
+
     /// RFC 3339 with an explicit offset. Fractional seconds accepted, not required.
     static func parseTimestamp(_ raw: String) throws -> Date {
         let withFraction = ISO8601DateFormatter()
@@ -51,9 +60,15 @@ enum TimeSemantics {
         throw TimeError.badTimestamp(raw)
     }
 
+    /// RFC 3339 rendered in the machine's CURRENT zone, with a real offset.
+    ///
+    /// `ISO8601DateFormatter` defaults to GMT, so the previous version emitted `20:53:20Z`
+    /// for a 2:53pm Denver meeting. The instant was right and the output was unreadable, and
+    /// a reader converting it by hand is a reader who will get it wrong.
     static func format(_ date: Date) -> String {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
+        f.timeZone = systemZone
         return f.string(from: date)
     }
 
@@ -69,7 +84,7 @@ enum TimeSemantics {
     }
 
     static func parseTimeZone(_ raw: String?) throws -> TimeZone {
-        guard let raw else { return TimeZone.current }
+        guard let raw else { return systemZone }
         guard let zone = TimeZone(identifier: raw) else { throw TimeError.badTimeZone(raw) }
         return zone
     }

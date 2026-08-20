@@ -146,7 +146,7 @@ actor CalendarStore {
     // MARK: - Conversion
 
     private func dto(from event: EKEvent, includeFields: Set<String>, zone: TimeZone) -> EventDTO {
-        let eventZone = event.isAllDay ? nil : (event.timeZone?.identifier ?? TimeZone.current.identifier)
+        let eventZone = event.isAllDay ? nil : (event.timeZone?.identifier)
         let occurrence = event.hasRecurrenceRules ? event.occurrenceDate : nil
         return EventDTO(
             id: event.eventIdentifier ?? "",

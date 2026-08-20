@@ -56,9 +56,18 @@ enum ToolHandlers {
             "can_read_events": .bool(state.canReadEvents),
             "guidance": .string(state.guidance),
             "identity": .string(Runtime.disclaimMode),
+            // The model needs to know where "now" and "today" are, and it cannot ask the OS
+            // itself. Reported live rather than snapshotted, so it is right after travel.
+            "system_time_zone": .string(TimeSemantics.systemZone.identifier),
+            "system_utc_offset_seconds": .int(TimeSemantics.systemZone.secondsFromGMT()),
+            "current_time": .string(TimeSemantics.format(Date())),
         ]
         return .init(
-            content: [.text(text: "Calendar authorization: \(state.rawValue)", annotations: nil, _meta: nil)],
+            content: [.text(
+                text: "Calendar authorization: \(state.rawValue). "
+                    + "System time zone: \(TimeSemantics.systemZone.identifier), "
+                    + "local time now \(TimeSemantics.format(Date())).",
+                annotations: nil, _meta: nil)],
             structuredContent: .object(payload))
     }
 
@@ -69,7 +78,7 @@ enum ToolHandlers {
             items: calendars,
             truncated: false,
             totalMatched: calendars.count,
-            effectiveTimeZone: TimeZone.current.identifier,
+            effectiveTimeZone: TimeSemantics.systemZone.identifier,
             limitsApplied: Limits.applied,
             trust: untrustedMarker)
         return try result(envelope, summary: "\(calendars.count) calendar(s)")

@@ -110,7 +110,8 @@ enum ToolRegistry {
                 "type": .string("string"),
                 "description": .string(
                     "IANA identifier, e.g. America/Denver. Used for rendering all-day dates. "
-                    + "Defaults to this machine's zone."),
+                    + "Defaults to the machine's CURRENT zone, which follows the OS -- so "
+                    + "after travelling, results are in the local zone with no restart."),
             ]),
         ]
     }
@@ -175,7 +176,12 @@ enum ToolRegistry {
                         + "as incomplete -- do not conclude a period is free from one."),
                 ]),
                 "total_matched": .object(["type": .string("integer")]),
-                "effective_time_zone": .object(["type": .string("string")]),
+                "effective_time_zone": .object([
+                    "type": .string("string"),
+                    "description": .string(
+                        "The zone start/end were rendered in -- the machine's current zone, "
+                        + "tracked live, so it follows you when you travel."),
+                ]),
                 "trust": .object([
                     "type": .string("string"),
                     "description": .string(
@@ -219,7 +225,11 @@ enum ToolRegistry {
                 ]),
                 "time_zone": .object([
                     "type": .array([.string("string"), .string("null")]),
-                    "description": .string("Null for all-day events, which have no time zone."),
+                    "description": .string(
+                        "The event's OWN time zone. Null means it floats with the machine's "
+                        + "zone (9am stays 9am wherever you are); a value means it is PINNED "
+                        + "to that zone, e.g. a call created in America/New_York. Also null "
+                        + "for all-day events."),
                 ]),
                 "status": .object(["type": .string("string")]),
                 "availability": .object(["type": .string("string")]),

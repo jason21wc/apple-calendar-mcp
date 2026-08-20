@@ -121,3 +121,61 @@ struct TimeSemanticsTests {
         #expect(Limits.clampResultLimit(-5) == 1)
     }
 }
+
+// Travel behaviour. The server is long-running -- a client holds it open for the session --
+// so a zone captured once would keep rendering a departed city's offset with nothing to
+// indicate it.
+
+@Suite("System time zone")
+struct SystemTimeZoneTests {
+
+    @Test("the system zone is live, not a snapshot taken at first use")
+    func systemZoneIsAutoupdating() {
+        // The identity matters, not the current value: `.current` caches, so a process that
+        // outlives a flight keeps answering with the origin's offset.
+        #expect(TimeSemantics.systemZone == TimeZone.autoupdatingCurrent)
+    }
+
+    @Test("timestamps render with the machine's real offset, not as UTC")
+    func timestampsCarryLocalOffset() {
+        let rendered = TimeSemantics.format(Date(timeIntervalSince1970: 1_787_000_000))
+        let offset = TimeSemantics.systemZone.secondsFromGMT(for: Date(timeIntervalSince1970: 1_787_000_000))
+
+        if offset == 0 {
+            #expect(rendered.hasSuffix("Z") || rendered.hasSuffix("+00:00"))
+        } else {
+            // Previously every timestamp ended in "Z" because ISO8601DateFormatter defaults to
+            // GMT -- the instant was right and a 2:53pm meeting displayed as 20:53.
+            #expect(!rendered.hasSuffix("Z"),
+                    "rendered \(rendered) as UTC while the machine is at offset \(offset)s")
+            #expect(rendered.contains("+") || rendered.contains("-"),
+                    "rendered \(rendered) with no offset")
+        }
+    }
+
+    @Test("a rendered timestamp round-trips to the same instant")
+    func renderingPreservesTheInstant() throws {
+        // Formatting for humans must not move the moment. An offset error here is invisible
+        // in the string and wrong by hours.
+        let original = Date(timeIntervalSince1970: 1_787_000_000)
+        let parsed = try TimeSemantics.parseTimestamp(TimeSemantics.format(original))
+        #expect(abs(parsed.timeIntervalSince(original)) < 1)
+    }
+
+    @Test("an explicitly requested zone overrides the system one; omitting it uses the system")
+    func explicitZoneWins() throws {
+        #expect(try TimeSemantics.parseTimeZone("Asia/Tokyo").identifier == "Asia/Tokyo")
+        #expect(try TimeSemantics.parseTimeZone(nil) == TimeSemantics.systemZone)
+    }
+
+    @Test("all-day dates are rendered in the requested zone, and the zone changes the date")
+    func allDayFollowsTheRequestedZone() throws {
+        // Near midnight the same instant is two different calendar days. This is the bug that
+        // makes an all-day event show up a day early or late after travel.
+        let instant = try TimeSemantics.parseTimestamp("2026-08-21T05:00:00Z")
+        let denver = try TimeSemantics.parseTimeZone("America/Denver")   // UTC-6 -> 20th, 11pm
+        let tokyo  = try TimeSemantics.parseTimeZone("Asia/Tokyo")       // UTC+9 -> 21st, 2pm
+        #expect(TimeSemantics.formatAllDay(instant, in: denver) == "2026-08-20")
+        #expect(TimeSemantics.formatAllDay(instant, in: tokyo) == "2026-08-21")
+    }
+}

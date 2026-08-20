@@ -76,8 +76,16 @@ struct EventDTO: Codable, Sendable, Hashable {
     /// cannot be ordered against timed events. Use `is_all_day` to choose.
     let allDayStartDate: String?
     let allDayEndDate: String?
-    /// NULLABLE on purpose: an all-day event has no time zone. A non-optional field here
-    /// would force a fabricated value into exactly the case where time zones cause bugs.
+    /// The event's OWN time zone, as stored -- not the zone it is being displayed in.
+    ///
+    /// Null means the event floats with whatever zone the machine is in: a 9am local meeting
+    /// stays 9am wherever you are. Non-null means it is PINNED, e.g. a call created in
+    /// America/New_York stays at that New York instant no matter where you travel.
+    ///
+    /// That distinction is the whole travel question. `start` always renders in your current
+    /// zone; this field says whether the event itself moves with you.
+    ///
+    /// Also null for all-day events, which have no time zone at all.
     let timeZone: String?
     let status: String
     let availability: String
@@ -175,6 +183,8 @@ struct ReadEnvelope<Item: Codable & Sendable>: Codable, Sendable {
     let items: [Item]
     let truncated: Bool
     let totalMatched: Int
+    /// The zone `start` and `end` were rendered in: the machine's CURRENT zone, tracked live.
+    /// Travel and it changes with no restart.
     let effectiveTimeZone: String
     let limitsApplied: LimitsApplied
     let trust: String
