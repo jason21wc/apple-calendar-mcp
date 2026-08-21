@@ -76,6 +76,27 @@
   this project. It has never actually run here; the security coverage to date came from the
   `security-auditor` agent instead. Either repair the skill or stop reaching for it.
 
+- **#19 — Bound every EventKit operation, and fail fast once wedged.** No call in `CalendarStore` has a
+  timeout (gotcha 64). Because the store is a serial actor on one dedicated thread, a single blocked call
+  takes the whole calendar surface down for the process's lifetime. A blocking synchronous EventKit call
+  **cannot be cancelled**, so the timeout cannot free the thread — the design has to be: bound the
+  *caller's* wait (well under the client's 60s ceiling), return a structured `error_type: "timeout"`, then
+  **mark the store wedged** so subsequent calls fail immediately with "calendar subsystem is blocked,
+  restart the server" instead of each burning another full timeout. Affects shipped read-only code today,
+  and gets more dangerous the moment writes exist.
+
+- **#20 — Test the create→delete→restore round trip using only ids the tools themselves return.** Gotcha
+  65: a sibling server shipped a create whose returned id its own delete could not consume, and the
+  mismatch surfaced as a hang. Our equivalent risk is real and known — `eventIdentifier` changes on sync —
+  so the test must construct nothing by hand: create, take the returned id, delete with it, restore with
+  what delete returns, then diff every persisted field.
+
+- **#21 — Consider an explicit `security_notice` string alongside `trust: "external_untrusted"`.**
+  `apple-mail`'s `search_messages` returns both, and the reviewer singled it out as real
+  prompt-injection defence placed at the boundary where untrusted content enters. Our DTOs carry the trust
+  marker but no human-readable notice telling the caller what to do with it. Cheap; decide whether the
+  marker alone is doing the work.
+
 ## Deferred/Future — Discussion
 
 - **#4 — Bulk mutation.** Explicitly out of v1 (decision C5). Revisit only after the

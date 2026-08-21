@@ -190,6 +190,21 @@ untestable purely because of an access modifier chosen by reflex. **Rule:** if a
 pure and its output is user-facing, make it internal and test it; "it's an implementation
 detail" is not a reason when the implementation detail is a sentence the user reads.
 
+**2026-08-20 — A sibling project's bug report found a defect here that no review had.** `apple-mail`'s
+`delete_draft` hung for 60s, twice. The same class of gap exists in this server and is worse — no EventKit
+call has a timeout, and because the store is a serial actor on one dedicated thread, one hang wedges every
+later calendar operation rather than just its own caller. Four security reviews and 99 tests never raised
+it. **Rule:** read bug reports from adjacent systems as findings against your own; shared authorship and
+shared architecture mean shared defects, and the sibling's failure is free evidence you did not have to
+cause yourself.
+
+**2026-08-20 — "Not found" degrading into "hang" is worse than either.** The `apple-mail` failure was an id
+FORM mismatch between two tools in one server: create returned an RFC Message-ID, delete expected an
+internal numeric id, and the lookup scanned instead of erroring. The caller could not distinguish
+not-found from still-working from deadlocked, and could not safely retry. **Rule:** every lookup must fail
+fast and structured on an unresolvable key, and every operation needs a bound well under the client's
+ceiling. An unbounded operation has no honest error to report.
+
 ---
 
 ## Graduated Patterns
