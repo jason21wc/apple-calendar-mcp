@@ -8,18 +8,40 @@
 
 ## Active (Implement Now/Soon)
 
+- **#1 — CONFIRM WRITES PROMPT. Blocks all write work.** Ask Cowork to *draft* (not send) an
+  email via `apple-mail`'s `create_draft`; its proxy auto-approves only read tools. If no
+  prompt appears, the human's stated requirement is unmet and no write tool should be built
+  until a mechanism that does prompt is found. ~2 minutes, no new code.
+
+- **#2 — Switch `toolPolicy` from `{"*": "ask"}` to per-tool.** Write tools `"ask"`, read tools
+  unlisted. Encodes "never prompt on read, always prompt on write" directly instead of relying
+  on `readOnlyHint` overriding a wildcard — a mechanism never confirmed from the minified
+  bundle. Backup of `claude_desktop_config.json` already taken.
+
 - **#3 — README destructive-capability warning.** Must state plainly: the server can delete
-  calendar events; restore is *recreate an equivalent event*, not true undo; event
-  identifiers and invitation state (organizer, attendee list, RSVP responses) do not
-  survive a restore. A license warranty disclaimer is not a substitute for this.
+  calendar events; restore **recreates an equivalent event with the same information — it is
+  not the original object**, and the event identifier will differ. Say why that is sufficient:
+  the only field a snapshot cannot reproduce is `attendees`, and C6 refuses those events
+  outright, so nothing this tool can delete is anything it cannot put back. A license warranty
+  disclaimer is not a substitute for this.
 
 - **#8 — Confirm C6 (attendee refusal) formally**, and verify the premise in Phase 6 with a
   second account: does deleting an invited event actually send a decline to the organizer
   and attendees? The refusal is cheap enough to keep either way, but the README rationale
   should not state an unverified claim as fact.
-- **#9 — Answer whether Cowork runs locally or remotely** before Phase 5. A remote sandbox
-  cannot reach a local `EKEventStore`, which would undo the justification for keeping undo
-  model-callable and let several guards be dropped.
+- **#9 — Answer whether Cowork runs locally or remotely.** A remote sandbox cannot reach a
+  local `EKEventStore`, which would undo the justification for keeping restore model-callable.
+
+- **#17 — Restore must ship in the SAME change as delete, never after.** C7 is the primary
+  user-facing control now that C1 is withdrawn; shipping the destructive half first leaves a
+  window with no way back. Test it end to end against a disposable calendar: create → delete →
+  restore → diff every persisted field.
+
+- **#18 — Snapshot must capture every field needed to reconstruct**, not just the DTO's default
+  set: `title`, `startDate`, `endDate`, `isAllDay`, `timeZone`, `location`, `notes`, `url`,
+  `availability`, `calendar_id`, and the recurrence rule. The read DTO withholds `notes`, `url`
+  and `location` unless requested — a snapshot built from it would silently drop them and the
+  loss would only appear at restore time, when the original is already gone.
 - **#10 — Verify `calshow:` opens Calendar.app at a date.** If it works, the C6 refusal can
   hand the user a clickable jump instead of just coordinates.
 - **#7 — Third-party attribution file.** If any expression is borrowed from either MIT

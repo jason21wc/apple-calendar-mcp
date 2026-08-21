@@ -24,14 +24,18 @@ struct CalendarRef: Codable, Sendable, Hashable {
     /// birthday calendars report false.
     let allowsContentModifications: Bool
     let isSubscribed: Bool
-    /// EventKit's permission AND our allowlist. `isImmutable` is deliberately NOT consulted:
-    /// the header says it governs renaming or deleting the calendar and explicitly "does NOT
-    /// imply that you cannot add events" -- including it would reject calendars the user
-    /// allowlisted and EventKit accepts.
+    /// Whether this server will write here. Since the allowlist (C1) was withdrawn on
+    /// 2026-08-20 this is exactly `allowsContentModifications` -- EventKit's own answer and
+    /// nothing else -- so a calendar shared with the user tomorrow is writable immediately.
+    ///
+    /// Kept as a distinct field rather than collapsed into the one above: it is the field a
+    /// caller should consult, and a future control could make the two diverge again.
+    ///
+    /// `isImmutable` is deliberately NOT consulted: the header says it governs renaming or
+    /// deleting the calendar and explicitly "does NOT imply that you cannot add events".
     let writable: Bool
-    /// Why `writable` is false, when it is. Without this, a calendar reporting
-    /// `allows_content_modifications: true` alongside `writable: false` reads as a
-    /// contradiction rather than as "EventKit would allow it; the allowlist does not".
+    /// Why `writable` is false, when it is -- so the value is actionable rather than a bare
+    /// negative the user has to go and investigate.
     let writableReason: String
     let trust: String
 

@@ -24,7 +24,7 @@ credentials.
 > or manipulated model and make each change reviewable. **They do not prevent it.**
 >
 > **The safeguards do not defend against a compromised machine — and the consequence is
-> worse than "they bypass the server".** The allowlist, the journal and its snapshots are
+> worse than "they bypass the server".** The journal and its snapshots are
 > ordinary files owned by your user account. Anything running as you — including the coding
 > agent this server talks to — can edit or delete them without going through this server.
 >
@@ -45,19 +45,29 @@ credentials.
 
 ## Status
 
-**Early development.** Phase 1 of 7 complete. There is no working MCP server yet — the
-current binary is a permission probe. Do not install this expecting a usable tool.
+**Read-only and usable.** Five read tools work against your real calendar from Claude Code,
+Codex and Claude Desktop: permission status, list calendars, list events, search events, and
+busy intervals. 95 tests pass.
+
+**No write tools exist yet.** Create, update and delete are designed but unbuilt — see
+`docs/IMPLEMENTATION-PLAN.md` §6. Nothing this server currently exposes can change your
+calendar.
 
 ## How it protects you
 
+These apply to the write tools, which are **not built yet**. They are listed so the design is
+public before the capability is.
+
 | Control | What it does |
 |---|---|
-| Writable-calendar allowlist | Writes only reach calendars you name in config, read once at startup |
-| Propose then commit | Every change is previewed and returns a token; a separate call applies it |
-| Verified summary | The confirming call must echo a server-generated sentence describing the change, so your approval prompt shows what will happen instead of an opaque id |
-| Attendee refusal | Events with other people on them cannot be modified at all — deleting one sends a decline or cancellation to real people, and nothing can take that back |
-| Mutation journal | Every change is recorded with a full pre-state snapshot |
+| Host approval on every write | Write tools are configured `"ask"` in your MCP client, which prompts per call and offers no "always allow". This is the only control here that the AI model cannot reach — it is enforced in the client, not in this server |
+| Attendee refusal | Events with other people on them cannot be modified at all — deleting one sends a decline or cancellation to real people, and nothing can take that back. The refusal returns the date, time and calendar so you can find and decline it yourself |
+| Restorable by construction | Every change is snapshotted first, and anything this server can delete it can put back. **Restore recreates an equivalent event with the same information — it is not the original object, and its identifier will differ.** That is sufficient precisely because the one field a snapshot cannot reproduce is the attendee list, and events with attendees are refused outright |
+| Mutation journal | Every change is recorded with a full pre-state snapshot, and a restore is recorded as a new entry referencing the original rather than erasing it |
 | No bulk operations | One event per call |
+
+**Writable means whatever macOS says is writable**, including calendars shared with you. If
+you can write to it in Calendar.app, this server can too.
 
 ## Requirements
 

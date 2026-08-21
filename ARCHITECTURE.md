@@ -14,7 +14,7 @@ Code and Codex read and write access to the user's macOS Calendar.
 ```
 MCPLayer         tool contracts, JSON schemas, request wiring   (never sees an EK* type)
    ↓
-CalendarKit      allowlist, limits, tokens, journal,
+CalendarKit      limits, journal, snapshots,
                  recurrence policy, guards                      (immutable DTOs only)
    ↓
 EventKitAdapter  the ONLY file that imports EventKit
@@ -36,7 +36,7 @@ hardened-runtime binary missing the calendars entitlement — potentially unreco
 | Info.plist embedded via `-sectcreate __TEXT __info_plist` | An SPM executable has no bundle and so cannot otherwise carry `NSCalendarsFullAccessUsageDescription` |
 | Stable self-signed cert + hardened runtime + entitlement | The TCC grant is checked against the **designated requirement**, which for a certificate-signed binary is `identifier "..." and certificate root = H"..."` — identity-based, so rebuilds keep the grant. Ad-hoc signing yields a **cdhash-based** requirement instead, which breaks on every build. Measured 2026-08-19 |
 | **Self-disclaiming re-exec at startup** | A plain executable never gets its own TCC identity — the grant is attributed to whoever spawned it, and an `.app` wrapper does not change that. Re-spawning once with `responsibility_spawnattrs_setdisclaim` makes the child its own responsible process. Verified 2026-08-19; the private symbol is resolved via `dlsym`, so its removal degrades to inherited mode rather than failing to launch |
-| One guarded `commit()`, four thin tool names | One place for guards; four separately-allowlistable names so a single "always allow" cannot authorize everything |
+| One guarded mutation path, separate thin tool names | One place for guards; distinct names so each can carry its own `toolPolicy` and a single approval cannot authorize everything |
 | Nothing cached | EventKit identifiers change on sync; fetched objects go stale after `EKEventStoreChangedNotification` |
 | Custom `SerialExecutor` preferred over continuation bridge | An actor releases isolation at every `await`, so it would not serialize; a custom executor makes synchronous EventKit calls genuinely non-reentrant. Decided in Phase 4 — fall back if it needs `@unchecked Sendable` |
 
@@ -51,8 +51,15 @@ source names — is attacker-influenceable through inbound invitations and is tr
 `external_untrusted` throughout. It is never interpreted as instructions, configuration,
 paths, or shell input.
 
-Containment controls C1–C6 live in `_ai-context/PROJECT-MEMORY.md` and are governed:
-amending one requires a fresh `evaluate_governance`.
+Containment controls live in `_ai-context/PROJECT-MEMORY.md` and are governed: amending one
+requires a fresh `evaluate_governance` and a same-turn memory write. Live set as of
+2026-08-20: **C3, C4, C5, C6, C7**. C1 (writable-calendar allowlist) was withdrawn by the
+user's decision; C2/C2a/C4a were superseded by host-enforced `toolPolicy` and by C7.
+
+**C7 — every mutation must be restorable**, where restorable means the *information* returns,
+not the original object. A new event carrying the same field values satisfies it. This is
+achievable only because C6 refuses events with attendees, and `attendees` is the single field
+a snapshot cannot reproduce (`readonly`, `EKCalendarItem.h:97`).
 
 **What the controls do not do.** They reduce blast radius and make each mutation
 individually reviewable. They do not prevent a model acting on injected instructions from

@@ -22,19 +22,19 @@
 
 | Condition | What to do when it fires |
 |---|---|
-| A containment control (C1-C6) would be weakened, amended, or dropped | Stop. Run `evaluate_governance`, then write the amendment into `PROJECT-MEMORY.md` in the same turn |
+| A containment control (C3-C7) would be weakened, amended, or dropped | Stop. Run `evaluate_governance`, then write the amendment into `PROJECT-MEMORY.md` in the same turn |
 | A probe or `--doctor` reports `inherited-*` rather than `disclaimed-child` | The self-disclaiming re-exec is not running — either the private symbol vanished on a macOS update or the spawn failed. Calendar access is then the host's, not ours. Do not ship a release in this state without saying so in the README |
 | Calendar access stops working after moving or reinstalling the binary | Expected: the TCC grant is keyed to the absolute path. Re-run `--setup` at the new path |
 | A Calendar call returns denied while `--doctor` reports green | Suspect the macOS 26.5 silent-denial trap: hardened runtime present, entitlement missing or cdhash drifted |
 | Any code is copied (not merely patterned) from `che-ical-mcp` or `orchard-mcp` | Flag to the human before it lands; add `NOTICE` + a provenance header |
-| Writes start failing after an iCloud resync | Allowlist resolution is failing closed on identifier drift — expected; re-run `--doctor` and re-add the calendar |
+| Writes start failing after an iCloud resync | `eventIdentifier` drifts on sync; re-find the event by content rather than by stored id |
 | The MCP Swift SDK reaches 1.0, or adds spec revision `2026-07-28` | Re-evaluate the exact pin and the one-revision-behind decision |
 
 ## Standing Authorizations
 
 | Granted | Limits | When |
 |---|---|---|
-| Write capability (create, update, delete, undo) on the user's real calendar | Only under containment controls C1-C6; any weakening needs fresh governance | 2026-08-17 |
+| Write capability (create, update, delete, restore) on the user's real calendar | Only under containment controls C3-C7, and only once a write tool is confirmed to prompt; any weakening needs fresh governance | 2026-08-20 |
 | Licence is Apache-2.0 | — | 2026-08-17 |
 | Run fresh-context review agents at plan approval and after substantial phases without asking each time | Small edits do not warrant it | 2026-08-18 |
 | Undo stays model-callable rather than CLI-only | Behind guards 5-9; premise (Cowork has no terminal) still unverified | 2026-08-18 |
@@ -64,5 +64,7 @@
   no obligation; code, comments, string literals and test fixtures do.
 - **Integration tests never run against real personal calendar data.** Disposable calendars
   only, opt-in and env-gated.
-- **No writes to a calendar not named in the allowlist**, and the allowlist is read once at
-  startup, never reloaded.
+- **No destructive tool ships ahead of its restore path.** Delete and its restore land in the
+  same change, tested end to end against a disposable calendar: create → delete → restore →
+  diff every persisted field. Shipping the destructive half first leaves a window with no way
+  back, and C7 is the primary user-facing control now that the allowlist is withdrawn.

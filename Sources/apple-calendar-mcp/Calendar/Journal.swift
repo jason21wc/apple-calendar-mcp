@@ -13,7 +13,7 @@
 // It is a record for the human: what changed, when, on which calendar, and enough detail to
 // put it back by hand. It is append-only BY CONVENTION -- a file owned by the user, in the
 // user's home directory, which any same-uid process can rewrite or truncate. PROJECT-MEMORY
-// says this plainly about the allowlist and snapshots, and it is equally true here.
+// says this plainly about the snapshots, and it is equally true here.
 //
 // So: not evidence against an attacker, and nothing downstream should treat a journal entry
 // as proof that this server made a change. Anything needing that guarantee has to hold it in

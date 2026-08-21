@@ -45,15 +45,17 @@ commit_delete(token, confirm_summary)
    to the organizer and everyone invited; deleting one you organized sends a cancellation.
    Irreversible, with a human audience. The refusal returns title, start, calendar,
    organizer and attendee count so the user can find and decline it by hand.
-2. **Writability** — `allowsContentModifications && inAllowlist`. Not `isImmutable`, which
-   governs the calendar object, not its contents.
-3. **Allowlist** — distinct error from (2), since an empty allowlist is the default.
-4. **Span required** on any recurring target.
-5. **Undo of a `futureEvents` delete → refuse** (recreating a series tail yields two masters).
-6. **Duplicate check** before recreating (best-effort; sync is asynchronous).
-7. **Post-state hash** on undo-of-create, so later human edits are not destroyed.
-8. **Idempotency** by journal-entry id.
-9. **72-hour undo horizon.**
+2. **Writability** — `allowsContentModifications`, EventKit's own answer and nothing else.
+   Not `isImmutable`, which governs the calendar object rather than its contents. The
+   writable-calendar allowlist was **withdrawn 2026-08-20**; a calendar shared with the user
+   is writable the moment macOS says so, with no config change.
+3. **Span required** on any recurring target.
+4. **Restore of a `futureEvents` delete → refuse** (recreating a series tail yields two
+   competing masters).
+5. **Duplicate check** before recreating (best-effort; sync is asynchronous).
+6. **Post-state hash** on restore-of-create, so later human edits are not destroyed.
+7. **Idempotency** by journal-entry id, keyed on the journal tail so it survives a respawn.
+8. **72-hour restore horizon.**
 
 ## Semantics
 

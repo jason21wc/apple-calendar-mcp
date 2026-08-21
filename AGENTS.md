@@ -6,7 +6,7 @@
 **Mode:** Standard
 
 > **Start here.** Phases 1-3 are built, tested and published; **Phase 4 (read surface) is
-> next**. Read `_ai-context/PROJECT-MEMORY.md` (containment controls C1-C6, 43 gotchas — most
+> next**. Read `_ai-context/PROJECT-MEMORY.md` (containment controls C3-C7, 63 gotchas — most
 > of them measured platform behaviour that will cost you hours if rediscovered), then
 > `docs/IMPLEMENTATION-PLAN.md` (rev. 5).
 >

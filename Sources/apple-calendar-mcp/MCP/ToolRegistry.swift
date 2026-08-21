@@ -44,7 +44,8 @@ enum ToolRegistry {
                 name: "calendar_list_calendars",
                 description: """
                     List calendars that hold events, with whether each is writable. Writability \
-                    reflects both EventKit's own permission and this server's allowlist.
+                    is EventKit's own answer: any calendar macOS lets you write to,
+                    including calendars shared with you.
                     """,
                 inputSchema: .object(["type": .string("object"), "properties": .object([:])]),
                 annotations: readOnly),

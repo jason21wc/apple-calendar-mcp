@@ -1,7 +1,7 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # Session State
 
-**Last Updated:** 2026-08-17
+**Last Updated:** 2026-08-20
 **Memory Type:** Working (transient)
 **Lifecycle:** Prune at session start per §7.0.4
 
@@ -12,213 +12,154 @@
 
 ## Current Position
 
-- **Phase:** Phases 1-3 complete, published, and security-audited. **Phase 4 is next.**
+- **Phase:** Phases 1–4 complete, published, in daily use. Phase 5 substrate (`Journal.swift`)
+  built. **Next work is the write surface**, redesigned this session.
 - **Mode:** Standard
 - **Repo:** https://github.com/jason21wc/apple-calendar-mcp (public, Apache-2.0)
-- **Active Task:** None in flight. Phase 4 is the read surface: DTOs, schemas,
-  `CalendarStore` actor, `TimeSemantics`, `Limits`, and five read tools.
+- **Active Task:** None in flight. Next code is `calendar_create_event` — but see
+  **Blocked On #1**, a two-minute human check that gates it.
 
 ## Quick Reference
 
 | Metric | Value |
 |--------|-------|
 | Project | **apple-calendar-mcp** |
-| Code written | Probe, `Reexec`, `CLI`, `AuthorizationState`, `TCCInspector`, `Doctor`, `SetupFlow`, 3 scripts |
 | Installed at | `/usr/local/bin/apple-calendar-mcp` (root:wheel), granted, `--doctor` clean |
-| Security audit | Complete — 3 HIGH, 4 MEDIUM, 5 LOW; all HIGH and MEDIUM fixed |
-| Builds | Clean, no warnings |
-| Signed | Yes — stable self-signed cert, entitlement, hardened runtime |
-| TCC identity | **Own row confirmed** (path-keyed) |
-| Plan | rev. 5, approved 2026-08-19 |
-| Containment controls | C1-C6 (C6 pending confirmation) |
-| Governance audits | 5 logged; latest `gov-f551d84f9142` |
-| Tool surface | 14 (6 read, 4 propose, 4 commit) |
+| Tests | **99 passing** via `./scripts/test.sh` |
+| Tool surface | **5, all read-only.** No write tool exists yet |
+| Desktop config | `--read-only`, `toolPolicy: {"*": "ask"}` (backup taken before edit) |
+| Containment controls | C3, C4, C5, C6, **C7 (new)**. C1 withdrawn; C2/C2a/C4a superseded |
+| Governance audits | 6 logged; latest `gov-120ca260c415` (REVIEW, no veto) |
+| Plan | **rev. 6** — §4, §6, §13 rewritten 2026-08-20 |
 
-## Phase 1 Result — gate PASSED, but only after an architecture change
+## What changed this session — the write design was reframed twice
 
-The original design **failed** the gate: a correctly signed binary (embedded Info.plist,
-calendars entitlement, hardened runtime, stable cert) still got **no TCC identity of its
-own**. Granting from a terminal created a TCC row for **that terminal app** and zero rows
-for us; the binary reported `fullAccess` purely by inheritance. A signed `.app` wrapper —
-the plan's designated fallback — **did not fix it either**.
+Both changes came from the human, and both **removed** design surface rather than adding it.
 
-Fix adopted: **self-disclaiming re-exec** (`Sources/apple-calendar-mcp/Reexec.swift`). The
-process re-spawns itself once with the private `responsibility_spawnattrs_setdisclaim`
-attribute, making the child its own responsible process. Verified end to end.
+### 1. Reads must never prompt; writes must always prompt
 
-| Check | Result |
-|---|---|
-| `__TEXT,__info_plist` embedded via `sectcreate` | Works — runtime reads its own bundle id |
-| Signed: identity + entitlement + hardened runtime | `Authority=apple-calendar-mcp local signing`, `flags=0x10000(runtime)` |
-| Status before disclaim | `fullAccess` — inherited from the host terminal, misleading |
-| Status after disclaim | `notDetermined` — our own identity |
-| Grant under disclaim | **TCC row created for our binary** |
-| Rebuild, same path, new cdhash | Grant **survives** (identity-based designated requirement) |
-| Same binary, different path | Grant **lost** (`client_type=1`, path-keyed) |
+Confirmed working: a read query in Cowork returned results with no approval prompt.
+`readOnlyHint: true` is doing that. What is **not yet confirmed** is that a write tool *does*
+prompt under the same config — see Blocked On #1.
 
-**Superseded:** the `.build` grant was revoked 2026-08-19. The only live grant is
-`/usr/local/bin/apple-calendar-mcp` (root-owned). Installing elsewhere requires a fresh
-`--setup` at that path — the grant is path-keyed.
+### 2. "Full ability to revert" was a symptom, not a specification
 
-## Published 2026-08-19
+> *"I don't specifically need it to 'revert'. I need to be able to put things back the way it
+> was, but it doesn't have to be the exact calendar event — it can be a new one with all the
+> same info."*
 
-Public at `github.com/jason21wc/apple-calendar-mcp`, Apache-2.0, copyright Jason Collier
-(personal, not Collier HMG). `_ai-context/` is published deliberately — the gotchas are the
-most valuable content in the repo. **Sanitised before publishing**: absolute home paths, the
-host terminal's bundle identifier, and this machine's certificate fingerprint were
-generalised. Keep it that way — re-check before each push.
+This dissolved the problem three previous designs died on. Every blocker — `eventIdentifier`
+changing on sync, invitation state being unrecoverable, series membership being unrestorable —
+exists **only** if restoration must return the original object. It does not have to.
 
-A code review before publishing found two real security defects in the setup scripts (the
-login password reaching argv, and a private key surviving Ctrl-C) plus a broken handoff
-between two scripts. All fixed; see LEARNING-LOG.
+**And the boundary was already drawn.** Attendees are the single field a snapshot cannot
+reproduce (`readonly` in EventKit), and **C6 already refuses to touch events with attendees**.
+So the set of events this tool may delete is exactly the set it can fully put back. Two
+constraints drawn for unrelated reasons landed on the same line.
 
-## Phase 2 Result — gate passed
+Recorded as **C7** in PROJECT-MEMORY, replacing C2/C2a/C4a.
 
-Skeleton complete. `Command` enum with dispatch (`serve` / `--grant` / `--probe` /
-`--version` / `--help`), metadata read from the embedded Info.plist rather than hardcoded,
-and honest exit codes: 64 for a bad flag, 69 for `serve` (not implemented until Phase 4), so
-a client sees a real failure rather than a silent exit that looks like a crash.
+### 3. C1 (writable-calendar allowlist) withdrawn — and it was a live defect, not just a decision
 
-Gate: `__TEXT,__info_plist` present, entitlement verified on the signed binary, signature
-valid, stdout clean.
+Human's decision, governance-evaluated (`gov-120ca260c415`, REVIEW, no S-Series veto).
+Writable now means whatever EventKit reports via `allowsContentModifications` — including
+calendars shared with the user later, with no config change. Their reasoning: the OS already
+decides what they may write to, and a second gate only this tool honours adds friction without
+changing who can reach the data.
 
-## Phase 3 Result — gate passed
+**This also kills the `source_type == .local` guard** proposed earlier the same day. Its whole
+rationale was CalDAV propagation on shared calendars — which is now explicitly wanted.
 
-`AuthorizationState` (five states, `.writeOnly` handled distinctly), `TCCInspector`,
-`Doctor`, `SetupFlow`. `--grant` is now `--setup` and the old name still works.
+**Grepping before recording the reversal found the allowlist live in shipped code.** It decided
+`calendar_list_calendars`'s `writable` flag, defaulted to empty, and failed closed — so with no
+config file present (this machine included) **every calendar was reported `writable: false`,
+reason "not in the allowlist"**. `Allowlist.swift` is deleted; `writable` is now
+`allowsContentModifications` alone. Four regression tests added, including one asserting no
+refusal string mentions an allowlist — the reason text is user-facing, and a stale one sends
+someone hunting for a config file that no longer exists. **Not yet verified live:** the
+installed binary at `/usr/local/bin` still predates this fix (see Next Actions).
 
-**Design correction found while building:** the plan had `--doctor` compare cdhashes. That
-is the wrong check — rebuilds keep the grant; what breaks it is the **path** changing. And
-`TCC.db` turned out to be unreadable by our own binary (needs Full Disk Access, which the
-terminal has and we do not). The replacement is better and needs no privilege: a disclaimed
-process sees only its own grant, so `disclaimed-child` + `fullAccess` **is** proof of
-ownership. See gotchas 28-29.
-
-`--setup` refuses to proceed under inherited identity, which structurally prevents the exact
-Phase 1 failure — granting to the terminal instead of to us.
-
-Verified failure paths: inherited identity → exit 1; binary at an ungranted path → exit 1
-naming the path to fix it; `--setup` under inherited identity → refuses.
-
-## Verified 2026-08-20 — the last Phase 1 gap is closed
-
-The disclaim was only ever tested from a shell. It is now verified under a real MCP client:
-Claude Desktop spawned `/usr/local/bin/apple-calendar-mcp` and the probe recorded
-`mode=disclaimed-child`, `status=fullAccess`, `parent=/Applications/Claude.app/Contents/Helpers/disclaimer`.
-
-Claude Desktop ships its own Anthropic-signed `disclaimer` helper using the same private API
-(gotcha 44), so it had already made us self-responsible and our re-exec correctly did not
-fire. The connection then closed as designed — there is no server loop until Phase 4, so the
-binary writes its probe and exits 69.
-
-## Carry Into Phase 4
-
-- Server loop MUST treat stdin EOF as unconditional shutdown (BACKLOG #12).
-- Orphan behaviour under SIGTERM/SIGKILL is still **unverified** — needs the long-running
-  server to test (BACKLOG #11).
-- Refuse to serve when `--doctor` would fail: serving without an owned grant produces
-  silent, confusing failures for the user.
-
-## Carry Into Phase 3 (complete)
-
-- `--doctor` must read `TCC.db` for a row matching **our own path**. `authorizationStatus`
-  cannot distinguish our grant from an inherited one, so a status-based check is worthless.
-- `--doctor` must report `disclaim_mode`; `inherited-*` means the re-exec is not working and
-  Calendar access belongs to the host.
-- `--grant` becomes `--setup`; it already warns that the grant is path-keyed.
-- Handle all **five** authorization states (`Authorized` is a deprecated alias for
-  `FullAccess`, runtime-indistinguishable).
-
-## Carry Into Phase 2 (complete)
-
-- `--setup` must run at the **final installed path**, never from `.build`.
-- Client configs must name that exact absolute path.
-- `--doctor` must report: disclaim mode active vs inherited, whether a TCC row exists for
-  our own path (read `TCC.db`, not `authorizationStatus` — status cannot tell them apart),
-  and say plainly when the grant belongs to a different path.
-- Signing needs one interactive keychain setup per machine before it works unattended.
-
-## Security Posture (closed 2026-08-19)
-
-The stale `.build` Calendar grant is **revoked** (auth_value 0); `/usr/local/bin/apple-calendar-mcp`
-holds the only live grant. That closes the impersonation exposure the audit found: a
-user-writable path with a Calendar grant, combined with a certificate that signs without a
-prompt, let any same-uid process hold calendar access under this tool's name.
-
-Note for anyone repeating this: System Settings shows the display name only, so two grants
-for the same binary at different paths are visually identical. Distinguish them by querying
-`TCC.db`; `tccutil` cannot target either (gotcha 32).
-
-Audit outcome: 3 HIGH, 4 MEDIUM, 5 LOW — all HIGH and MEDIUM fixed, plus a second review
-round that found the first fix had reinstated the bypass it replaced.
+The governance evaluation surfaced `acct-ledger-integrity-le2-audit-trail-immutability`, and it
+is the right frame for C7: *corrections are made through reversing entries, never by editing or
+deleting the original record.* Restoration is a **new forward operation that references the
+original journal entry**, not a rollback.
 
 ## Blocked On (human decisions)
 
 | # | Decision | Blocks |
 |---|---|---|
-| ~~1~~ | ~~Bundle identifier~~ — **settled**: `com.collierhmg.apple-calendar-mcp`, now baked into the designated requirement | done |
-| 2 | **Does Cowork run locally or remotely?** | Phase 5 — decides whether undo guards 5-9 are built at all |
-| 3 | **Confirm C6** (attendee refusal) formally | Phase 6 |
-| 4 | **Default allowlist empty** ⇒ all writes fail closed on a fresh install | Phase 5 |
-
-## Plan of Record
-
-**`docs/IMPLEMENTATION-PLAN.md`** (rev. 3) — approved 2026-08-18, copied into the repo so
-it survives session restarts. Read it before touching code: tool contract, field-level
-schemas, the guard set (under review — see plan §4), recurrence semantics, phase gates. Summaries live in
-`ARCHITECTURE.md` and `SPECIFICATION.md`; the plan is authoritative where they differ.
-
-## Resuming After a Restart
-
-1. Read `AGENTS.md` → `_ai-context/PROJECT-MEMORY.md` (controls C1-C6, 43 gotchas, open
-   questions) → `docs/IMPLEMENTATION-PLAN.md`.
-2. Phases 1-3 are built, tested and published. Next work is **Phase 4** (read surface).
-3. See Blocked On below for what needs a human.
-
-## Session Summary
-
-**2026-08-17 — onboarding.** Scaffolded `standard` kit (11 files). Captured founding
-context in `PROJECT-MEMORY.md`. Three scope reversals landed mid-session and are all
-recorded: read-only → read+write, personal-only → likely public open source, and the
-resulting distribution/signing correction.
-
-**2026-08-18 — planning.** Plan taken to rev. 3 through three independent reviews
-(adversarial, cold-context validation, coherence audit). Five claims previously recorded as
-"verified" were **wrong** and were corrected against the local EventKit headers — see
-Gotchas 1 and 10-15. Structural fixes: `create` was a second ungated write path; the
-journal-reading tool leaked every field the privacy policy withholds; undo of a
-`futureEvents` delete would have produced two competing masters; undo-of-create could
-destroy later human edits. Two overstated security claims withdrawn (§10 of the plan).
-
-Governance: `gov-03e091f8d62b` PROCEED (onboarding) · `gov-84360fe55592` REVIEW (scaffold +
-plan) · `gov-cec3bcaf6e71` **ESCALATE** on write capability
-(`meta-safety-non-maleficence-privacy-security`, S-Series), cleared by explicit human
-approval under C1-C5 · `gov-f551d84f9142` REVIEW amending C1/C2/C3, carving out C5, adding
-C6, and recording the same-uid residual risk. Reasoning traces logged against each ID.
+| **1** | **Does a WRITE tool actually prompt?** Ask Cowork to *draft* (not send) an email. `apple-mail`'s `create_draft` is installed and its proxy auto-approves only read tools. Report whether it prompted. ~2 minutes, no new code, nothing created but a deletable draft. | Everything below |
+| 2 | Does Cowork run locally or remotely? | Whether restore needs to be model-callable at all |
+| 3 | Confirm C6 formally, and verify in Phase 6 that deleting an invited event really does notify the organizer | README wording |
 
 ## Next Actions
 
-1. **Phase 4 — read surface.** Five read tools, DTOs, schemas, the CalendarStore actor,
-   time semantics, and stdin-EOF shutdown. See plan §5.
+1. **Reinstall so the writability fix is live** — the granted binary still reports every
+   calendar as non-writable:
+   `swift build -c release && ./scripts/sign.sh && sudo cp .build/release/apple-calendar-mcp /usr/local/bin/apple-calendar-mcp`
+   Sign **before** copying: `cp` preserves signatures, so signing after installing signs the
+   wrong file. Then ask Cowork to list calendars and confirm `writable: true` on yours.
+2. **Blocked on #1.** Nothing else should be built until it is answered — a write tool that
+   does not prompt fails the human's stated requirement outright.
+3. **Switch `toolPolicy` from `{"*": "ask"}` to per-tool.** Write tools `"ask"`; read tools
+   left unlisted so they stay silent. Encodes the requirement exactly rather than by side
+   effect, and removes the open question of whether the `*` wildcard was even honoured.
+4. **Build in this order:** `calendar_create_event` → `calendar_delete_event` **with restore in
+   the same change** → `calendar_update_event`. Delete must never ship before its restore path.
+5. **Re-run the §6 gates** — items 1, 3, 4, 5 still apply; item 2 (`source_type`) is withdrawn.
 
-<details><summary>Superseded next-actions</summary>
+## Plan of Record
 
-1. **Phase 2 — Skeleton.** Promote the probe into the real package: arg dispatch,
-   `--version`, and keep `Reexec` as the first thing `main` does. Gate: `otool -s __TEXT
-   __info_plist` shows the section and `codesign -d --entitlements` verifies.
+**`docs/IMPLEMENTATION-PLAN.md`** — **rev. 6**, §4/§6/§13 rewritten 2026-08-20. It is a **copy**
+of `~/.claude/plans/proceed-with-writing-the-linear-iverson.md`; replace it from there on every
+revision (a stale rev. 3 copy was once live while `OPERATIONS.md` named it authoritative).
 
-<details><summary>Phase 1 (complete) — original instructions</summary>
+## Resuming After a Restart
 
-1. **Phase 1 — TCC spawn-path gate.** Build a minimal stub that calls
-   `requestFullAccessToEvents` and prints `authorizationStatus(for:.event)`. Embed the
-   Info.plist via `-sectcreate`, sign with a stable self-signed cert + entitlement +
-   hardened runtime. Grant from Terminal, then have Claude Code and Codex each spawn the
-   same binary and print status again.
-   **Gate:** all hosts report `fullAccess` AND System Settings → Privacy → Calendars lists
-   *apple-calendar-mcp*, not Terminal.
+1. Read `AGENTS.md` → `_ai-context/PROJECT-MEMORY.md` (controls, 63 gotchas, the human's stated
+   requirements table) → `docs/IMPLEMENTATION-PLAN.md` §6.
+2. Phases 1–4 are built, tested, published and in daily use. The journal is built.
+3. **Start at Blocked On #1.** It is the only thing in the way.
 
-   *Outcome: failed as written, passed after adding the self-disclaiming re-exec.*
-</details>
-2. Answer Open Question #1 (Cowork local or remote) before Phase 5 — it decides whether
-   several undo guards get built at all.
-3. Confirm the bundle identifier before Phase 1 (it is fixed by the TCC grant).
+## Security Posture
+
+The stale `.build` Calendar grant is **revoked** (`auth_value 0`) and that deny row must stay —
+removing it would let a user-writable path be re-granted. `/usr/local/bin/apple-calendar-mcp`
+holds the only live grant. Never grant Calendar access to a binary under `.build`.
+
+System Settings shows the display name only, so two grants for the same binary at different
+paths look identical; distinguish via `TCC.db` (`tccutil` cannot target either — gotcha 32).
+
+**Unrelated to this project, still true:** a plaintext iCloud app-specific password sits in
+`claude_desktop_config.json` under `apple-mail` → `APPLE_MAIL_MCP_IMAP_PASSWORD_ICLOUD`. Raised;
+the human has scoped Apple Mail and QuickBooks guardrails to their own projects.
+
+The allowlist is gone, but the journal and snapshots remain **same-uid writable** — reductions,
+not boundaries. `toolPolicy` is the one control in this project the model cannot reach, because
+it is enforced in the host process.
+
+## Phase Results (condensed)
+
+**Phase 1 — passed only after an architecture change.** A correctly signed binary got no TCC
+identity of its own; a signed `.app` wrapper did not fix it. Fix: **self-disclaiming re-exec**
+(`Reexec.swift`). Grant survives rebuild at the same path (identity-based requirement); grant is
+lost if the path changes (`client_type=1`).
+
+**Phase 2 — passed.** Command dispatch, metadata from the embedded Info.plist, honest exit codes.
+
+**Phase 3 — passed.** Five authorization states, `TCCInspector`, `Doctor`, `SetupFlow`. `--setup`
+refuses to run under inherited identity, structurally preventing the Phase 1 failure. `--doctor`
+proves ownership with no privilege: a disclaimed process sees only its own grant, so
+`disclaimed-child` + `fullAccess` **is** the proof (gotchas 28–29).
+
+**Phase 4 — passed, then failed in real use, then fixed.** Five read tools shipped with every
+event tool returning numbers where its own schema promised strings — Swift encodes `Date` as
+seconds since 2001, and the SDK validates `structuredContent` in memory before serialization.
+DTOs now carry pre-formatted RFC 3339 strings; 6 schema-conformance tests added with a positive
+control. A second real-use report found timestamps pinned to `Z`: `ISO8601DateFormatter` defaults
+to GMT, and `TimeZone.current` is a snapshot that would keep the departure city's offset after a
+flight. Now `autoupdatingCurrent` with an explicit formatter zone, so travel adjusts by itself.
+
+**Verified 2026-08-20:** the disclaim works under a real MCP client. Claude Desktop ships its own
+Anthropic-signed `disclaimer` helper using the same private API (gotcha 44), so it had already
+made us self-responsible and our re-exec correctly idled.

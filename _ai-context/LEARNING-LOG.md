@@ -163,6 +163,33 @@ on one too, but the word "measurement" made it read as the cure rather than the 
 **Rule:** an experiment that also ships the capability it is measuring is not an experiment.
 If the measurement can be taken without the capability, it must be.
 
+**2026-08-20 — I treated a stated requirement as a specification instead of a symptom.** The
+human asked for "full ability to revert". I took that as *restore the original object*, and
+spent three refuted designs on identifier stability, invitation state and series membership —
+all genuinely unsolvable. Asked directly, the actual need was "put things back the way they
+were, and it can be a new event with the same info." Every blocker vanished. **Rule:** when a
+requirement leads somewhere impossible, re-examine the requirement before the design. Ask what
+outcome it protects, not what mechanism it names.
+
+**2026-08-20 — Two constraints drawn for unrelated reasons turned out to be the same line.**
+C6 refuses events with attendees (they would mail real people). Restorability fails on exactly
+one field — attendees, readonly in EventKit. So the set the tool may delete is precisely the
+set it can fully put back. **Rule:** when a hard boundary already exists, check whether the new
+problem stops at the same place before drawing a second one.
+
+**2026-08-20 — Withdrawing a decision is a code change, not a memory edit.** C1 was dropped in
+conversation and the natural next move was to write it into PROJECT-MEMORY and move on. Grepping
+the repo first found the allowlist live in shipped code, silently reporting every one of the
+user's calendars as non-writable. **Rule:** when a decision is reversed, grep for its
+implementation before recording the reversal — a control written for a future phase may already
+be load-bearing in a shipped one.
+
+**2026-08-20 — `private` on a pure function is where untested logic hides.** `writableReason`
+took two booleans, returned four strings, needed no calendar and no permission — and was
+untestable purely because of an access modifier chosen by reflex. **Rule:** if a function is
+pure and its output is user-facing, make it internal and test it; "it's an implementation
+detail" is not a reason when the implementation detail is a sentence the user reads.
+
 ---
 
 ## Graduated Patterns

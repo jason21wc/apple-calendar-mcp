@@ -72,8 +72,7 @@ enum ToolHandlers {
     }
 
     private static func listCalendars(_ store: CalendarStore) async throws -> CallTool.Result {
-        let writable = Allowlist.writableCalendarIds
-        let calendars = await store.calendars(writableIds: writable)
+        let calendars = await store.calendars()
         let envelope = ReadEnvelope(
             items: calendars,
             truncated: false,

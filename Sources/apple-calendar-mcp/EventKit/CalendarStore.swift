@@ -49,12 +49,16 @@ actor CalendarStore {
 
     // MARK: - Calendars
 
-    func calendars(writableIds: Set<String>) -> [CalendarRef] {
+    func calendars() -> [CalendarRef] {
         store.calendars(for: .event).map { cal in
-            // `allowsContentModifications` is EventKit's own answer. `isImmutable` is NOT
-            // consulted: its header says it governs renaming or deleting the calendar and
-            // "does NOT imply that you cannot add events or reminders to the calendar".
-            // Including it would reject calendars the user allowlisted that EventKit accepts.
+            // `allowsContentModifications` is EventKit's own answer, and as of 2026-08-20 it is
+            // the ONLY answer -- the writable-calendar allowlist (C1) was withdrawn by the
+            // user's decision. If macOS lets them write to a calendar, so does this server,
+            // including one shared with them tomorrow, with no config change.
+            //
+            // `isImmutable` is NOT consulted: its header says it governs renaming or deleting
+            // the calendar and "does NOT imply that you cannot add events or reminders to the
+            // calendar". Consulting it would reject the user's own writable calendars.
             let permitted = cal.allowsContentModifications
             return CalendarRef(
                 id: cal.calendarIdentifier,
@@ -63,10 +67,8 @@ actor CalendarStore {
                 sourceType: Self.describe(cal.source?.sourceType),
                 allowsContentModifications: permitted,
                 isSubscribed: cal.isSubscribed,
-                writable: permitted && writableIds.contains(cal.calendarIdentifier),
-                writableReason: Self.writableReason(
-                    permitted: permitted,
-                    allowlisted: writableIds.contains(cal.calendarIdentifier)),
+                writable: permitted,
+                writableReason: Self.writableReason(permitted: permitted),
                 trust: untrustedMarker)
         }
     }
@@ -178,13 +180,11 @@ actor CalendarStore {
             trust: untrustedMarker)
     }
 
-    private static func writableReason(permitted: Bool, allowlisted: Bool) -> String {
-        switch (permitted, allowlisted) {
-        case (true, true):   return "writable"
-        case (true, false):  return "EventKit permits writing, but this calendar is not in the allowlist"
-        case (false, true):  return "in the allowlist, but EventKit itself does not permit writing here"
-        case (false, false): return "EventKit does not permit writing here (subscribed, holiday or birthday calendar)"
-        }
+    // Internal rather than private so the reason strings are testable without a calendar.
+    static func writableReason(permitted: Bool) -> String {
+        permitted
+            ? "writable"
+            : "EventKit does not permit writing here (subscribed, holiday or birthday calendar)"
     }
 
     private static func describe(_ status: EKEventStatus) -> String {

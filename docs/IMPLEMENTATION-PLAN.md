@@ -1,4 +1,4 @@
-# apple-calendar-mcp — Implementation Plan (rev. 5)
+# apple-calendar-mcp — Implementation Plan (rev. 6)
 
 ## Context
 
@@ -118,12 +118,13 @@ Full text in `_ai-context/PROJECT-MEMORY.md`; summarised here.
 
 | | Control | State |
 |---|---|---|
-| C1 | Writable-calendar allowlist, `{identifier, title, source}` all three matching, fail closed, loaded once at startup | Live, applies from Phase 5 |
-| C2 | Only the committing call is destructive; takes a token plus a server-minted `confirm_summary` echoed byte-exactly | **Under review** — its subject (the destructive call) is undefined while the write surface is deferred |
-| C2a | Always confirm, even on a single match | Same |
+| ~~C1~~ | Writable-calendar allowlist | **WITHDRAWN** 2026-08-20 by human decision (`gov-120ca260c415`). Writable = `allowsContentModifications`, whatever EventKit says — including calendars shared with the user later, with no config change |
+| ~~C2~~ | `confirm_summary` echo | **SUPERSEDED** by host-enforced `toolPolicy: "ask"`, which the model cannot reach |
+| ~~C2a~~ | Always confirm, even on a single match | **SUPERSEDED** — `"ask"` prompts on every call and offers no always-allow |
 | C3 | Two-phase propose/commit plus a per-event JSON pre-state snapshot | Live from Phase 5 |
 | C4 | Append-only journal sufficient to reverse | Live from Phase 5 |
-| C4a | Undo semantics | **Under review** — see §6 |
+| ~~C4a~~ | Undo semantics | **SUPERSEDED by C7** |
+| **C7** | **Every mutation must be restorable** — restore means *the information is back*, not that the original object returns | **Live from the first write tool.** See §6 |
 | C5 | No bulk mutation; one event identifier per call, which may span occurrences of that one series | Live |
 | C6 | Refuse all mutation of events with attendees or an external organizer | Live, unaffected by §6 |
 
@@ -207,99 +208,118 @@ untestable for three phases because nothing ran long enough to observe.
 
 ---
 
-## 6. The write surface — measured, not designed around
+## 6. The write surface — redesigned 2026-08-20
 
-### What was refuted, and how
+### The reframing that unblocked it
 
-An earlier draft of this section proposed building `create` **in order to measure** whether
-Claude Desktop shows the human an approval prompt. That premise was false, and the answer was
-already on this machine. Verified in Claude Desktop's own bundle:
+Three write designs died on making delete reversible. All three assumed *reversible* meant
+**the original event comes back** — and under that assumption it is genuinely impossible:
+`eventIdentifier` changes on sync, invitation state cannot be reconstructed, and series
+membership cannot be restored.
 
-```
-"Allow once"  /  "Allow for this task"  /  "Allow for all tasks"
-"running unattended — nobody is present to approve it. It can be retried in an attended session."
-readOnlyHint: 35 refs    destructiveHint: 30 refs    toolPolicy: 5 refs
-```
+The human, asked directly, wanted something weaker and entirely achievable:
 
-**Desktop prompts, consumes the annotations, treats data-modifying tools specially, and
-refuses per-call approvals when no human is present.** `apple-mail` — already installed, with
-`delete_messages` and `create_draft` — has been traversing that exact path for months.
+> *"I don't specifically need it to 'revert'. I need to be able to put things back the way it
+> was, but it doesn't have to be the exact calendar event — it can be a new one with all the
+> same info."*
 
-The failure was filing this as an *open question* rather than an *assumption*. Open questions
-get designed around; assumptions get checked. Three previous write designs died of unmeasured
-premises, and this was a fourth wearing a lab coat: a write tool with an experiment attached
-as justification.
+**C7: every mutation must be restorable, where restorable means the information is back.** A
+new event carrying the same field values satisfies it. Every blocker above is about *identity*,
+and identity is not the requirement.
 
-### The control that was missing: `toolPolicy`
+**Why this is safe rather than merely convenient.** `attendees` is the one field a snapshot
+cannot reproduce (`readonly`, `EKCalendarItem.h:97`) — and **C6 already refuses to mutate any
+event with attendees or an external organizer**. The set this tool may delete is therefore
+exactly the set it can fully put back. Two constraints drawn for unrelated reasons, on the same
+line.
 
-Desktop accepts a per-server policy map — `blocked` > `ask` > `ask-session` > `allow`,
-strictest wins. **`"ask"` requires approval on every call, with Allow-once and Deny only — no
-persistent always-allow**, so it cannot be worn down into a standing grant.
+**Shape, from `acct-ledger-integrity-le2-audit-trail-immutability`** (surfaced by
+`gov-120ca260c415`): *corrections are made through reversing entries, never by editing or
+deleting the original record.* Restore is a **new forward operation that references the original
+journal entry** — not a rollback. The journal keeps both. Delete-and-recreate would lose the
+history; a reversing entry keeps it, and `calendar_recent_mutations` can then show a human what
+happened and what undid it.
 
-This is the first control in this project **the model cannot satisfy by itself**. Every other
-one is reachable: `confirm_summary` is a token the model holds and echoes; the allowlist, the
-journal and the snapshots are same-uid files. `toolPolicy` is enforced in the host process.
+### Approval: reads silent, writes gated
 
-§4's line — *"host-side approval is not a control, it is an assumption the server cannot
-observe"* — is true and was defeatist. The user configures that file. Setting it converts an
-unobservable assumption into a set fact, and the README can require the same of anyone else.
+Verified in Claude Desktop's own bundle: `"Allow once"` / `"Allow for this task"` /
+`"Allow for all tasks"`; `"running unattended — nobody is present to approve it."`;
+`readOnlyHint` 35 refs, `destructiveHint` 30, `toolPolicy` 5.
 
-**Set on the `apple-calendar` server now, while it is still `--read-only`.** Verifying it with
-zero write capability in existence is the whole point.
+`toolPolicy` is per-server, `blocked > ask > ask-session > allow`, strictest wins. **`"ask"`
+requires approval on every call with Allow-once and Deny only — no persistent always-allow**, so
+it cannot be worn down into a standing grant.
+
+This is the first control here **the model cannot satisfy by itself**. Every other one is
+reachable: `confirm_summary` is a token the model holds and echoes; the journal and snapshots are
+same-uid files. `toolPolicy` is enforced in the host process.
+
+**Measured 2026-08-20:** a read query returned results with **no prompt** under
+`toolPolicy: {"*": "ask"}` — the required behaviour, almost certainly because Desktop exempts
+`readOnlyHint` tools. The minified bundle could not confirm the mechanism, which leaves an
+untested inference: **whether a write tool prompts under the same policy is unverified.**
+
+**Gate 1, before any write code:** confirm a write tool prompts, using `apple-mail`'s
+`create_draft` — already installed, its proxy auto-approving only read tools. Free, two minutes,
+and it settles the question without building the capability whose safety depends on the answer.
+Then move to per-tool policy: writes `"ask"`, reads unlisted, so the requirement is encoded
+directly rather than resting on a wildcard whose handling is inferred.
 
 ### Status
 
 **Built:** `Journal.swift` — write-ahead, intent before the save and outcome after, so an
 interrupted write leaves a visible orphan. Tri-state outcome (`saved` / `noChangeNeeded` /
 `failed`), because `saveEvent` returning NO with a **nil** error is a success. Concurrency-safe
-via `O_APPEND` plus in-process serialisation, after parallel tests reproduced the interleaved-
-write corruption that concurrent tool handlers would cause. 95 tests.
+via `O_APPEND` plus in-process serialisation, after parallel tests reproduced the interleaved
+corruption concurrent tool handlers would cause. 95 tests.
 
-**Gated on, before `calendar_create_event` is written:**
+### Remaining gates before `calendar_create_event`
 
-1. `toolPolicy: {"*": "ask"}` verified prompting on the read-only server.
-2. **A `source_type` guard.** "Additive and cannot mail anyone" is a non-sequitur: `attendees`
-   being readonly closes the *invitation* path, not the *propagation* path. C1 already admits
-   a shared iCloud calendar is writable if allowlisted, EventKit exposes no `isShared`, and an
-   event on one propagates over CalDAV to every subscriber's devices without touching
-   attendees. `EKSource.sourceType == .local` is the only source that provably cannot
-   propagate. "Start with Jason, not Family" is an instruction to a human, not a guard — and
-   this project has repeatedly found that class of protection worthless.
-3. **Explicit rejection of `alarms` and `recurrence`**, alongside `attendees`. `alarms` is
-   read-write and is the one field that makes a created event actively interrupt a human on
-   every device. Rejecting it by omission means a later revision adds it as "just another
-   optional field".
+1. **Write-prompt confirmation** (above). Blocking.
+2. ~~`source_type` guard~~ — **WITHDRAWN with C1.** Its entire rationale was CalDAV propagation
+   on shared calendars, which the human now explicitly wants.
+3. **Explicit rejection of `alarms` and `recurrence`** on create, alongside `attendees`. `alarms`
+   is read-write and is the one field that makes a created event actively interrupt a human on
+   every device. Rejecting by omission means a later revision adds it as "just another optional
+   field".
 4. **Reversal keys recorded by content, not identifier alone.** `eventIdentifier` changes on
-   sync, and EventKit re-syncs the event immediately after a successful save — so the id in
-   the outcome entry can be stale within seconds on a CalDAV calendar. Record
+   sync and EventKit re-syncs immediately after a successful save, so the id in an outcome entry
+   can be stale within seconds on a CalDAV calendar. Record
    `(calendar_id, title, start, end, creationDate)` so a reversal can re-find by content.
-5. **All-day construction tested before written.** Setting `isAllDay = true` does not
-   normalise the dates, and EventKit stores all-day `end` inclusively — so a naive
-   `[midnight, midnight+24h)` produces a **two-day** event.
+5. **All-day construction tested before written.** `isAllDay = true` does not normalise the
+   dates, and EventKit stores all-day `end` **inclusively** — a naive `[midnight, midnight+24h)`
+   produces a **two-day** event.
+6. **Snapshots must capture every reconstructable field**, not the read DTO's default set. The
+   DTO withholds `notes`, `url` and `location` unless requested; a snapshot built from it would
+   drop them silently, and the loss would surface at restore time, when the original is gone.
 
-**Idempotency, corrected.** An in-memory dedupe does not stop the realistic retry: clients
-respawn stdio servers without warning, so the retry arrives at a fresh process with an empty
-set. And returning the prior identifier silently reports success for work not done — two
-identical 30-minute blocks is a legitimate request. Return a distinct `DUPLICATE_SUPPRESSED`
-outcome carrying the prior id, and key it on the journal tail so it survives a respawn.
+### Build order
 
-**What the journal is not.** An earlier line claimed it "holds enough to reverse it". Nothing
-reverses anything — undo is deferred and `calendar_recent_mutations` is not built. The honest
-claim is that a human can reverse one additive event by hand in Calendar.app, which was true
-before the journal existed. It is substrate and a user-facing record, not safety currency.
+`calendar_create_event` → `calendar_delete_event` **with restore in the same change** →
+`calendar_update_event`. Delete never ships ahead of its restore path. `destructiveHint: true`
+on delete; `readOnlyHint: true` stays on all five read tools.
+
+**Idempotency.** An in-memory dedupe does not stop the realistic retry: clients respawn stdio
+servers without warning, so the retry reaches a fresh process with an empty set. And returning
+the prior identifier silently reports success for work not done — two identical 30-minute blocks
+is a legitimate request. Return a distinct `DUPLICATE_SUPPRESSED` outcome carrying the prior id,
+keyed on the journal tail so it survives a respawn.
+
+**What the journal is not.** It is substrate and a user-facing record. Until restore is written,
+nothing reverses anything: the honest claim is that a human can undo one additive event by hand
+in Calendar.app, which was true before the journal existed.
 
 ### EventKit specifics to honour when create is written
 
-`event.calendar` must be assigned from the refetched allowlisted calendar or the save fails.
-`EKEvent` must be constructed on the store's confined thread, or EventKit objects cross the
-adapter boundary the architecture forbids. `title` is nullable and EventKit will happily save
-an empty one, producing a near-invisible event the user cannot find to delete. `timeZone` does
-not move the event — `startDate` is the instant — so setting one without the other is a silent
-offset error. `url` is an `NSURL` and a malformed string becomes nil rather than erroring.
-`span` is required and meaningless on a new event; pass `EKSpanThisEvent`. Use
-`saveEvent:span:error:`, not the `commit:NO` variant, or write-ahead ordering is fiction.
-Set `availability` explicitly — a silent `.busy` default changes the user's free/busy for
-anyone querying it.
+`event.calendar` must be assigned from a refetched calendar or the save fails. `EKEvent` must be
+constructed on the store's confined thread, or EventKit objects cross the adapter boundary the
+architecture forbids. `title` is nullable and EventKit will happily save an empty one, producing
+a near-invisible event the user cannot find to delete. `timeZone` does not move the event —
+`startDate` is the instant — so setting one without the other is a silent offset error. `url` is
+an `NSURL` and a malformed string becomes nil rather than erroring. `span` is required and
+meaningless on a new event; pass `EKSpanThisEvent`. Use `saveEvent:span:error:`, not the
+`commit:NO` variant, or write-ahead ordering is fiction. Set `availability` explicitly — a silent
+`.busy` default changes the user's free/busy for anyone querying it.
 
 ## 7. Trust boundary and privacy
 
@@ -410,11 +430,11 @@ green. `docs/IMPLEMENTATION-PLAN.md` matches this file.
 
 ## 13. Open decisions
 
-1. **Desktop write posture** — becomes live at Phase 6, not before. With no write tools built,
-   `--read-only` is a statement of fact rather than a restriction.
-2. **C2/C2a/C4a** are formally under review while the write surface is deferred; their subject
-   does not currently exist. A governance evaluation is owed when the surface is redesigned.
-3. **Adopt C6 formally** — currently recorded as pending human confirmation.
+1. **Does a write tool prompt?** The one blocking unknown — §6, Gate 1.
+2. ~~C2/C2a/C4a under review~~ — **resolved**: C2/C2a superseded by `toolPolicy`, C4a replaced
+   by C7. Governance evaluated as `gov-120ca260c415` (REVIEW, no S-Series veto).
+3. **Adopt C6 formally** — pending human confirmation, and now load-bearing twice over: it is
+   what makes C7 achievable, since attendees are the only unrestorable field.
 4. **Any borrowing of expression** from the MIT reference repos — flagged case by case.
 
 ## 14. Cleanup — complete 2026-08-20
