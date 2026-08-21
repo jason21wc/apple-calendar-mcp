@@ -16,8 +16,11 @@
   built. **Next work is the write surface**, redesigned this session.
 - **Mode:** Standard
 - **Repo:** https://github.com/jason21wc/apple-calendar-mcp (public, Apache-2.0)
-- **Active Task:** None in flight. Next code is `calendar_create_event` — but see
-  **Blocked On #1**, a two-minute human check that gates it.
+- **Active Task:** None in flight. **Agreed next code is BACKLOG #19** (bound EventKit
+  operations + fail fast once wedged) — a live defect in shipped read-only code that does NOT
+  depend on the open blocker. It touches the executor, so plan it before writing it. Awaiting
+  the human's go.
+- **After that:** `calendar_create_event`, gated on **Blocked On #1**.
 
 ## Quick Reference
 
@@ -25,6 +28,7 @@
 |--------|-------|
 | Project | **apple-calendar-mcp** |
 | Installed at | `/usr/local/bin/apple-calendar-mcp` (root:wheel), granted, `--doctor` clean |
+| Install verified | **2026-08-20 18:33** — cdhash `43b6bc57…` matches the signed build; zero allowlist strings in the shipped binary, so the writability fix is live |
 | Tests | **99 passing** via `./scripts/test.sh` |
 | Tool surface | **5, all read-only.** No write tool exists yet |
 | Desktop config | `--read-only`, `toolPolicy: {"*": "ask"}` (backup taken before edit) |
@@ -88,25 +92,59 @@ original journal entry**, not a rollback.
 
 | # | Decision | Blocks |
 |---|---|---|
-| **1** | **Does a WRITE tool actually prompt?** Ask Cowork to *draft* (not send) an email. `apple-mail`'s `create_draft` is installed and its proxy auto-approves only read tools. Report whether it prompted. ~2 minutes, no new code, nothing created but a deletable draft. | Everything below |
-| 2 | Does Cowork run locally or remotely? | Whether restore needs to be model-callable at all |
-| 3 | Confirm C6 formally, and verify in Phase 6 that deleting an invited event really does notify the organizer | README wording |
+| **1** | **Does a WRITE tool prompt in COWORK specifically?** Ask Cowork (Claude Desktop, where `toolPolicy` actually applies) to *draft* — not send — an email via `apple-mail`'s `create_draft`. Report whether a **permission prompt** appeared, as distinct from any governance output. | All write work |
+| 2 | Does Cowork run locally or remotely? | Whether restore needs to be model-callable |
+| 3 | Confirm C6 formally; verify in Phase 6 that deleting an invited event really notifies the organizer | README wording |
+
+### Why the 2026-08-19 test did NOT answer #1
+
+A test report came back covering `create_draft` and `delete_draft`. **It ran through the
+remote-devices bridge, not Cowork.** What fired was this project's own ai-governance PreToolUse
+hook — a different layer from the host's `toolPolicy` approval prompt, and only the second one
+is the control being relied on. The report never mentions an approval prompt. #1 is still open
+and needs a run in Claude Desktop specifically.
+
+The same report supplied the strongest argument yet for why `toolPolicy` is the only approval
+mechanism worth counting: **the agent waved itself through an ESCALATE verdict** on a delete,
+on the strength of a standing instruction from a turn earlier. Reasonable in that instance;
+fatal as a control. See gotcha 67.
+
+## Findings adopted from the sibling-server report (2026-08-19 test, received 2026-08-20)
+
+Gotchas 64–67, lessons logged, BACKLOG #19–#21. The one that matters:
+
+**No EventKit call in this server has a timeout**, and `CalendarStore` is a serial actor on one
+dedicated thread — so one blocked call wedges the entire calendar surface for the process's
+lifetime, not just its own caller. `apple-mail`'s measured hang was per-call; ours would be
+total. A blocking synchronous EventKit call **cannot be cancelled**, so a timeout cannot free
+the thread. The fix must bound the *caller's* wait AND mark the store wedged so later calls
+fail fast with "calendar subsystem is blocked, restart the server" rather than each burning a
+full timeout. **This affects shipped read-only code today.** BACKLOG #19.
+
+Already fine on our side: the report's timestamp recommendation (finding C) is the convention
+this server already implements — `autoupdatingCurrent` plus an explicit formatter zone — so
+apple-calendar is the reference the other servers are being pointed at, and there is nothing
+to change here.
 
 ## Next Actions
 
-1. **Reinstall so the writability fix is live** — the granted binary still reports every
-   calendar as non-writable:
-   `swift build -c release && ./scripts/sign.sh && sudo cp .build/release/apple-calendar-mcp /usr/local/bin/apple-calendar-mcp`
-   Sign **before** copying: `cp` preserves signatures, so signing after installing signs the
-   wrong file. Then ask Cowork to list calendars and confirm `writable: true` on yours.
-2. **Blocked on #1.** Nothing else should be built until it is answered — a write tool that
-   does not prompt fails the human's stated requirement outright.
-3. **Switch `toolPolicy` from `{"*": "ask"}` to per-tool.** Write tools `"ask"`; read tools
-   left unlisted so they stay silent. Encodes the requirement exactly rather than by side
-   effect, and removes the open question of whether the `*` wildcard was even honoured.
-4. **Build in this order:** `calendar_create_event` → `calendar_delete_event` **with restore in
-   the same change** → `calendar_update_event`. Delete must never ship before its restore path.
+1. **BACKLOG #19 — bound EventKit operations, fail fast once wedged.** Agreed as the next work.
+   Independent of the blocker. Architecture-bearing (touches `DedicatedThreadExecutor` /
+   `CalendarStore`), so plan it, get a contrarian review, then build.
+2. **Blocked on #1** before any write tool. A write tool that does not prompt fails the human's
+   stated requirement outright.
+3. **Switch `toolPolicy` from `{"*": "ask"}` to per-tool.** Writes `"ask"`, reads unlisted.
+   Encodes the requirement directly and removes the open question of whether the `*` wildcard
+   was even honoured.
+4. **Build order:** `calendar_create_event` → `calendar_delete_event` **with restore in the
+   same change** → `calendar_update_event`. Delete never ships ahead of its restore path.
 5. **Re-run the §6 gates** — items 1, 3, 4, 5 still apply; item 2 (`source_type`) is withdrawn.
+
+## Open item belonging to the human, not to this repo
+
+**A test draft is still sitting in iCloud Drafts** — subject "Test draft from apple-mail MCP",
+to jason.collier@me.com. `apple-mail`'s `delete_draft` hung twice at 60s and never removed it.
+Needs deleting by hand in Mail.app. Nothing in this project can clear it.
 
 ## Plan of Record
 
