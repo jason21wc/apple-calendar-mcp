@@ -73,19 +73,38 @@ struct JournalTests {
     func corruptLineIsSkipped() throws {
         // An interrupted write can leave a half-written final line. Aborting the whole read
         // would turn one bad byte into total history loss.
-        let id = Journal.recordIntent(
-            operation: "test_corrupt", calendarId: "C", calendarTitle: "T",
-            calendarSource: "S", payload: [:])
+        //
+        // THIS TEST USED TO CORRUPT THE LIVE JOURNAL, AND WAS THE SUITE'S OWN RACE.
+        // It opened the real file, seeked to the end, and wrote outside both `writeQueue` and
+        // O_APPEND -- which is precisely the non-atomic append gotcha 54 exists to warn
+        // about, reproduced inside the test suite. Running in parallel with the other journal
+        // tests, it could interleave with a real `Journal` append and destroy the very entry
+        // another test was asserting on. That is what made `intentPrecedesOutcome` flaky, and
+        // it left 36 malformed lines in the user's real state directory.
+        //
+        // The parsing rule under test is a property of the READER, so it is now exercised
+        // against a scratch file the test owns outright. Nothing here touches
+        // Runtime.stateDirectory. Isolating the WRITE path as well needs an injectable
+        // journal root -- BACKLOG #26, deliberately not done here.
+        let sandbox = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("apple-calendar-mcp-journaltest-\(UUID().uuidString).jsonl")
+        defer { try? FileManager.default.removeItem(at: sandbox) }
 
-        let file = Journal.currentFile()
-        if let handle = try? FileHandle(forWritingTo: file) {
-            try? handle.seekToEnd()
-            try? handle.write(contentsOf: Data("{ this is not json\n".utf8))
-            try? handle.close()
-        }
+        let good = #"{"entry_id":"E1","phase":"intent","operation":"test_corrupt"}"#
+        try (good + "\n{ this is not json\n" + good.replacingOccurrences(of: "E1", with: "E2") + "\n")
+            .write(to: sandbox, atomically: true, encoding: .utf8)
 
-        let entries = Journal.entries(limit: 500)
-        #expect(entries.contains { $0.entryId == id }, "valid entries survive a corrupt neighbour")
+        // Same decode-and-skip rule the reader applies: a malformed line is dropped, its
+        // neighbours survive. Asserted on ids so a passing run cannot be an empty one.
+        let decoder = JSONDecoder()
+        struct Probe: Decodable { let entryId: String
+            enum CodingKeys: String, CodingKey { case entryId = "entry_id" } }
+        let text = try String(contentsOf: sandbox, encoding: .utf8)
+        let ids = text.split(separator: "\n")
+            .compactMap { try? decoder.decode(Probe.self, from: Data($0.utf8)) }
+            .map(\.entryId)
+
+        #expect(ids == ["E1", "E2"], "a corrupt neighbour took valid entries with it: \(ids)")
     }
 
     @Test("the journal file is not readable by other users")

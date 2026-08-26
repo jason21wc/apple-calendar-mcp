@@ -1,5 +1,10 @@
-// Phase 1 probe. This is NOT the MCP server -- it exists to answer one question before any
-// of the server gets built:
+// The executable's entry point: startup, command dispatch, and the Phase 1 identity probe.
+//
+// This file BEGAN as a probe built before any of the server existed, to answer one question,
+// and its header said so for four phases after that stopped being true. Running with no
+// arguments now enters the MCP server (see the dispatch at the bottom, and MCP/).
+//
+// The question the probe answered, kept because everything below still turns on it:
 //
 //   When Claude Code or Codex spawns this binary, does macOS attribute the Calendar grant
 //   to THIS binary, or to the app that launched it?
@@ -10,9 +15,9 @@
 // call fails -- silently, per the entitlement note. That would kill the bare-executable
 // design and force an .app wrapper, so nothing else is built until this is settled.
 //
-// Because MCP clients speak JSON-RPC over stdout, the probe must never print to stdout.
-// It writes a JSON record to disk and logs to stderr, so the answer survives regardless of
-// who spawned it or whether the MCP handshake failed.
+// Because MCP clients speak JSON-RPC over stdout, NOTHING here may print to stdout. The probe
+// writes a JSON record to disk and logs to stderr, so its answer survives regardless of who
+// spawned it or whether the MCP handshake failed -- and the same rule binds the server.
 
 import Foundation
 import EventKit

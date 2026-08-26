@@ -50,13 +50,16 @@ let package = Package(
         // inside this same package, so no library-extraction restructure is needed.
         // Verified by building AND running, not by reading the manifest documentation.
         //
-        // WHAT THIS LINKAGE DOES NOT BUY. main.swift is top-level code, so its globals
-        // (`disclaimMode`, `stateDir`, `store`) are initialised by `main` -- which never
-        // runs in a test host. They are also @MainActor-isolated, so the compiler happily
-        // lets a @MainActor test read them and the process then SEGVs (measured: signal 11,
-        // whole run lost). Everything that touches them -- Doctor.run, SetupFlow.run,
-        // printVersion, writeProbe -- is reachable only through a real subprocess. See
-        // Tests/AppleCalendarMCPTests/ReexecProcessTests.swift.
+        // WHAT THIS LINKAGE DOES NOT BUY. Top-level code in main.swift is @MainActor-isolated
+        // and is initialised by `main`, which never runs in a test host -- so a test reading
+        // such a binding SEGVs the whole run (measured: signal 11).
+        //
+        // FIXED 2026-08-19, and this comment described the old world until 2026-08-22: the
+        // process-wide values moved into `Runtime`, which is lazily initialised and safe to
+        // read from any isolation context. Doctor.run and SetupFlow.run are now called
+        // directly from PermissionLifecycleTests. What still needs a real subprocess is what
+        // is genuinely about the PROCESS -- the disclaim mode it chose, argv handling, and
+        // stdout purity. See ReexecProcessTests and ServerLifecycleTests.
         //
         // FRAMEWORK NOTE. `import Testing` needs no package dependency on Swift 6.3, but on
         // a Command Line Tools-only machine Testing.framework is not on SwiftPM's default

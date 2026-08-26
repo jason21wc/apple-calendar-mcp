@@ -60,17 +60,27 @@ enum TimeSemantics {
         throw TimeError.badTimestamp(raw)
     }
 
-    /// RFC 3339 rendered in the machine's CURRENT zone, with a real offset.
+    /// RFC 3339 rendered in an EXPLICIT zone, with a real offset.
     ///
-    /// `ISO8601DateFormatter` defaults to GMT, so the previous version emitted `20:53:20Z`
-    /// for a 2:53pm Denver meeting. The instant was right and the output was unreadable, and
-    /// a reader converting it by hand is a reader who will get it wrong.
-    static func format(_ date: Date) -> String {
+    /// `ISO8601DateFormatter` defaults to GMT, so an earlier version emitted `20:53:20Z` for
+    /// a 2:53pm Denver meeting. The instant was right and the output was unreadable, and a
+    /// reader converting it by hand is a reader who will get it wrong.
+    ///
+    /// The zone is a PARAMETER rather than an implicit default because a response reports
+    /// which zone it rendered in (`effective_time_zone`). When the formatter chose one zone
+    /// and the envelope named another, the field was simply false -- and the timestamps
+    /// still carried explicit offsets, so nothing downstream could detect the disagreement.
+    /// One zone is chosen per request and every timestamp in that response uses it.
+    static func format(_ date: Date, in zone: TimeZone) -> String {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
-        f.timeZone = systemZone
+        f.timeZone = zone
         return f.string(from: date)
     }
+
+    /// Rendered in the machine's current zone. For values that belong to the process rather
+    /// than to a request -- `current_time` in the permission report has no caller-chosen zone.
+    static func format(_ date: Date) -> String { format(date, in: systemZone) }
 
     /// All-day events are date-only. Formatting one as an instant invites the reader to
     /// convert it, which is precisely the bug.
@@ -89,11 +99,19 @@ enum TimeSemantics {
         return zone
     }
 
-    /// Validate a query window. Returns the interval in days for the error message.
+    /// Validate a query window.
+    ///
+    /// Compares SECONDS, not truncated days. `Int(interval / 86_400)` floors, so a 31.9-day
+    /// window measured 31 and passed a 31-day cap -- the bound was really "under 32 days".
+    /// Small, and it is the kind of slack that turns a documented limit into an approximate
+    /// one. The reported figure is rounded UP so the error names a number that actually
+    /// exceeds the maximum rather than one equal to it.
     static func validateInterval(start: Date, end: Date, maxDays: Int) throws {
         guard end > start else { throw TimeError.endNotAfterStart }
-        let days = Int(end.timeIntervalSince(start) / 86_400)
-        guard days <= maxDays else { throw TimeError.intervalTooLong(days: days, max: maxDays) }
+        let seconds = end.timeIntervalSince(start)
+        guard seconds <= Double(maxDays) * 86_400 else {
+            throw TimeError.intervalTooLong(days: Int(ceil(seconds / 86_400)), max: maxDays)
+        }
     }
 
     /// Half-open overlap: the event touches [windowStart, windowEnd) at some point.

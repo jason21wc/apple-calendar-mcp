@@ -97,9 +97,14 @@ enum Doctor {
             checks.append(("TCC row (extra)", .ok("skipped -- needs Full Disk Access, which this tool does not request")))
         }
 
-        checks.append(("tool surface", Runtime.isReadOnly
-            ? .ok("read-only -- no mutating tool is exposed on this connection")
-            : .ok("read and write")))
+        // "read and write" was reported here whenever --read-only was absent, and it was
+        // FALSE: no write tool has ever been built. --doctor is the command a worried user
+        // runs to find out what this binary can do, which makes it the worst possible place
+        // to overstate the capability. The build's surface and the client's configuration are
+        // two different facts and are now reported as two.
+        checks.append(("tool surface", .ok(
+            "read-only -- no write tool exists in this build"
+            + (Runtime.isReadOnly ? "; this connection also passed --read-only" : ""))))
 
         // 4. Raw status, listed last: on its own it cannot distinguish an owned grant from
         //    an inherited one, which is why ownership above is the check that matters.

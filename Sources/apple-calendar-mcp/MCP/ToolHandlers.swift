@@ -4,11 +4,47 @@
 // isError with a message that says what was wrong AND what a correct call looks like, because
 // the reader is a model that will otherwise retry the same malformed call.
 //
+// Every failure also leads with a STABLE CODE -- `INTERVAL_TOO_LARGE: interval is 45 days...`
+// -- so a caller can branch on the cause without pattern-matching English prose that will be
+// reworded. The codes are the enum in ToolError; the prose after the colon is free to change.
+//
+// The code travels in the text rather than in `structuredContent`, deliberately. A tool that
+// declares an outputSchema promises that its structured output conforms to it, and an error
+// payload does not have the shape of a successful one; emitting it anyway would hand a
+// strict client a validation failure on top of the error it was already reporting.
+//
 // Framework errors never cross this boundary verbatim -- they leak paths and internal state,
 // and they are not actionable.
 
 import Foundation
 import MCP
+
+/// Stable failure codes. The wording after a code may change; the code may not.
+///
+/// Only the codes the READ surface can actually produce are listed. The write surface will
+/// add its own when it exists -- a code advertised by a tool that cannot emit it is the same
+/// class of claim as a phase marked complete before it was built.
+enum ToolError: String {
+    case permissionDenied = "PERMISSION_DENIED"
+    case badTimestamp = "BAD_TIMESTAMP"
+    case badTimeZone = "BAD_TIME_ZONE"
+    case endNotAfterStart = "END_NOT_AFTER_START"
+    case intervalTooLarge = "INTERVAL_TOO_LARGE"
+    case missingArgument = "MISSING_ARGUMENT"
+    case unknownTool = "UNKNOWN_TOOL"
+    case storeUnavailable = "CALENDAR_STORE_UNAVAILABLE"
+
+    /// Maps the time layer's errors onto the wire codes, so the two cannot drift apart
+    /// silently -- a new TimeError case will not compile without a decision here.
+    init(_ error: TimeError) {
+        switch error {
+        case .badTimestamp:     self = .badTimestamp
+        case .badTimeZone:      self = .badTimeZone
+        case .endNotAfterStart: self = .endNotAfterStart
+        case .intervalTooLong:  self = .intervalTooLarge
+        }
+    }
+}
 
 enum ToolHandlers {
 
@@ -18,9 +54,18 @@ enum ToolHandlers {
             // WHEN access is broken, so gating it behind access would be circular.
             if params.name == "calendar_permission_status" { return permissionStatus() }
 
+            // Name validity does not depend on permission. Checked BEFORE the access gate
+            // because otherwise a typo'd tool name on a machine without a grant reports
+            // PERMISSION_DENIED -- sending the caller to fix a permission that is not the
+            // problem, and hiding a mistake it could have corrected itself.
+            guard ToolRegistry.names.contains(params.name) else {
+                return failure(.unknownTool, "unknown tool: \(params.name). This server "
+                               + "provides: \(ToolRegistry.names.sorted().joined(separator: ", "))")
+            }
+
             let state = AuthorizationState.current
             guard state.canReadEvents else {
-                return failure("""
+                return failure(.permissionDenied, """
                     Calendar access unavailable (\(state.rawValue)).
 
                     \(state.guidance)
@@ -36,39 +81,57 @@ enum ToolHandlers {
             case "calendar_find_events":       return try await findEvents(params, store)
             case "calendar_busy_intervals":    return try await busyIntervals(params, store)
             default:
-                return failure("unknown tool: \(params.name)")
+                // Unreachable: the name was checked against the registry above. Kept so
+                // adding a tool to the registry without a handler fails loudly rather than
+                // falling through to something arbitrary.
+                return failure(.unknownTool, "tool \(params.name) is declared but not handled")
             }
         } catch let e as TimeError {
-            return failure(e.description)
+            return failure(ToolError(e), e.description)
         } catch {
             // Sanitised deliberately: framework errors carry paths and internal detail, and a
             // model cannot act on them anyway.
-            return failure("the calendar store could not complete that request")
+            return failure(.storeUnavailable, "the calendar store could not complete that request")
         }
     }
 
     // MARK: - Tools
 
-    private static func permissionStatus() -> CallTool.Result {
+    /// Built from a typed DTO rather than assembled inline, so the payload this tool returns
+    /// can be checked against the schema it advertises without a calendar or a grant.
+    static func permissionPayload(now: Date = Date()) -> PermissionStatusDTO {
         let state = AuthorizationState.current
-        let payload: [String: Value] = [
-            "status": .string(state.rawValue),
-            "can_read_events": .bool(state.canReadEvents),
-            "guidance": .string(state.guidance),
-            "identity": .string(Runtime.disclaimMode),
+        let zone = TimeSemantics.systemZone
+        return PermissionStatusDTO(
+            status: state.rawValue,
+            canReadEvents: state.canReadEvents,
+            guidance: state.guidance,
+            identity: Runtime.disclaimMode,
             // The model needs to know where "now" and "today" are, and it cannot ask the OS
             // itself. Reported live rather than snapshotted, so it is right after travel.
-            "system_time_zone": .string(TimeSemantics.systemZone.identifier),
-            "system_utc_offset_seconds": .int(TimeSemantics.systemZone.secondsFromGMT()),
-            "current_time": .string(TimeSemantics.format(Date())),
-        ]
-        return .init(
-            content: [.text(
-                text: "Calendar authorization: \(state.rawValue). "
-                    + "System time zone: \(TimeSemantics.systemZone.identifier), "
-                    + "local time now \(TimeSemantics.format(Date())).",
-                annotations: nil, _meta: nil)],
-            structuredContent: .object(payload))
+            systemTimeZone: zone.identifier,
+            systemUtcOffsetSeconds: zone.secondsFromGMT(),
+            currentTime: TimeSemantics.format(now, in: zone))
+    }
+
+    private static func permissionStatus() -> CallTool.Result {
+        let payload = permissionPayload()
+        do {
+            return try CallTool.Result(
+                content: [.text(
+                    text: "Calendar authorization: \(payload.status). "
+                        + "System time zone: \(payload.systemTimeZone), "
+                        + "local time now \(payload.currentTime).",
+                    annotations: nil, _meta: nil)],
+                structuredContent: payload)
+        } catch {
+            // Encoding a struct of Strings, Bools and an Int cannot realistically fail, but
+            // this tool is the one that has to answer when everything else is broken, so it
+            // degrades to text rather than throwing into the generic store-unavailable path.
+            return .init(content: [.text(
+                text: "Calendar authorization: \(payload.status). \(payload.guidance)",
+                annotations: nil, _meta: nil)])
+        }
     }
 
     private static func listCalendars(_ store: CalendarStore) async throws -> CallTool.Result {
@@ -77,8 +140,12 @@ enum ToolHandlers {
             items: calendars,
             truncated: false,
             totalMatched: calendars.count,
+            // No window and no result cap: this tool takes no arguments at all, so the zone
+            // is the machine's and both limits are honestly null.
             effectiveTimeZone: TimeSemantics.systemZone.identifier,
-            limitsApplied: Limits.applied,
+            limitsApplied: Limits.applied(limit: nil, windowed: false),
+            // This tool takes no calendar_ids, so none can go unmatched.
+            unmatchedCalendarIds: [],
             trust: untrustedMarker)
         return try result(envelope, summary: "\(calendars.count) calendar(s)")
     }
@@ -89,61 +156,72 @@ enum ToolHandlers {
         let limit = Limits.clampResultLimit(params.arguments?["limit"]?.intValue)
         let include = fieldSet(params.arguments?["include_fields"])
 
-        let (items, total) = await store.events(
+        let (items, total, unmatched) = await store.events(
             start: w.start, end: w.end, calendarIds: w.calendarIds,
             includeFields: include, zone: w.zone, limit: limit)
 
         return try result(
             ReadEnvelope(items: items, truncated: total > items.count, totalMatched: total,
                          effectiveTimeZone: w.zone.identifier,
-                         limitsApplied: Limits.applied, trust: untrustedMarker),
-            summary: summarise(count: items.count, total: total, noun: "event"))
+                         limitsApplied: Limits.applied(limit: limit),
+                         unmatchedCalendarIds: unmatched, trust: untrustedMarker),
+            summary: summarise(count: items.count, total: total, noun: "event",
+                               unmatched: unmatched))
     }
 
     private static func findEvents(_ params: CallTool.Parameters,
                                    _ store: CalendarStore) async throws -> CallTool.Result {
         guard let query = params.arguments?["query"]?.stringValue, !query.isEmpty else {
-            return failure("query is required and must not be empty")
+            return failure(.missingArgument, "query is required and must not be empty")
         }
         let w = try window(from: params)
         let limit = Limits.clampResultLimit(params.arguments?["limit"]?.intValue)
-        let searchFields = fieldSet(params.arguments?["search_fields"], default: ["title"])
+        let searchFields = fieldSet(params.arguments?["search_fields"],
+                                    default: EventSearch.defaultFields)
 
-        // Fetch the window, then filter locally. Notes and location are needed to search them,
-        // so they are requested here and then dropped unless the caller also asked for them --
-        // searching a field is not a reason to disclose it.
-        let needed: Set<String> = searchFields.union(fieldSet(params.arguments?["include_fields"]))
-        let (candidates, _) = await store.events(
-            start: w.start, end: w.end, calendarIds: w.calendarIds,
-            includeFields: needed, zone: w.zone, limit: Limits.maxResultLimit)
-
-        let needle = query.lowercased()
-        let matched = candidates.filter { e in
-            if searchFields.contains("title"), e.title.lowercased().contains(needle) { return true }
-            if searchFields.contains("notes"), (e.notes ?? "").lowercased().contains(needle) { return true }
-            if searchFields.contains("location"), (e.location ?? "").lowercased().contains(needle) { return true }
-            return false
-        }
-
+        // Match first, convert second, cap third -- and all three inside the adapter.
+        //
+        // Two separate bugs live at this boundary and only one is obvious. The obvious one:
+        // capping BEFORE matching made `total_matched` a count of matches among the first 500
+        // events by start order, so a populated month could answer "no matching events" with
+        // a straight face. The quiet one: matching after CONVERSION built a DTO for every
+        // event in the window -- including the notes and location strings fetched purely so
+        // they could be searched -- and then discarded all but the matches. The window is
+        // bounded in TIME, not in COUNT, and a dense shared calendar makes that gap real.
+        //
+        // Only matching events are converted now, and only the returned page of those.
         let requested = fieldSet(params.arguments?["include_fields"])
-        let items = matched.prefix(limit).map { redact($0, keeping: requested) }
+        let (matches, total, unmatched) = await store.searchEvents(
+            start: w.start, end: w.end, calendarIds: w.calendarIds,
+            query: query, searchFields: searchFields,
+            // Notes and location are matched against the event itself, so they no longer need
+            // requesting here merely to be searchable -- only to be RETURNED. Withholding is
+            // therefore structural rather than a redaction pass that could be forgotten.
+            includeFields: requested, zone: w.zone, limit: limit)
 
         return try result(
-            ReadEnvelope(items: Array(items), truncated: matched.count > items.count,
-                         totalMatched: matched.count, effectiveTimeZone: w.zone.identifier,
-                         limitsApplied: Limits.applied, trust: untrustedMarker),
-            summary: summarise(count: items.count, total: matched.count, noun: "match"))
+            ReadEnvelope(items: matches, truncated: total > matches.count,
+                         totalMatched: total, effectiveTimeZone: w.zone.identifier,
+                         limitsApplied: Limits.applied(limit: limit),
+                         unmatchedCalendarIds: unmatched, trust: untrustedMarker),
+            summary: summarise(count: matches.count, total: total, noun: "match",
+                               unmatched: unmatched))
     }
 
     private static func busyIntervals(_ params: CallTool.Parameters,
                                       _ store: CalendarStore) async throws -> CallTool.Result {
         let w = try window(from: params)
-        let intervals = await store.busyIntervals(start: w.start, end: w.end, calendarIds: w.calendarIds)
+        let (intervals, unmatched) = await store.busyIntervals(
+            start: w.start, end: w.end, calendarIds: w.calendarIds, zone: w.zone)
         return try result(
             ReadEnvelope(items: intervals, truncated: false, totalMatched: intervals.count,
                          effectiveTimeZone: w.zone.identifier,
-                         limitsApplied: Limits.applied, trust: untrustedMarker),
-            summary: "\(intervals.count) busy period(s)")
+                         // Merged periods are never capped -- every one in the window is
+                         // returned, so claiming a result limit would be false.
+                         limitsApplied: Limits.applied(limit: nil),
+                         unmatchedCalendarIds: unmatched, trust: untrustedMarker),
+            summary: "\(intervals.count) busy period(s)"
+                + Self.unmatchedNote(unmatched))
     }
 
     // MARK: - Argument handling
@@ -157,6 +235,8 @@ enum ToolHandlers {
               let endRaw = params.arguments?["end"]?.stringValue else {
             throw TimeError.badTimestamp("start and end are both required")
         }
+        // The zone chosen here renders EVERY timestamp in the response and is reported back
+        // as `effective_time_zone`. Defaults to the machine's, tracked live.
         let start = try TimeSemantics.parseTimestamp(startRaw)
         let end = try TimeSemantics.parseTimestamp(endRaw)
         try TimeSemantics.validateInterval(start: start, end: end, maxDays: Limits.maxIntervalDays)
@@ -172,21 +252,11 @@ enum ToolHandlers {
         return set.isEmpty ? fallback : set
     }
 
-    /// Drop fields the caller did not ask for. Searching a field is not consent to see it.
-    private static func redact(_ e: EventDTO, keeping: Set<String>) -> EventDTO {
-        EventDTO(
-            id: e.id, occurrenceDate: e.occurrenceDate, calendarId: e.calendarId,
-            title: e.title, start: e.start, end: e.end, isAllDay: e.isAllDay,
-            allDayStartDate: e.allDayStartDate, allDayEndDate: e.allDayEndDate,
-            timeZone: e.timeZone, status: e.status, availability: e.availability,
-            isRecurring: e.isRecurring, isDetached: e.isDetached, hasAttendees: e.hasAttendees,
-            notes: keeping.contains("notes") ? e.notes : nil,
-            url: keeping.contains("url") ? e.url : nil,
-            location: keeping.contains("location") ? e.location : nil,
-            attendeeCount: keeping.contains("attendee_count") ? e.attendeeCount : nil,
-            organizerName: keeping.contains("organizer_name") ? e.organizerName : nil,
-            trust: e.trust)
-    }
+    // `redact()` lived here and is GONE. It dropped unrequested fields from search results
+    // after the fact, which was necessary only because the search fetched notes and location
+    // in order to match them. The adapter now matches against the event itself, so those
+    // fields are never requested unless the caller wants them returned -- withholding is a
+    // property of what is asked for, not a pass that a later edit could forget to run.
 
     // MARK: - Results
 
@@ -199,13 +269,28 @@ enum ToolHandlers {
             structuredContent: envelope)
     }
 
-    private static func summarise(count: Int, total: Int, noun: String) -> String {
-        count < total
+    private static func summarise(count: Int, total: Int, noun: String,
+                                  unmatched: [String] = []) -> String {
+        let base = count < total
             ? "\(count) of \(total) \(noun)(s) — TRUNCATED, narrow the window for the rest"
             : "\(count) \(noun)(s)"
+        return base + unmatchedNote(unmatched)
     }
 
-    private static func failure(_ message: String) -> CallTool.Result {
-        .init(content: [.text(text: message, annotations: nil, _meta: nil)], isError: true)
+    /// Says so in the TEXT as well as the structured payload. A client that shows only the
+    /// summary would otherwise read "0 events" and stop, which is the failure this exists to
+    /// prevent.
+    private static func unmatchedNote(_ unmatched: [String]) -> String {
+        guard !unmatched.isEmpty else { return "" }
+        return " — WARNING: \(unmatched.count) requested calendar id(s) matched no calendar "
+            + "on this Mac, so those calendars were NOT searched. EventKit identifiers change "
+            + "on sync; re-read them from calendar_list_calendars."
+    }
+
+    /// Errors lead with a stable code so a caller can branch on the cause without parsing
+    /// prose. `structuredContent` is deliberately omitted: see the note at the top of the file.
+    private static func failure(_ code: ToolError, _ message: String) -> CallTool.Result {
+        .init(content: [.text(text: "\(code.rawValue): \(message)", annotations: nil, _meta: nil)],
+              isError: true)
     }
 }

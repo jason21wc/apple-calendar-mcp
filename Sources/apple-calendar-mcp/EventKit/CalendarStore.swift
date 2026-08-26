@@ -1,4 +1,11 @@
-// The ONLY file that imports EventKit. EK* objects never leave it.
+// The only file that touches calendar CONTENT. EK* objects never leave it.
+//
+// Three other files import EventKit -- main.swift, AuthorizationState and SetupFlow -- but
+// only for the authorization API (`EKAuthorizationStatus`, `authorizationStatus(for:)`,
+// `requestFullAccessToEvents`). No EKEvent or EKCalendar exists outside this file, and
+// nothing that does exist here crosses the boundary: callers get immutable DTOs. The
+// invariant is about event objects, not about the import statement, and it was written the
+// other way round for four revisions.
 //
 // WHY A CUSTOM EXECUTOR RATHER THAN AN ACTOR + CONTINUATION BRIDGE
 //
@@ -79,38 +86,78 @@ actor CalendarStore {
     ///
     /// Returns everything matching plus the total, so the caller can distinguish "nothing
     /// found" from "stopped counting".
+    /// `limit` is optional and nil means "every match in the window". Searching needs the
+    /// whole window before it filters -- capping first would make the match count a count of
+    /// the first N events rather than of the query -- and the window itself is already
+    /// bounded to `Limits.maxIntervalDays`, so nil is bounded in time, not unbounded.
     func events(start: Date, end: Date, calendarIds: [String]?,
                 includeFields: Set<String>, zone: TimeZone,
-                limit: Int) -> (items: [EventDTO], total: Int) {
+                limit: Int?) -> (items: [EventDTO], total: Int, unmatchedCalendarIds: [String]) {
         let all = store.calendars(for: .event)
         let scope = CalendarScope.resolve(requested: calendarIds,
                                           available: all.map(\.calendarIdentifier))
-        if scope.matchesNothing { return ([], 0) }
+        // An id that matched nothing is REPORTED, not swallowed. EventKit identifiers change
+        // on a full sync, so a caller holding a stale one would otherwise get an empty result
+        // indistinguishable from an empty week -- a false absence, the dangerous kind.
+        if scope.matchesNothing { return ([], 0, scope.unmatchedIds) }
         let scoped = scope.selectedIds.map { ids in all.filter { ids.contains($0.calendarIdentifier) } }
 
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: scoped ?? all)
         let matched = store.events(matching: predicate)
 
-        // EventKit guarantees no ordering, so sort explicitly with a deterministic
-        // tie-breaker. Without the tie-breaker, two events at the same instant can swap
-        // places between calls and a caller diffing results sees phantom changes.
-        let sorted = matched.sorted { a, b in
-            if a.startDate != b.startDate { return a.startDate < b.startDate }
-            let at = a.title ?? "", bt = b.title ?? ""
-            if at != bt { return at < bt }
-            return (a.eventIdentifier ?? "") < (b.eventIdentifier ?? "")
-        }
+        let sorted = matched.sorted(by: Self.deterministicOrder)
 
-        return (sorted.prefix(limit).map { dto(from: $0, includeFields: includeFields, zone: zone) },
-                sorted.count)
+        let kept = limit.map { Array(sorted.prefix($0)) } ?? sorted
+        return (kept.map { dto(from: $0, includeFields: includeFields, zone: zone) },
+                sorted.count,
+                scope.unmatchedIds)
     }
 
-    /// Merged busy periods. Titles never leave this function.
-    func busyIntervals(start: Date, end: Date, calendarIds: [String]?) -> [BusyInterval] {
+    /// Text search, matched BEFORE conversion.
+    ///
+    /// Filtering happens on the `EKEvent`, so only events that actually match are ever turned
+    /// into DTOs. The handler used to convert the whole window and filter the DTOs, which
+    /// built -- and immediately discarded -- one object per non-matching event, carrying the
+    /// notes and location strings fetched purely so they could be searched.
+    ///
+    /// `total` counts every match in the window, not the returned page: capping before
+    /// matching is what let a populated month answer "no matching events".
+    func searchEvents(start: Date, end: Date, calendarIds: [String]?,
+                      query: String, searchFields: Set<String>,
+                      includeFields: Set<String>, zone: TimeZone,
+                      limit: Int) -> (items: [EventDTO], total: Int, unmatchedCalendarIds: [String]) {
         let all = store.calendars(for: .event)
         let scope = CalendarScope.resolve(requested: calendarIds,
                                           available: all.map(\.calendarIdentifier))
-        if scope.matchesNothing { return [] }
+        if scope.matchesNothing { return ([], 0, scope.unmatchedIds) }
+        let scoped = scope.selectedIds.map { ids in all.filter { ids.contains($0.calendarIdentifier) } }
+
+        let predicate = store.predicateForEvents(withStart: start, end: end, calendars: scoped ?? all)
+        let needle = query.lowercased()
+
+        let (kept, total) = EventSearch.filterCountCap(
+            store.events(matching: predicate), limit: limit,
+            matches: { event in
+                EventSearch.matches(title: event.title ?? "", notes: event.notes,
+                                    location: event.location, needle: needle,
+                                    fields: searchFields)
+            },
+            orderedBy: Self.deterministicOrder)
+
+        // Convert only what is returned.
+        return (kept.map { dto(from: $0, includeFields: includeFields, zone: zone) },
+                total,
+                scope.unmatchedIds)
+    }
+
+    /// Merged busy periods. Titles never leave this function.
+    func busyIntervals(start: Date, end: Date, calendarIds: [String]?,
+                       zone: TimeZone) -> (intervals: [BusyInterval], unmatchedCalendarIds: [String]) {
+        let all = store.calendars(for: .event)
+        let scope = CalendarScope.resolve(requested: calendarIds,
+                                          available: all.map(\.calendarIdentifier))
+        // "You are free" is the single most dangerous thing this tool can say wrongly.
+        if scope.matchesNothing { return ([], scope.unmatchedIds) }
         let scoped = scope.selectedIds.map { ids in all.filter { ids.contains($0.calendarIdentifier) } }
 
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: scoped ?? all)
@@ -140,15 +187,28 @@ actor CalendarStore {
                 merged.append((p.start, p.end, 1))
             }
         }
-        return merged.map {
-            BusyInterval(start: TimeSemantics.format($0.start),
-                         end: TimeSemantics.format($0.end),
+        return (merged.map {
+            BusyInterval(start: TimeSemantics.format($0.start, in: zone),
+                         end: TimeSemantics.format($0.end, in: zone),
                          eventCount: $0.count)
-        }
+        }, scope.unmatchedIds)
+    }
+
+    /// EventKit guarantees no ordering, so sort explicitly with a deterministic tie-breaker.
+    /// Without the tie-breaker, two events at the same instant can swap places between calls
+    /// and a caller diffing results sees phantom changes.
+    private static func deterministicOrder(_ a: EKEvent, _ b: EKEvent) -> Bool {
+        if a.startDate != b.startDate { return a.startDate < b.startDate }
+        let at = a.title ?? "", bt = b.title ?? ""
+        if at != bt { return at < bt }
+        return (a.eventIdentifier ?? "") < (b.eventIdentifier ?? "")
     }
 
     // MARK: - Conversion
 
+    /// `zone` renders EVERY timestamp in the result, not just the all-day dates. One zone
+    /// per request, reported back as `effective_time_zone`, so that field is a fact about the
+    /// payload rather than a restatement of the argument.
     private func dto(from event: EKEvent, includeFields: Set<String>, zone: TimeZone) -> EventDTO {
         let eventZone = event.isAllDay ? nil : (event.timeZone?.identifier)
         let occurrence = event.hasRecurrenceRules ? event.occurrenceDate : nil
@@ -156,11 +216,19 @@ actor CalendarStore {
             id: event.eventIdentifier ?? "",
             // Explicitly nil, never absent -- a missing key and a null are different things to
             // a schema validator, and only one of them matches ["string","null"].
-            occurrenceDate: occurrence.map(TimeSemantics.format),
+            // UTC, ALWAYS -- deliberately not the request's rendering zone.
+            //
+            // This is an identifier, not a display value: it is half of the
+            // (eventIdentifier, occurrenceDate) key that addresses one occurrence of a
+            // series. Rendering it in a caller-chosen zone would make the same occurrence
+            // produce different STRINGS for different callers, so anything that stored the
+            // key and compared it textually later would silently stop matching. The instant
+            // is what identifies the occurrence; its offset is not part of the identity.
+            occurrenceDate: occurrence.map { TimeSemantics.format($0, in: .gmt) },
             calendarId: event.calendar?.calendarIdentifier ?? "",
             title: event.title ?? "",
-            start: TimeSemantics.format(event.startDate),
-            end: TimeSemantics.format(event.endDate),
+            start: TimeSemantics.format(event.startDate, in: zone),
+            end: TimeSemantics.format(event.endDate, in: zone),
             isAllDay: event.isAllDay,
             allDayStartDate: event.isAllDay
                 ? TimeSemantics.formatAllDay(event.startDate, in: zone) : nil,

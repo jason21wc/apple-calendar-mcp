@@ -6,6 +6,11 @@ import Testing
 // the rules were previously three lines inside an actor holding an EKEventStore, and so
 // could only be checked by hand on a Mac with the right data.
 
+// NOTE: `unmatchedIds` was computed and tested here from the start and then DISCARDED by the
+// adapter, so it never reached a caller -- the comment in CalendarScope claimed it was
+// "reported rather than swallowed" while nothing reported it. It now travels in the response
+// envelope as `unmatched_calendar_ids`; see ReadContractTests for the end-to-end assertion.
+
 @Suite("Calendar scoping")
 struct CalendarScopeTests {
 

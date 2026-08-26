@@ -23,7 +23,19 @@ enum Limits {
         return max(1, min(requested, maxResultLimit))
     }
 
-    static var applied: LimitsApplied {
-        LimitsApplied(limit: maxResultLimit, maxIntervalDays: maxIntervalDays)
+    /// What THIS call actually applied.
+    ///
+    /// `limit` is the effective cap for the call in hand, not the ceiling: reporting the
+    /// ceiling made every default query claim a limit of 500 while returning at most 100,
+    /// which is precisely the "you are free" / "I stopped looking" confusion `truncated`
+    /// exists to prevent. Null means no result cap was applied at all -- listing calendars
+    /// and merging busy intervals return everything they find.
+    ///
+    /// `maxIntervalDays` is null for calls that take no time window, for the same reason: a
+    /// window cap the call cannot reach is not a limit that was applied to it.
+    static func applied(limit: Int?, windowed: Bool = true) -> LimitsApplied {
+        LimitsApplied(limit: limit,
+                      maxResultLimit: maxResultLimit,
+                      maxIntervalDays: windowed ? maxIntervalDays : nil)
     }
 }

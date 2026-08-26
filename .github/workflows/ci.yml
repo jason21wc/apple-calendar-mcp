@@ -1,0 +1,63 @@
+# Build and test on a macOS runner.
+#
+# WHAT THIS DELIBERATELY DOES NOT DO
+# No signing, no keychain access, no TCC, no Calendar. None of them can work on a hosted
+# runner: the signing certificate is created once per machine in the login keychain, the
+# Calendar grant is keyed to an absolute path on a specific Mac, and there is no human to
+# answer a permission prompt. A workflow that appeared to check those would be worse than one
+# that does not -- it would report green for checks that never ran.
+#
+# The matrix therefore stops at: it builds, the unit and contract tests pass, the scripts
+# parse, and the shell checks hold. That is exactly the part that is machine-checkable, and it
+# is the first automation this project has had -- every defect so far was caught by a human or
+# an agent reading code.
+#
+# The test suite runs through scripts/test.sh rather than `swift test`, because that is the
+# supported command: Command Line Tools ship Testing.framework but no XCTest, and the module
+# and dyld paths have to be derived from `xcode-select -p`. CI mirroring the local command is
+# the point -- a green CI that runs something else is not evidence about the command people
+# actually use.
+#
+# The lifecycle tests spawn the real binary as a server. That is safe here for the same reason
+# it is safe locally: serving reads the authorization STATUS and no calendar data, prompts for
+# nothing, and writes nothing (the state directory is created by --probe and by the journal,
+# not by the server loop). On a runner with no grant it simply reports that it has none.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: build, test, lint scripts
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      # Run from the package root: the embedded Info.plist is added with
+      # -sectcreate, whose path is relative to the invoker's working directory.
+      - name: Build
+        run: swift build
+
+      - name: Every script parses
+        run: bash -n scripts/*.sh
+
+      - name: Shell checks
+        run: ./scripts/test-shell.sh
+
+      # Also drives scripts/test-shell.sh a second time via ShellScriptTests. Cheap, and it
+      # keeps the standalone path and the bridged path from diverging unnoticed.
+      - name: Test suite
+        run: ./scripts/test.sh

@@ -65,10 +65,17 @@ struct EventDTO: Codable, Sendable, Hashable {
     /// "will remain the same even if the event has been detached and its start date has
     /// changed", which is exactly why start date cannot be used for this. Null for
     /// non-recurring events.
+    ///
+    /// Rendered in UTC ALWAYS, unlike `start` and `end`, which follow the request's
+    /// `effective_time_zone`. A key whose text depends on a display preference is not a key:
+    /// two callers asking about the same occurrence in different zones would receive
+    /// different strings, and anything storing and later comparing one textually would stop
+    /// matching for a reason nothing in the payload explains.
     let occurrenceDate: String?
     let calendarId: String
     let title: String
-    /// RFC 3339 with an explicit offset, rendered in the machine's current zone.
+    /// RFC 3339 with an explicit offset, rendered in the response's `effective_time_zone` --
+    /// the caller's `time_zone` when they gave one, the machine's current zone otherwise.
     ///
     /// TWO CONVENTIONS MEET HERE, so read carefully. Query windows are half-open --
     /// `[start, end)` -- but EventKit stores an all-day event's `end` INCLUSIVELY, as
@@ -205,6 +212,15 @@ struct ReadEnvelope<Item: Codable & Sendable>: Codable, Sendable {
     /// Travel and it changes with no restart.
     let effectiveTimeZone: String
     let limitsApplied: LimitsApplied
+    /// Requested `calendar_ids` that matched no calendar on this Mac.
+    ///
+    /// Always present, empty when there were none. EventKit identifiers change on a full
+    /// sync, so a caller holding a stale one would otherwise receive `items: []` with
+    /// `truncated: false` -- byte-identical to a genuinely empty week. That is a false
+    /// ABSENCE, and an assistant that cannot tell the two apart will report a free
+    /// afternoon over a full one. `CalendarScope` computed this from the start and the
+    /// value was discarded before it reached the wire.
+    let unmatchedCalendarIds: [String]
     let trust: String
 
     enum CodingKeys: String, CodingKey {
@@ -212,15 +228,62 @@ struct ReadEnvelope<Item: Codable & Sendable>: Codable, Sendable {
         case totalMatched = "total_matched"
         case effectiveTimeZone = "effective_time_zone"
         case limitsApplied = "limits_applied"
+        case unmatchedCalendarIds = "unmatched_calendar_ids"
     }
 }
 
+/// The limits a single call applied -- not the limits the server is capable of applying.
+///
+/// Every field is present on the wire, null where it does not apply, because "no cap" and
+/// "the server did not say" are different answers to a caller deciding whether a result is
+/// complete (the same distinction `encode` vs `encodeIfPresent` protects in EventDTO).
 struct LimitsApplied: Codable, Sendable, Hashable {
-    let limit: Int
-    let maxIntervalDays: Int
+    /// Effective result cap for THIS call. Null when none was applied.
+    let limit: Int?
+    /// The largest `limit` a caller may request. A server constant, reported so a caller
+    /// knows what it is allowed to ask for next.
+    let maxResultLimit: Int
+    /// Window cap applied to this call. Null for calls that take no time window.
+    let maxIntervalDays: Int?
+
+    /// Hand-written so the nullable fields emit an explicit null rather than vanishing.
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(limit, forKey: .limit)
+        try c.encode(maxResultLimit, forKey: .maxResultLimit)
+        try c.encode(maxIntervalDays, forKey: .maxIntervalDays)
+    }
 
     enum CodingKeys: String, CodingKey {
         case limit
+        case maxResultLimit = "max_result_limit"
         case maxIntervalDays = "max_interval_days"
+    }
+}
+
+/// The permission report, as a type rather than a dictionary assembled inside the handler.
+///
+/// It was a `[String: Value]` literal, which meant the one tool whose entire job is to work
+/// when everything else is broken had no declared output shape and no test -- the same
+/// "private, therefore untested" trap as `writableReason`. A struct makes both free.
+struct PermissionStatusDTO: Codable, Sendable, Hashable {
+    let status: String
+    let canReadEvents: Bool
+    let guidance: String
+    /// `disclaimed-child` is the only value meaning the Calendar grant belongs to this
+    /// binary rather than to whatever launched it.
+    let identity: String
+    /// The model cannot ask the OS where "now" and "today" are, so the answer travels with
+    /// the report. Read live, so it is right after a flight or a DST change.
+    let systemTimeZone: String
+    let systemUtcOffsetSeconds: Int
+    let currentTime: String
+
+    enum CodingKeys: String, CodingKey {
+        case status, guidance, identity
+        case canReadEvents = "can_read_events"
+        case systemTimeZone = "system_time_zone"
+        case systemUtcOffsetSeconds = "system_utc_offset_seconds"
+        case currentTime = "current_time"
     }
 }

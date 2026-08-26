@@ -83,6 +83,7 @@ func printVersion() {
           identifier: \(Meta.bundleIdentifier)
           path:       \(Meta.executablePath)
           mode:       \(Runtime.disclaimMode)
-          tools:      \(Runtime.isReadOnly ? "read-only (--read-only)" : "read and write")
+          tools:      read-only -- no write tool exists in this build\
+        \(Runtime.isReadOnly ? "\n  --read-only: yes (mutating tools would be withheld)" : "")
         """)
 }

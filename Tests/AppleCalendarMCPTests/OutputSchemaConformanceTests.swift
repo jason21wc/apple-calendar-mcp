@@ -43,6 +43,27 @@ enum SchemaCheck {
                     problems += typeMismatches(value: v, schema: subSchema, path: "\(path)/\(key)")
                 }
             }
+
+            // A field the payload emits and the schema never declares.
+            //
+            // This is the half of the conformance problem the type check cannot see: an
+            // undeclared field is validated by nobody, so it can carry anything -- and
+            // `limits_applied` did exactly that, shipping the hard ceiling in a field
+            // callers were meant to read as the limit in force. Only checked where the
+            // schema declares properties at all; a bare `{"type": "object"}` claims nothing
+            // about its keys and is not violated by having some.
+            for key in obj.keys where props[key] == nil {
+                problems.append("\(path.isEmpty ? "<root>" : path)/\(key): emitted but not "
+                                + "declared in the schema")
+            }
+
+            // A field the schema requires and the payload omits.
+            if let required = schema["required"] as? [String] {
+                for key in required where obj[key] == nil {
+                    problems.append("\(path.isEmpty ? "<root>" : path)/\(key): declared "
+                                    + "required and absent from the payload")
+                }
+            }
         }
 
         if let itemSchema = schema["items"] as? [String: Any], let arr = value as? [Any] {
@@ -114,7 +135,8 @@ struct OutputSchemaConformanceTests {
                     sampleEvent(allDay: false, recurring: true)],
             truncated: false, totalMatched: 3,
             effectiveTimeZone: "America/Denver",
-            limitsApplied: Limits.applied, trust: untrustedMarker)
+            limitsApplied: Limits.applied(limit: 100),
+            unmatchedCalendarIds: [], trust: untrustedMarker)
 
         let problems = SchemaCheck.typeMismatches(
             value: try encoded(envelope), schema: try schema(forTool: "calendar_list_events"))
@@ -126,7 +148,8 @@ struct OutputSchemaConformanceTests {
         let envelope = ReadEnvelope(
             items: [sampleEvent(allDay: false, recurring: true)],
             truncated: true, totalMatched: 99,
-            effectiveTimeZone: "UTC", limitsApplied: Limits.applied, trust: untrustedMarker)
+            effectiveTimeZone: "UTC", limitsApplied: Limits.applied(limit: 100),
+            unmatchedCalendarIds: [], trust: untrustedMarker)
 
         let problems = SchemaCheck.typeMismatches(
             value: try encoded(envelope), schema: try schema(forTool: "calendar_find_events"))
@@ -140,7 +163,8 @@ struct OutputSchemaConformanceTests {
                                  end: "2026-08-20T15:00:00Z", eventCount: 2)],
             truncated: false, totalMatched: 1,
             effectiveTimeZone: "America/Denver",
-            limitsApplied: Limits.applied, trust: untrustedMarker)
+            limitsApplied: Limits.applied(limit: 100),
+            unmatchedCalendarIds: [], trust: untrustedMarker)
 
         let problems = SchemaCheck.typeMismatches(
             value: try encoded(envelope), schema: try schema(forTool: "calendar_busy_intervals"))
@@ -167,6 +191,101 @@ struct OutputSchemaConformanceTests {
         // Not requested: absent entirely, which is not the same as "this event has no notes".
         #expect(!json.keys.contains("notes"))
         #expect(!json.keys.contains("organizer_name"))
+    }
+
+    @Test("every tool declares an outputSchema, because every tool returns structuredContent")
+    func everyToolDeclaresAnOutputSchema() throws {
+        // permission_status and list_calendars shipped returning structuredContent with no
+        // declared shape at all. A client validating structured output had nothing to
+        // validate against, and the field-level drift that follows is invisible.
+        for tool in ToolRegistry.all() {
+            #expect(tool.outputSchema != nil, """
+                \(tool.name) declares no outputSchema but the handler returns                 structuredContent. Either declare the shape or stop returning it.
+                """)
+        }
+    }
+
+    @Test("the permission report matches the schema it advertises")
+    func permissionPayloadMatchesItsSchema() throws {
+        // Uses the real payload builder. It reads the authorization STATUS, which prompts
+        // nothing and touches no calendar data, so this runs anywhere.
+        let problems = SchemaCheck.typeMismatches(
+            value: try encoded(ToolHandlers.permissionPayload()),
+            schema: try schema(forTool: "calendar_permission_status"))
+        #expect(problems.isEmpty, "schema violations:\n\(problems.joined(separator: "\n"))")
+    }
+
+    @Test("a calendar list matches the schema it advertises")
+    func calendarPayloadMatchesItsSchema() throws {
+        let envelope = ReadEnvelope(
+            items: [CalendarRef(id: "CAL-1", title: "Home", sourceTitle: "iCloud",
+                                sourceType: "caldav", allowsContentModifications: true,
+                                isSubscribed: false, writable: true,
+                                writableReason: CalendarStore.writableReason(permitted: true),
+                                trust: untrustedMarker),
+                    CalendarRef(id: "CAL-2", title: "US Holidays", sourceTitle: "Subscribed",
+                                sourceType: "subscribed", allowsContentModifications: false,
+                                isSubscribed: true, writable: false,
+                                writableReason: CalendarStore.writableReason(permitted: false),
+                                trust: untrustedMarker)],
+            truncated: false, totalMatched: 2,
+            effectiveTimeZone: "America/Denver",
+            limitsApplied: Limits.applied(limit: nil, windowed: false),
+            unmatchedCalendarIds: [], trust: untrustedMarker)
+
+        let problems = SchemaCheck.typeMismatches(
+            value: try encoded(envelope), schema: try schema(forTool: "calendar_list_calendars"))
+        #expect(problems.isEmpty, "schema violations:\n\(problems.joined(separator: "\n"))")
+    }
+
+    @Test("limits_applied is DECLARED, not merely emitted")
+    func limitsAppliedIsDeclared() throws {
+        // It was emitted on every response and declared in no schema, so nothing validated
+        // it and it was free to report the ceiling instead of the limit in force.
+        for name in ["calendar_list_events", "calendar_find_events",
+                     "calendar_busy_intervals", "calendar_list_calendars"] {
+            let props = try #require(try schema(forTool: name)["properties"] as? [String: Any])
+            #expect(props["limits_applied"] != nil, "\(name) emits limits_applied undeclared")
+            let required = try #require(try schema(forTool: name)["required"] as? [String])
+            #expect(required.contains("limits_applied"))
+            #expect(required.contains("effective_time_zone"))
+        }
+    }
+
+    @Test("a null limit survives as an explicit null rather than vanishing")
+    func nullLimitIsPresent() throws {
+        // "No cap applied" and "the server did not say" are different answers for a caller
+        // deciding whether a result is complete.
+        let json = try #require(
+            try encoded(Limits.applied(limit: nil, windowed: false)) as? [String: Any])
+        #expect(json.keys.contains("limit"))
+        #expect(json["limit"] is NSNull)
+        #expect(json.keys.contains("max_interval_days"))
+        #expect(json["max_interval_days"] is NSNull)
+        #expect(json["max_result_limit"] as? Int == Limits.maxResultLimit)
+    }
+
+    @Test("the checker catches a field the payload emits and the schema never declared")
+    func checkerDetectsUndeclaredField() throws {
+        // Second positive control, for the second half of the checker.
+        struct Extra: Encodable { let declared = "yes"; let sneaked = 1 }
+        let schema: [String: Any] = ["type": "object",
+                                     "properties": ["declared": ["type": "string"]]]
+        let problems = SchemaCheck.typeMismatches(value: try encoded(Extra()), schema: schema)
+        #expect(problems.contains { $0.contains("sneaked") },
+                "an undeclared field passed unnoticed: \(problems)")
+    }
+
+    @Test("the checker catches a required field the payload omits")
+    func checkerDetectsMissingRequired() throws {
+        struct Partial: Encodable { let present = "yes" }
+        let schema: [String: Any] = ["type": "object",
+                                     "properties": ["present": ["type": "string"],
+                                                    "absent": ["type": "string"]],
+                                     "required": ["present", "absent"]]
+        let problems = SchemaCheck.typeMismatches(value: try encoded(Partial()), schema: schema)
+        #expect(problems.contains { $0.contains("absent") },
+                "a missing required field passed unnoticed: \(problems)")
     }
 
     @Test("the checker itself catches a Date, so a passing suite means something")
