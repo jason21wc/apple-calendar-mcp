@@ -9,63 +9,99 @@ import Foundation
 @Suite("Mutation journal")
 struct JournalTests {
 
+    /// A journal root this test owns outright, removed when it finishes.
+    ///
+    /// Every test below used to write into the user's REAL state directory. Two consequences,
+    /// both observed: the live journal accumulated hundreds of test entries that no one would
+    /// ever want, and the parallel suite shared one mutable append-only file, which made
+    /// `intentPrecedesOutcome` fail intermittently. A test that writes where production writes
+    /// is not testing the code, it is competing with it.
+    private func withTemporaryRoot<T>(_ body: (URL) throws -> T) rethrows -> T {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("apple-calendar-mcp-journal-\(UUID().uuidString)",
+                                    isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        return try body(root)
+    }
+
+    @Test("no journal test can resolve a path inside the real state directory")
+    func testRootsNeverTouchLiveState() {
+        // The guard that keeps the fix from silently regressing. If a future edit drops the
+        // `root:` argument, the default is Runtime.stateDirectory and this fails.
+        withTemporaryRoot { root in
+            let real = Runtime.stateDirectory.standardizedFileURL.path
+            for path in [Journal.directory(root: root).standardizedFileURL.path,
+                         Journal.currentFile(root: root).standardizedFileURL.path] {
+                #expect(!path.hasPrefix(real), """
+                    a journal test resolved \(path), which is inside the user's real state                     directory \(real). Tests must never write there.
+                    """)
+            }
+        }
+    }
+
     @Test("an intent is recorded BEFORE the outcome, so an interrupted write leaves a trace")
     func intentPrecedesOutcome() {
-        // The whole point of write-ahead: if the process dies between the two, the intent
-        // survives and says what was being attempted. A single after-the-fact entry would
-        // leave exactly nothing in the case that most needs a record.
-        let id = Journal.recordIntent(
-            operation: "test_create", calendarId: "CAL-1", calendarTitle: "Test",
-            calendarSource: "Local", payload: ["title": "Interrupted"])
+        withTemporaryRoot { root in
+            // The whole point of write-ahead: if the process dies between the two, the intent
+            // survives and says what was being attempted. A single after-the-fact entry would
+            // leave exactly nothing in the case that most needs a record.
+            let id = Journal.recordIntent(
+                root: root, operation: "test_create", calendarId: "CAL-1", calendarTitle: "Test",
+                calendarSource: "Local", payload: ["title": "Interrupted"])
 
-        let orphans = Journal.orphanedIntents()
-        #expect(orphans.contains { $0.entryId == id },
-                "an intent with no outcome must be visible as orphaned")
+            let orphans = Journal.orphanedIntents(root: root)
+            #expect(orphans.contains { $0.entryId == id },
+                    "an intent with no outcome must be visible as orphaned")
 
-        Journal.recordOutcome(
-            entryId: id, operation: "test_create", calendarId: "CAL-1", calendarTitle: "Test",
-            calendarSource: "Local", eventId: "EVT-1", payload: ["title": "Interrupted"],
-            outcome: .saved, error: nil)
+            Journal.recordOutcome(
+                root: root, entryId: id, operation: "test_create", calendarId: "CAL-1", calendarTitle: "Test",
+                calendarSource: "Local", eventId: "EVT-1", payload: ["title": "Interrupted"],
+                outcome: .saved, error: nil)
 
-        #expect(!Journal.orphanedIntents().contains { $0.entryId == id },
-                "once the outcome lands the intent is no longer orphaned")
+            #expect(!Journal.orphanedIntents(root: root).contains { $0.entryId == id },
+                    "once the outcome lands the intent is no longer orphaned")
+        }
     }
 
     @Test("an entry carries enough to reconstruct the change without EventKit")
     func entryIsSelfContained() throws {
-        let id = Journal.recordIntent(
-            operation: "test_create", calendarId: "CAL-2", calendarTitle: "Jason",
-            calendarSource: "iCloud",
-            payload: ["title": "Dentist", "start": "2026-08-21T14:00:00-06:00",
-                      "end": "2026-08-21T15:00:00-06:00"])
+        try withTemporaryRoot { root in
+            let id = Journal.recordIntent(
+                root: root, operation: "test_create", calendarId: "CAL-2", calendarTitle: "Jason",
+                calendarSource: "iCloud",
+                payload: ["title": "Dentist", "start": "2026-08-21T14:00:00-06:00",
+                          "end": "2026-08-21T15:00:00-06:00"])
 
-        let entry = try #require(Journal.entries(limit: 500).last { $0.entryId == id })
-        // Calendar identity is recorded as all three fields, not just the identifier --
-        // identifiers change on a full sync, so an id alone may not resolve later.
-        #expect(entry.calendarTitle == "Jason")
-        #expect(entry.calendarSource == "iCloud")
-        #expect(entry.payload["title"] == "Dentist")
-        #expect(entry.payload["start"] == "2026-08-21T14:00:00-06:00")
-        // Whether we owned our privacy identity matters when reading history back: an entry
-        // written under an inherited identity means the change was attributed to the host.
-        #expect(!entry.privacyIdentity.isEmpty)
+            let entry = try #require(Journal.entries(limit: 500, root: root).last { $0.entryId == id })
+            // Calendar identity is recorded as all three fields, not just the identifier --
+            // identifiers change on a full sync, so an id alone may not resolve later.
+            #expect(entry.calendarTitle == "Jason")
+            #expect(entry.calendarSource == "iCloud")
+            #expect(entry.payload["title"] == "Dentist")
+            #expect(entry.payload["start"] == "2026-08-21T14:00:00-06:00")
+            // Whether we owned our privacy identity matters when reading history back: an entry
+            // written under an inherited identity means the change was attributed to the host.
+            #expect(!entry.privacyIdentity.isEmpty)
+        }
     }
 
     @Test("all three save outcomes round-trip — a no-op is not a failure")
     func saveOutcomesAreDistinct() throws {
-        // EventKit returns NO with a nil error when nothing needed saving. Collapsing that
-        // into "failed" would report a false failure on every unchanged save.
-        for outcome in [SaveOutcome.saved, .noChangeNeeded, .failed] {
-            let id = Journal.recordIntent(
-                operation: "test_outcome", calendarId: "C", calendarTitle: "T",
-                calendarSource: "S", payload: [:])
-            Journal.recordOutcome(
-                entryId: id, operation: "test_outcome", calendarId: "C", calendarTitle: "T",
-                calendarSource: "S", eventId: nil, payload: [:],
-                outcome: outcome, error: outcome == .failed ? "boom" : nil)
+        try withTemporaryRoot { root in
+            // EventKit returns NO with a nil error when nothing needed saving. Collapsing that
+            // into "failed" would report a false failure on every unchanged save.
+            for outcome in [SaveOutcome.saved, .noChangeNeeded, .failed] {
+                let id = Journal.recordIntent(
+                    root: root, operation: "test_outcome", calendarId: "C", calendarTitle: "T",
+                    calendarSource: "S", payload: [:])
+                Journal.recordOutcome(
+                    root: root, entryId: id, operation: "test_outcome", calendarId: "C", calendarTitle: "T",
+                    calendarSource: "S", eventId: nil, payload: [:],
+                    outcome: outcome, error: outcome == .failed ? "boom" : nil)
 
-            let entry = try #require(Journal.entries(limit: 500).last { $0.entryId == id && $0.phase == .outcome })
-            #expect(entry.saveOutcome == outcome)
+                let entry = try #require(Journal.entries(limit: 500, root: root).last { $0.entryId == id && $0.phase == .outcome })
+                #expect(entry.saveOutcome == outcome)
+            }
         }
     }
 
@@ -84,8 +120,8 @@ struct JournalTests {
         //
         // The parsing rule under test is a property of the READER, so it is now exercised
         // against a scratch file the test owns outright. Nothing here touches
-        // Runtime.stateDirectory. Isolating the WRITE path as well needs an injectable
-        // journal root -- BACKLOG #26, deliberately not done here.
+        // Runtime.stateDirectory, and as of BACKLOG #26 neither does any other test here:
+        // `Journal` now takes an explicit `root`, so the write path is isolated too.
         let sandbox = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("apple-calendar-mcp-journaltest-\(UUID().uuidString).jsonl")
         defer { try? FileManager.default.removeItem(at: sandbox) }
@@ -109,11 +145,13 @@ struct JournalTests {
 
     @Test("the journal file is not readable by other users")
     func journalIsPrivate() throws {
-        Journal.recordIntent(operation: "test_perms", calendarId: "C", calendarTitle: "T",
-                             calendarSource: "S", payload: [:])
-        let attrs = try FileManager.default.attributesOfItem(atPath: Journal.currentFile().path)
-        let perms = (attrs[.posixPermissions] as? NSNumber)?.intValue ?? 0
-        // It records event titles and times -- real calendar content.
-        #expect(perms & 0o077 == 0, "mode is \(String(perms, radix: 8))")
+        try withTemporaryRoot { root in
+            Journal.recordIntent(root: root, operation: "test_perms", calendarId: "C",
+                                 calendarTitle: "T", calendarSource: "S", payload: [:])
+            let attrs = try FileManager.default.attributesOfItem(atPath: Journal.currentFile(root: root).path)
+            let perms = (attrs[.posixPermissions] as? NSNumber)?.intValue ?? 0
+            // It records event titles and times -- real calendar content.
+            #expect(perms & 0o077 == 0, "mode is \(String(perms, radix: 8))")
+        }
     }
 }

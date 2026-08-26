@@ -87,23 +87,36 @@ enum Journal {
     /// protects against a second process sharing the file.
     private static let writeQueue = DispatchQueue(label: "com.collierhmg.apple-calendar-mcp.journal")
 
-    static var directory: URL {
-        Runtime.stateDirectory.appendingPathComponent("journal", isDirectory: true)
+    /// Where the journal lives.
+    ///
+    /// `root` is a parameter with a production default rather than a fixed constant, and it
+    /// is threaded through every entry point below. The tests need to write somewhere they
+    /// own: they used to append to the user's REAL journal, which grew on every run and --
+    /// worse -- gave parallel tests a shared mutable file to race over.
+    ///
+    /// Deliberately NOT a settable static. A mutable global that redirects where calendar
+    /// history gets written is exactly the shape this project has twice been bitten by: a
+    /// value the caller hands you cannot authenticate its own setter. A defaulted parameter
+    /// keeps production call sites unchanged while making the location explicit and
+    /// impossible to redirect from a distance.
+    static func directory(root: URL = Runtime.stateDirectory) -> URL {
+        root.appendingPathComponent("journal", isDirectory: true)
     }
 
     /// Monthly files, so a long-lived install does not accumulate one unbounded file and a
     /// human looking for "what happened in August" has somewhere obvious to look.
-    static func currentFile(now: Date = Date()) -> URL {
+    static func currentFile(now: Date = Date(), root: URL = Runtime.stateDirectory) -> URL {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeSemantics.systemZone
         f.dateFormat = "yyyy-MM"
-        return directory.appendingPathComponent("\(f.string(from: now)).jsonl")
+        return directory(root: root).appendingPathComponent("\(f.string(from: now)).jsonl")
     }
 
     /// Record an intent and return its id. Call BEFORE mutating.
     @discardableResult
-    static func recordIntent(operation: String,
+    static func recordIntent(root: URL = Runtime.stateDirectory,
+                             operation: String,
                              calendarId: String, calendarTitle: String, calendarSource: String,
                              payload: [String: String]) -> String {
         let id = UUID().uuidString
@@ -119,12 +132,13 @@ enum Journal {
             payload: payload,
             saveOutcome: nil,
             errorDescription: nil,
-            privacyIdentity: Runtime.disclaimMode))
+            privacyIdentity: Runtime.disclaimMode), root: root)
         return id
     }
 
     /// Record what actually happened. Call AFTER the save, whatever the result.
-    static func recordOutcome(entryId: String, operation: String,
+    static func recordOutcome(root: URL = Runtime.stateDirectory,
+                              entryId: String, operation: String,
                               calendarId: String, calendarTitle: String, calendarSource: String,
                               eventId: String?, payload: [String: String],
                               outcome: SaveOutcome, error: String?) {
@@ -140,19 +154,22 @@ enum Journal {
             payload: payload,
             saveOutcome: outcome,
             errorDescription: error,
-            privacyIdentity: Runtime.disclaimMode))
+            privacyIdentity: Runtime.disclaimMode), root: root)
     }
 
     // MARK: - Writing
 
-    private static func append(_ entry: JournalEntry) {
-        writeQueue.sync { appendLocked(entry) }
+    private static func append(_ entry: JournalEntry, root: URL) {
+        writeQueue.sync { appendLocked(entry, root: root) }
     }
 
-    private static func appendLocked(_ entry: JournalEntry) {
-        Runtime.ensureStateDirectory()
+    private static func appendLocked(_ entry: JournalEntry, root: URL) {
+        // Only tighten the process state directory when that IS the root. A test root is the
+        // test's to manage, and calling Runtime here would reach into the user's home
+        // regardless of where the journal was pointed.
+        if root == Runtime.stateDirectory { Runtime.ensureStateDirectory() }
         try? FileManager.default.createDirectory(
-            at: directory, withIntermediateDirectories: true,
+            at: directory(root: root), withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700])
 
         let encoder = JSONEncoder()
@@ -163,7 +180,7 @@ enum Journal {
         }
         line.append(0x0A)   // newline
 
-        let file = currentFile()
+        let file = currentFile(root: root)
 
         // O_APPEND makes each write land at the end atomically, rather than the
         // seek-then-write pair which another writer can slip between. Created 0600 from the
@@ -196,8 +213,8 @@ enum Journal {
     /// Entries for the current month, oldest first. Malformed lines are skipped rather than
     /// aborting the read -- a truncated final line from an interrupted write must not make
     /// the whole history unreadable.
-    static func entries(limit: Int = 100) -> [JournalEntry] {
-        guard let data = try? Data(contentsOf: currentFile()),
+    static func entries(limit: Int = 100, root: URL = Runtime.stateDirectory) -> [JournalEntry] {
+        guard let data = try? Data(contentsOf: currentFile(root: root)),
               let text = String(data: data, encoding: .utf8) else { return [] }
         let decoder = JSONDecoder()
         return text.split(separator: "\n")
@@ -206,8 +223,8 @@ enum Journal {
     }
 
     /// Intents with no matching outcome: writes that began and never reported back.
-    static func orphanedIntents() -> [JournalEntry] {
-        let all = entries(limit: 1000)
+    static func orphanedIntents(root: URL = Runtime.stateDirectory) -> [JournalEntry] {
+        let all = entries(limit: 1000, root: root)
         let completed = Set(all.filter { $0.phase == .outcome }.map(\.entryId))
         return all.filter { $0.phase == .intent && !completed.contains($0.entryId) }
     }

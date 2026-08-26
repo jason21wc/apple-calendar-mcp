@@ -75,5 +75,6 @@
   only, opt-in and env-gated.
 - **No destructive tool ships ahead of its restore path.** Delete and its restore land in the
   same change, tested end to end against a disposable calendar: create → delete → restore →
-  diff every persisted field. Shipping the destructive half first leaves a window with no way
-  back, and C7 is the primary user-facing control now that the allowlist is withdrawn.
+  diff every restorable field. Shipping the destructive half first leaves a window with no way
+  back. C7 has one explicit exception: EventKit cannot reconstruct attendee/invitation state;
+  C6 permits that removal only behind confirmation that discloses the loss and social recovery.

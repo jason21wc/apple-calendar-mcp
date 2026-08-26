@@ -174,8 +174,8 @@ setter and what an account server does with a removal is unmeasured.
 mutation path in the shipped server, so there is nothing for any of these to gate: no guard in
 this table appears in `Sources/`. They are decisions binding the write surface when it is
 built, and a fresh `evaluate_governance` is required to weaken one — which is exactly why they
-are recorded now. But a reader who took "Live" as "running" would have believed the server was
-enforcing attendee refusal today, and it enforces nothing, because it changes nothing.
+are recorded now. But a reader who took "Live" as "running" would have believed mutation
+guards were already enforced, when they enforce nothing today because the server changes nothing.
 
 **`confirm_summary` is presentation, not enforcement.** It makes the host's approval prompt
 display a real sentence instead of an identifier. It does not prove a human read it — the
@@ -309,14 +309,14 @@ The human, asked directly, wanted something weaker and entirely achievable:
 > same info."*
 
 **C7: every mutation must be restorable, where restorable means the information is back.** A
-new event carrying the same field values satisfies it. Every blocker above is about *identity*,
-and identity is not the requirement.
+new event carrying the same field values satisfies it. Identity is not the requirement.
 
-**Why this is safe rather than merely convenient.** `attendees` is the one field a snapshot
-cannot reproduce (`readonly`, `EKCalendarItem.h:97`) — and **C6 already refuses to mutate any
-event with attendees or an external organizer**. The set this tool may delete is therefore
-exactly the set it can fully put back. Two constraints drawn for unrelated reasons, on the same
-line.
+**Named exception, approved 2026-08-25.** `attendees` is the one field a snapshot cannot
+reproduce (`readonly`, `EKCalendarItem.h:97`). C6 now permits attendee/external-organizer
+removal behind per-call confirmation that states the EventKit action may notify participants,
+that invitation state cannot be restored, and that recovery may require asking to be
+re-invited. Exact EventKit removal semantics remain unmeasured; the tool must call the action
+*remove* and never claim equivalence to Calendar.app's Decline.
 
 **Shape, from `acct-ledger-integrity-le2-audit-trail-immutability`** (surfaced by
 `gov-120ca260c415`): *corrections are made through reversing entries, never by editing or
@@ -553,8 +553,8 @@ forwarding **is** now covered (§5).
 |---|---|
 | Reinstalling or moving the binary loses the grant | Path-keyed by design; `--setup` runs at the final path; `--doctor` says so in plain English |
 | Hardened runtime without the entitlement → silent permanent denial | Ship both always; `sign.sh` asserts both on the signed binary |
-| Deleting an invited event notifies real people | C6, checked against ground truth. **The notification claim is inference, not header-verified** — confirm in Phase 6 with a second account |
-| Prompt injection driving a mutation | The guarded commit path, C6's ground-truth refusal and C7 restorability. **Not** the allowlist (C1 withdrawn 2026-08-20), and **not yet** any human-approval mechanism — `toolPolicy` was never configured and elicitation is unmeasured (§6, BACKLOG #1). Reduces blast radius and improves reviewability; does **not** prevent a find → propose → commit chain |
+| Removing an invited event may notify real people or behave differently from Calendar.app's Decline | C6 requires per-call confirmation that discloses the uncertainty and C7's attendee-state exception. A second-account test is optional characterization, not a release gate |
+| Prompt injection driving a mutation | The guarded commit path, refetched ground-truth checks, per-call confirmation, and C7 restorability with its named attendee-state exception. **Not** the allowlist (C1 withdrawn 2026-08-20), and **not yet** any human-approval mechanism — `toolPolicy` was never configured and elicitation is unmeasured (§6, BACKLOG #1). Reduces blast radius and improves reviewability; does **not** prevent a find → propose → commit chain |
 | Controls sit inside the agent's blast radius | Stated verbatim in README and memory; startup-only config load |
 | Same-uid impersonation of this binary's identity | Root-owned install path; never grant to `.build` |
 | Server restart invalidates in-flight tokens | Expected; surfaced as `TOKEN_INVALID` |

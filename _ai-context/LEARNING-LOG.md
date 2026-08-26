@@ -27,9 +27,10 @@ consolidation especially, since it moves boundaries rather than code.
 
 **2026-08-18 — A control that reads impressive can be strictly weaker than a one-line
 predicate.** The propose/commit token machinery is the most elaborate thing in the design
-and does not prevent injection; the attendee refusal is one `if` consulting the event
-itself and cannot be argued past. **Rule:** rank controls by *what they consult* — ground
-truth beats model-supplied arguments — not by how much machinery they involve.
+and does not prevent injection; a guard that refetches the event consults stronger evidence
+than a model-supplied summary. Whether the resulting policy is confirmation or refusal is a
+separate human decision. **Rule:** rank controls by *what they consult* — ground truth beats
+model-supplied arguments — not by how much machinery they involve.
 
 **2026-08-18 — Author review does not catch author contradictions.** Three fresh-context
 reviews found four blocking defects the author had read past repeatedly, two of them
@@ -171,11 +172,11 @@ were, and it can be a new event with the same info." Every blocker vanished. **R
 requirement leads somewhere impossible, re-examine the requirement before the design. Ask what
 outcome it protects, not what mechanism it names.
 
-**2026-08-20 — Two constraints drawn for unrelated reasons turned out to be the same line.**
-C6 refuses events with attendees (they would mail real people). Restorability fails on exactly
-one field — attendees, readonly in EventKit. So the set the tool may delete is precisely the
-set it can fully put back. **Rule:** when a hard boundary already exists, check whether the new
-problem stops at the same place before drawing a second one.
+**2026-08-20 — SUPERSEDED 2026-08-25: two constraints initially appeared to stop at the same
+line.** C6 once refused attendee events, and attendees are the one field EventKit cannot
+restore. The human later accepted confirmed removal plus a narrow C7 exception and social
+recovery. **Rule:** when controls appear to share a boundary, record whether that identity is
+an invariant or merely a policy choice; amending one may invalidate the other.
 
 **2026-08-20 — Withdrawing a decision is a code change, not a memory edit.** C1 was dropped in
 conversation and the natural next move was to write it into PROJECT-MEMORY and move on. Grepping
@@ -333,6 +334,12 @@ observed adapter behavior as separate evidence levels; verify each claim at its 
 state writes.** Journal tests accumulated in the user's state directory and one fixture wrote
 outside the journal's synchronization. **Rule: every persistent subsystem needs a temporary
 test root, and tests must assert that their resolved path is outside the live state directory.**
+
+**2026-08-26 — A green disposable CI runner proved independence from local prerequisites, not
+storage hermeticity.** The suite passed without a Calendar grant, signing certificate, or
+pre-existing state, while `JournalTests` still wrote into the runner user's normal state path.
+**Rule:** call tests hermetic only when state roots are injected and asserted outside production
+paths; an ephemeral machine merely makes contamination disposable.
 
 **2026-08-24 — I cited a standard as proof that an implementation obeys it.** RFC 5546 defines
 what organizer `CANCEL` and attendee `REPLY` mean; I wrote that this "verifies" EventKit sends

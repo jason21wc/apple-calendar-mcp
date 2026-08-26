@@ -66,17 +66,18 @@ source names — is attacker-influenceable through inbound invitations and is tr
 paths, or shell input.
 
 Containment controls live in `_ai-context/PROJECT-MEMORY.md` and are governed: amending one
-requires a fresh `evaluate_governance` and a same-turn memory write. The adopted set, unchanged since
-2026-08-20: **C3, C4, C5, C6, C7** — see the plan's §4 table for the state of each. **None is
+requires a fresh `evaluate_governance` and a same-turn memory write. The adopted set is
+**C3, C4, C5, C6, C7**; C6/C7 were materially amended 2026-08-25 — see the plan's §4 table for the state of each. **None is
 in force today**: they govern mutation, and this server has no mutation path, so there is
 nothing for them to gate. They bind the write surface when it is built. C1 (writable-calendar allowlist) was withdrawn by the
 user's decision; C2/C2a/C4a were superseded by C7 and the later write design. The enforced
 human-approval mechanism remains an open gate for the write surface.
 
 **C7 — every mutation must be restorable**, where restorable means the *information* returns,
-not the original object. A new event carrying the same field values satisfies it. This is
-achievable only because C6 refuses events with attendees, and `attendees` is the single field
-a snapshot cannot reproduce (`readonly`, `EKCalendarItem.h:97`).
+not the original object. A new event carrying the same field values satisfies it. There is one
+named exception: EventKit exposes `attendees` as read-only, so attendee/invitation state cannot
+be reconstructed. C6 permits removing such an event only behind per-call confirmation that
+discloses the uncertainty and the need for social recovery if the user wants to be re-invited.
 
 **What the controls do not do.** They reduce blast radius and make each mutation
 individually reviewable. They do not prevent a model acting on injected instructions from

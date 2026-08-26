@@ -15,31 +15,28 @@
   prior `apple-mail` experiment is not to be repeated as evidence: three independent confounds
   made its null result attribute to nothing (gotcha 83).
 
-- **#26 — `JournalTests` writes to the user's REAL state directory, and the suite is now
-  intermittently red because of it.** Verified 2026-08-24: every current journal line is test
-  output (`test_create`, `test_outcome`, `test_corrupt`, `test_perms`, or the malformed-line
-  fixture), and the file grows on every run. `intentPrecedesOutcome` failed once during this
-  session and passed on re-runs. Two defects share the same missing storage boundary:
-  **(a) No test isolation.** `Journal` writes to `Runtime.stateDirectory`, a `static let` with
-  no injection point, so a test cannot redirect it — and `HOME` cannot redirect it either,
-  because `homeDirectoryForCurrentUser` reads the passwd database (gotcha 37). The immediate
-  race is more specific than "parallel appends": `Journal` serializes its own O_APPEND writes,
-  but `corruptLineIsSkipped` opens that same live file independently, seeks to the end, and
-  writes outside both `writeQueue` and O_APPEND. It can race a journal append. Other suites
-  avoid the state directory deliberately; this one does not.
-  **(b) `entries()` reads and decodes the ENTIRE file on every call**, then throws away all but
-  `.suffix(limit)`. `orphanedIntents()` does this at `limit: 1000`. Cost grows without bound
-  within a month, and this is the read path a future `calendar_recent_mutations` would use.
-  Fix (a) before trusting the suite — a test that fails once in four is not evidence of
-  anything, per this project's own standard. Fix (b) before the journal has a caller.
-  Do not delete the live journal as part of the code fix. Cleanup is a separate, explicit
-  operation outside the repository even though current inspection found test output only.
+- **#26 — journal test isolation. (a) DONE 2026-08-26; (b) still open.**
+  **(a) Test isolation — fixed.** `Journal`'s storage location is now an explicit `root:`
+  parameter defaulting to `Runtime.stateDirectory`, threaded through `directory`,
+  `currentFile`, `recordIntent`, `recordOutcome`, `entries` and `orphanedIntents`. Production
+  call sites are unchanged; the tests pass a temporary directory they own and delete.
+  Deliberately **not** a settable static — a mutable global redirecting where calendar history
+  is written is the shape this project has twice been bitten by. A guard test asserts no
+  journal test can resolve a path beneath the real state directory, so dropping the argument
+  fails the suite rather than silently writing to the user's home. **Verified: three
+  consecutive full runs added zero lines to the live journal** (was ~10 per run).
+  **(b) `entries()` still reads and decodes the ENTIRE monthly file on every call**, then
+  discards all but `.suffix(limit)`; `orphanedIntents()` does it at `limit: 1000`. Cost grows
+  without bound within a month, and this is the read path `calendar_recent_mutations` would
+  use. Fix before the journal has a caller.
+  Do not delete the live journal as part of a code fix — that is a separate, explicit
+  operation, even though inspection found only test output.
 
 - **#24 — Measure server elicitation, then decide whether it replaces or supplements
   `toolPolicy`.** The pinned SDK supports `Server.requestElicitation`, but its validator is a
   no-op under this server's effective default (`strict: false`; gotcha 84). Sequence:
-  **(1)** capture the connected client's declared elicitation sub-capabilities at initialize
-  and surface them through `calendar_permission_status`; **(2)** pending human approval to add
+  **(1)** capture the connected client's declared **form** elicitation capability at initialize
+  and surface it through `calendar_permission_status`; **(2)** pending human approval to add
   a sixth public tool, run one harmless form-elicitation round trip; **(3)** for future writes,
   explicitly require the needed form capability and refuse on absence, decline, cancellation,
   error or non-response. A declaration is eligibility to try, not proof that a human responded,
@@ -75,18 +72,6 @@
   on `readOnlyHint` overriding a wildcard — a mechanism never confirmed from the minified
   bundle. Backup of `claude_desktop_config.json` already taken.
 
-- **#8 — Confirm C6 (attendee refusal) formally**, and note the second-account test is more
-  important than recorded: it is not merely "does deleting notify people", it is **"what does
-  `removeEvent` on an invited event actually DO?"** EventKit has no decline API
-  (`participantStatus` is readonly, gotcha 91), so `removeEvent` is the only lever and its
-  behaviour over CalDAV is unknown — it may produce a proper decline, a silent local removal
-  that desyncs on next sync, or a cancellation. Those are three very different outcomes and
-  only one of them is acceptable. Until measured, refusal is the only defensible policy.
-  Original item follows.
-- **#8a — original:** confirm C6 formally, and verify the premise in Phase 6 with a
-  second account: does deleting an invited event actually send a decline to the organizer
-  and attendees? The refusal is cheap enough to keep either way, but the README rationale
-  should not state an unverified claim as fact.
 - **#17 — Restore must ship in the SAME change as delete, never after.** C7 is the primary
   user-facing control now that C1 is withdrawn; shipping the destructive half first leaves a
   window with no way back. Test it end to end against a disposable calendar: create → delete →
@@ -108,8 +93,6 @@
   used a wrong one. Settle by checking what Claude Desktop and Claude Code actually show the
   model for each, then pick. Low severity either way.
 
-- **#10 — Verify `calshow:` opens Calendar.app at a date.** If it works, the C6 refusal can
-  hand the user a clickable jump instead of just coordinates.
 - **#7 — Third-party attribution file.** If any expression is borrowed from either MIT
   reference repo, add a `NOTICE` / `THIRD-PARTY-NOTICES.md` carrying the original MIT text
   and copyright line, and mark provenance in the borrowing file's header. Not needed if
@@ -170,6 +153,8 @@ Removed after verifying each against the repository rather than against memory:
 | #13 `unsafeFlags` decision | Decided and recorded in PROJECT-MEMORY: accepted, clone-and-build only |
 | #15 CI on a macOS runner | `.github/workflows/ci.yml` — build, `./scripts/test.sh`, `bash -n`, shell checks. No signing, keychain, TCC or Calendar access, none of which can work on a hosted runner |
 | #16 `security-scan` skill | Routed above as external; not this repo's work |
+| #8/#8a attendee-refusal decision and mandatory second-account test | Resolved 2026-08-25 by the C6/C7 amendment (`gov-800ad831a848`): confirmed removal with disclosed uncertainty and a named restorability exception. A second-account test is optional characterization, not a release gate |
+| #10 `calshow:` handoff for refused attendee events | Obsolete with the withdrawal of blanket C6 refusal; do not keep infrastructure for a handoff policy no longer adopted |
 
 ---
 

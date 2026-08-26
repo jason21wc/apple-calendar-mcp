@@ -1,7 +1,7 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # Session State
 
-**Last Updated:** 2026-08-24
+**Last Updated:** 2026-08-26
 **Memory Type:** Working (transient)
 **Lifecycle:** Prune at session start per §7.0.4
 
@@ -16,9 +16,10 @@
   write tool exists.** Phase 5 substrate (`Journal.swift`) built, with no caller.
 - **Mode:** Standard
 - **Repo:** https://github.com/jason21wc/apple-calendar-mcp (public, Apache-2.0)
-- **Active Task:** C6/C7 attendee-deletion policy reconsideration. The human's current leaning
-  is that blanket refusal and a mandatory second-account test are stricter than needed, but no
-  containment amendment is final yet.
+- **Active Task:** Isolate journal tests before further implementation. C6/C7 are decided:
+  attendee/external-organizer removal is
+  permitted behind per-call confirmation, with a named restorability exception for invitation
+  state and social recovery if the user needs to be re-invited.
 - **Next code:** **BACKLOG #26** — isolate `JournalTests` from the live state directory before
   trusting another suite result. Then **BACKLOG #19** — bound EventKit operations, fail fast once wedged. A live
   defect in shipped read-only code, independent of the write blocker. It touches
@@ -38,7 +39,7 @@
 | Containment controls | C3, C4, C5, C6, **C7**. C1 withdrawn; C2/C2a/C4a superseded |
 | Latest governance | `gov-800ad831a848` (PROCEED, no S-Series) — **the C6/C7 amendment, approved by the human**. Also this session: `gov-73d2d27428b5`, `gov-cec327c3a310`, `gov-d463782d41dd` |
 | Plan | `docs/IMPLEMENTATION-PLAN.md` — **now canonical and repo-owned.** The revision number lives in the plan itself and is not restated here |
-| CI | `.github/workflows/ci.yml` — macOS runner, build + tests + shell checks, **no signing**. First run green 2026-08-26, which also proves the suite is hermetic: it passes with no Calendar grant, no certificate and no state directory |
+| CI | `.github/workflows/ci.yml` — macOS runner, build + tests + shell checks, **no signing**. Green since 2026-08-26. It proves independence from Calendar permissions, signing and pre-existing state; storage hermeticity is separate and was only achieved 2026-08-26 by BACKLOG #26 |
 
 ## What changed 2026-08-22 — drift fixed at the cause, and the read contract audited
 
@@ -128,7 +129,6 @@ SDK), so its review is source-reasoning only. The suite runs clean here.
 | # | Decision | Blocks |
 |---|---|---|
 | **1** | **Demonstrate a real human-approval round trip in Claude Desktop/Cowork through an enforced mechanism before any write tool ships.** Candidate paths are measured host `toolPolicy` or explicitly guarded server elicitation; neither is proven today. The two prior experiments each measured the wrong layer (gotcha 83). | All write work |
-| 2 | Confirm C6 formally, and verify in Phase 6 that deleting an invited event really notifies the organizer | README wording |
 
 ## The 2026-08-22 write-prompt result, and what it actually established
 
@@ -174,23 +174,25 @@ See **BACKLOG #24**.
 
 ## Next Actions
 
-1. **Report Desktop/Cowork's declared elicitation sub-capabilities** through the existing
-   permission-status surface (BACKLOG #24). If the human approves expanding the public tool
-   surface, then add a harmless elicitation round-trip probe. Only after both measurements
-   decide whether elicitation replaces or supplements `toolPolicy`.
-2. **Set `toolPolicy` on one server and re-run the write test** (BACKLOG #23 — human's call,
+1. **BACKLOG #26** — inject a temporary journal root and assert tests cannot resolve beneath
+   `Runtime.stateDirectory`. Do this before treating repeated local suite runs as trustworthy.
+2. **BACKLOG #24** — report Desktop/Cowork's declared elicitation **form** capability, then
+   complete a harmless real round trip. Capability reporting alone does not establish that a
+   human can be reached. Only after both measurements decide whether elicitation replaces or
+   supplements `toolPolicy`; the final design must also fail closed on non-response.
+3. **Set `toolPolicy` on one server and re-run the write test** (BACKLOG #23 — human's call,
    config edit). Until the key exists there is nothing to measure. Pick a probe tool that does
    NOT elicit server-side, so any prompt attributes to the host.
-3. **Reinstall the signed binary** if the read-surface fixes should be live in clients — the
+4. **Reinstall the signed binary** if the read-surface fixes should be live in clients — the
    copy at `/usr/local/bin` predates them. `./scripts/sign.sh`, then `sudo cp`, then verify
    with `codesign --verify --strict`. **No new grant is needed**: same path, and the
    designated requirement is identity-based.
-4. **BACKLOG #19** — bound EventKit operations, fail fast once wedged. Architecture-bearing:
+5. **BACKLOG #19** — bound EventKit operations, fail fast once wedged. Architecture-bearing:
    plan it, contrarian-review it, then build.
-5. **Blocked On #1** before any write tool.
-6. If #23 proves host policy and the human retains it, move to per-tool `toolPolicy`
+6. **Blocked On #1** before any write tool.
+7. If #23 proves host policy and the human retains it, move to per-tool `toolPolicy`
    (BACKLOG #2): writes `"ask"`, reads unlisted.
-7. **Build order:** `calendar_create_event` → `calendar_delete_event` **with restore in the
+8. **Build order:** `calendar_create_event` → `calendar_delete_event` **with restore in the
    same change** → `calendar_update_event`.
 
 ## Not measured, and not to be assumed
