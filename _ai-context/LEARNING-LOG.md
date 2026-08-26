@@ -205,6 +205,169 @@ not-found from still-working from deadlocked, and could not safely retry. **Rule
 fast and structured on an unresolvable key, and every operation needs a bound well under the client's
 ceiling. An unbounded operation has no honest error to report.
 
+**2026-08-22 — The drift had one structural cause, and it was not carelessness.** Phase status,
+test counts and plan revision numbers were restated in six files, and the canonical plan lived
+outside the repo as a private file the repo held a *copy* of. Every restatement is a thing that
+can go stale independently, and the count reached four different values (63/95/99/119) across
+four documents. **Rule: a volatile fact belongs in exactly one place, and preferably in a
+command rather than in prose. If a document must mention it, it points at the command.**
+
+**2026-08-22 — The schema conformance suite could not see the field that was lying.** It walked
+the *declared* properties of each `outputSchema`, so `limits_applied` — emitted on every
+response and declared in none — was skipped entirely while it reported the hard ceiling as the
+limit in force. **Rule: a conformance check must test in both directions. Declared-but-absent
+AND emitted-but-undeclared. Whatever the schema does not name, nothing is checking.**
+
+**2026-08-22 — A field that echoes an argument can be false without being malformed.**
+`effective_time_zone` reported the caller's requested zone while timestamps rendered in the
+machine's. Every timestamp carried a valid RFC 3339 offset, so nothing downstream could detect
+it. **Rule: a field that describes the payload must be derived from the payload. Echoing the
+request back as though it were a fact about the response is how a well-formed answer lies.**
+
+**2026-08-22 — Truncating before filtering turns a count bug into an absence bug.** The search
+fetched 500 events and filtered those, so a match at position 501 came back as "no matching
+events". A wrong count is a nuisance; a wrong absence is what makes an assistant book over
+something. **Rule: filter the whole bounded set first, cap second — and bound the set by the
+query window, not by the page size.**
+
+**2026-08-22 — "Untestable" was a missing prerequisite, not a property.** Orphan behaviour sat
+as an unmet exit criterion for three phases because every subprocess test invoked `--version`,
+which exits in milliseconds. Once a long-running command existed the test took one file and
+found a real fact in passing (there is no `serve` subcommand). **Rule: when a gate is deferred
+as untestable, record what would make it testable — otherwise "not yet" quietly becomes
+"never".**
+
+**2026-08-22 — The fresh-context audit found four dangerous claims I had just finished
+"reconciling".** I audited the read surface against its contract and fixed eight defects, then
+a subagent with no context found four more of exactly the class I had been hunting: controls
+marked *Live* with no code path to gate, `--doctor` printing "read and write" on a build with
+no write tool, a computed-and-discarded value whose comment promised it was reported, and a
+README recovery claim in the present tense. **Rule: the author who just corrected a document
+is the reader least able to see what is still wrong in it. Budget for the fresh pass as part
+of the work, not as a formality after it.**
+
+**2026-08-22 — Test coverage proves a function works, not that anything calls it.**
+`CalendarScope.unmatchedIds` was computed, documented as "reported rather than swallowed", and
+unit-tested three ways — and no caller ever read it, so a stale calendar id produced an empty
+result indistinguishable from an empty week. Green tests around a dead value look exactly like
+green tests around a live one. **Rule: when a value exists to be surfaced, assert it at the
+boundary it is surfaced through, not only at the function that computes it.**
+
+**2026-08-22 — "Live" conflated a decision being in force with a mechanism being in force.**
+Four containment controls were tabulated as Live while the server had no mutation path for any
+of them to gate, and ARCHITECTURE republished it publicly. **Rule: a control has two states —
+adopted and enforced — and any table with one column will merge them. Say which.**
+
+**2026-08-22 — I bounded a query in the wrong dimension and called it safe.** Uncapping the
+search fetch, I reasoned "the window is capped at 31 days, so it is bounded in time". An
+independent review pointed out that `eventsMatchingPredicate` returns an ARRAY — EventKit had
+always materialised every matching event, and my change added a DTO per event on top. Days
+bound nothing about count. The fix was not a smaller window or a scan ceiling but an ordering
+change: match on the `EKEvent` before converting, so only returned matches become objects.
+**Rule: when you justify removing a limit, name the dimension the remaining limit constrains,
+and check it is the dimension that grows.**
+
+**2026-08-22 — Removing a redaction pass was the proof the fix was right.** Once the adapter
+matched against the event itself, the search no longer needed to fetch notes and location just
+to search them, so `redact()` — which stripped them back out afterwards — became dead. A
+control that exists to undo an earlier decision is a sign the earlier decision was wrong.
+**Rule: when a fix deletes a compensating step rather than adding one, that is evidence it
+addressed the cause.**
+
+**2026-08-22 — A generic function is how a tested rule and the executed rule stay the same
+rule.** The filter-then-count-then-cap ordering was tested over DTOs while the adapter had its
+own hand-inlined copy over `EKEvent`s. Two implementations of one guarantee is one that can
+drift silently. Making it generic over the element means the test exercises the code that
+runs. **Rule: if a rule matters enough to test, the code under test must be the code in the
+call path — not a faithful-looking twin.**
+
+**2026-08-22 — The control the whole design rested on had never been switched on, and two
+"measurements" were taken on top of it.** Memory recorded `toolPolicy: {"*": "ask"}` as
+configured in Claude Desktop. It appears in no server entry, no backup, and no settings file —
+it was never applied. So the measurement "reads do not prompt even with toolPolicy set" and the
+later "a write executed with no prompt" both measured the same thing: the default with no
+policy at all. **This is the third time here: the C1 allowlist decided a shipped tool's output
+while unconfigured, four containment controls were tabulated "Live" with no code path to gate,
+and now this.** The shape is always the same — the control is recorded when it is *decided*,
+and nothing re-checks that it was *applied*. **Rule: verify a control by observing the artifact
+that would carry it — the config file, the binary, the call path — never by remembering that
+you set it up. And before trusting any measurement, confirm the thing being measured is
+switched on.**
+
+**2026-08-22 — A negative result is only evidence if the mechanism was present to fail.**
+"No prompt appeared" reads like an answer and was nearly recorded as one. With the policy
+absent, the only thing it established was that the default does not gate writes — useful, but
+the opposite of what the experiment was for. **Rule: before accepting a null result, state what
+would have had to be true for a positive one, and check that it was.**
+
+**2026-08-22 — I asked a sibling project to confirm my hypothesis and it refuted it usefully.**
+I suspected the unprompted write was explained by missing annotations. It was not: their write
+tools declare `readOnlyHint: false` and their deletes declare `destructiveHint: true`. What
+they supplied instead was a third confound I had not considered — the two tools tested never
+request confirmation server-side at all — making the silence overdetermined three ways. **Rule:
+ask a peer for the facts that would DISCONFIRM your hypothesis, not for the ones that would
+confirm it; and when a null result has several sufficient causes, it is evidence about none of
+them.**
+
+**2026-08-22 — Server-initiated elicitation was available in our binary, but owning the
+request is not the same as owning the guard.** The pinned SDK supports elicitation, while its
+capability validator is inert under our effective default configuration. **Rule: a project-
+owned approval control requires an explicit, tested capability check and refusal path; a
+control you ship is verifiable only when its effective guard is also yours.**
+
+**2026-08-22 — I told the human a control "fails closed" and it does not.** The SDK's
+`validateClientCapability` reads exactly like a fail-closed guard, and its whole body sits
+inside `if configuration.strict` — with `strict: false` as the default our server takes. I had
+already read the function and quoted it before noticing the enclosing condition. **Rule: when
+citing a guard as a safety property, read the enclosing scope and the default configuration,
+not just the guard. A conditional guard is a comment until you can name the condition and show
+it holds** — this is the third instance here of a control that was real in source and inert in
+the running configuration.
+
+**2026-08-24 — A protocol standard is not evidence that a framework call triggers that
+protocol action.** iTIP defines `CANCEL` and `REPLY`; it does not prove EventKit's
+`removeEvent` emits either. **Rule: keep protocol semantics, exposed platform capability, and
+observed adapter behavior as separate evidence levels; verify each claim at its own layer.**
+
+**2026-08-24 — A persistence component without an injectable root turned unit tests into live
+state writes.** Journal tests accumulated in the user's state directory and one fixture wrote
+outside the journal's synchronization. **Rule: every persistent subsystem needs a temporary
+test root, and tests must assert that their resolved path is outside the live state directory.**
+
+**2026-08-24 — I cited a standard as proof that an implementation obeys it.** RFC 5546 defines
+what organizer `CANCEL` and attendee `REPLY` mean; I wrote that this "verifies" EventKit sends
+them on delete, and recorded it as no-longer-inference. It does nothing of the kind — the
+causal step from `removeEvent` to a message on the wire is exactly the part no specification
+can supply. Caught by a fresh reviewer, in a session I had spent removing claims of this shape.
+**Rule: a spec defining semantics, a header naming a concept, and an implementation performing
+an action are three different evidence layers. Name which one you have.**
+
+**2026-08-24 — I misquoted a warning that my own tool output had attributed correctly.** The
+fetched Google page said the caveat about emails being sent anyway belongs to the deprecated
+boolean `sendNotifications`; I attached it to `sendUpdates`, which is string-valued and cannot
+be set to `false`. The error was introduced between reading and summarising. **Rule: when a
+source distinguishes two parameters, carry the distinction into the summary — a caveat is
+attached to the thing it was written about, and generalising it invents evidence.**
+
+**2026-08-24 — The test written to prove corruption-tolerance was the corruption.**
+`corruptLineIsSkipped` opened the live journal, seeked to the end and wrote outside both the
+write queue and O_APPEND — the exact non-atomic append gotcha 54 exists to warn about,
+reproduced inside the suite. Running in parallel it could destroy the entry another test was
+asserting on, which is what made the suite intermittently red, and it left 36 malformed lines
+in the user's real state directory. I had diagnosed it vaguely as "parallel tests sharing a
+file"; a reviewer found the actual line. **Rule: a test that fabricates a failure condition
+must fabricate it in a fixture it owns. If it reaches into production storage to do so, it is
+not simulating the bug — it is committing it.**
+
+**2026-08-24 — I proposed a permission matrix that quietly reversed four settled decisions.**
+It ungated inert creates (the human had asked for approval on create, change and delete),
+treated restorability as authorization, downgraded a rejection to an approval, and
+re-introduced the `source_type` guard the human had deliberately withdrawn — all while
+presenting itself as adopting best practice. **Rule: when a new model touches an area with
+existing decisions, diff it against those decisions explicitly before proposing it. A design
+that reads as coherent can still be a silent reversal, and "industry practice" is not
+authority over a decision the human already made.**
+
 ---
 
 ## Graduated Patterns

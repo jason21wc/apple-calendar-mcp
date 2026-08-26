@@ -1,14 +1,19 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # apple-calendar-mcp
 
-**Description:** Local stdio MCP server giving Claude Code and Codex read+write access to the macOS user's Apple Calendar via native EventKit. Swift, personal use, Apache-2.0, intended for public release.
+**Description:** Local stdio MCP server giving Claude Code, Codex and Claude Desktop access to the macOS user's Apple Calendar via native EventKit. **Read access is shipped; write access is designed, governed and not built.** Swift, personal use, Apache-2.0, published.
 **Framework:** AI Coding Methods (current version)
 **Mode:** Standard
 
-> **Start here.** Phases 1-3 are built, tested and published; **Phase 4 (read surface) is
-> next**. Read `_ai-context/PROJECT-MEMORY.md` (containment controls C3-C7, 63 gotchas — most
-> of them measured platform behaviour that will cost you hours if rediscovered), then
-> `docs/IMPLEMENTATION-PLAN.md` (rev. 5).
+> **Start here.** Phases 1-4 are built, tested, published and in daily use. **Five read-only
+> tools are shipped and no write tool exists.** The Phase 5 journal substrate is built but has
+> no caller. The next code is `BACKLOG` #19 — bound EventKit calls and fail fast once the
+> store wedges — and **all write work is blocked** on confirming that a write tool prompts in
+> Claude Desktop.
+>
+> Read `_ai-context/PROJECT-MEMORY.md` (containment controls C3-C7, and the gotcha table —
+> mostly measured platform behaviour that will cost you hours if rediscovered), then
+> `docs/IMPLEMENTATION-PLAN.md`, which is the canonical plan and lives in this repo.
 >
 > Two things to know before touching anything: the Calendar grant is keyed to the binary's
 > **absolute path**, and the server only owns that grant because it re-spawns itself with a
@@ -45,8 +50,46 @@ CLAUDE.md — not here):
 
 ## Key Commands
 
-- [Add project commands here — build, test, lint, run]
+| Command | What it does |
+|---|---|
+| `swift build` | Debug build. Run from the package root — the embedded Info.plist is added via `-sectcreate` with a path relative to the invoker's cwd |
+| `swift build -c release` | Release build, the one that gets signed and installed |
+| `./scripts/test.sh` | **The** test command. Never plain `swift test`: Command Line Tools ship `Testing.framework` but no XCTest, and the module and dyld paths have to be derived from `xcode-select -p`. Takes `swift test` flags, e.g. `--filter ReadContractTests` |
+| `./scripts/test-shell.sh` | Shell-script checks, standalone. Also driven by the Swift suite |
+| `bash -n scripts/*.sh` | Parse check, what CI runs |
+| `./scripts/make-signing-cert.sh` | Once per machine. Creates the stable self-signed certificate the TCC grant's designated requirement names |
+| `./scripts/trust-signing-cert.sh` | Once per machine, **interactive**, needs the login password. Puts `codesign` on the key's partition list so signing needs no dialog |
+| `./scripts/sign.sh` | Signs the release binary with hardened runtime and the calendars entitlement, and asserts both afterwards |
+| `<binary> --setup` | Requests Calendar access. Must run at the **final installed path** — the grant is path-keyed |
+| `<binary> --doctor` | Reports authorization, identity (`disclaimed-child` is the only good value) and install state |
+| `<binary>` *(no arguments)* | Serves MCP over stdio. There is **no** `serve` subcommand; passing one exits `EX_USAGE` |
+
+Never run the binary's `--setup`, `--probe` or a real calendar query from a test: `--setup`
+raises a real TCC prompt, and `--probe` writes into the user's real `~/.local/state`.
 
 ## Project Structure
 
-[Document key directories and files as the project grows]
+```
+Sources/apple-calendar-mcp/
+  main.swift          entry point: SIGPIPE ignore -> startup flags -> privacy identity
+                      -> command dispatch. Top-level code, so nothing here is testable
+  Runtime.swift       process-wide facts: disclaim mode, state directory, --read-only
+  Reexec.swift        the self-disclaiming re-exec. Load-bearing: without it the Calendar
+                      grant belongs to whatever launched the binary
+  CLI.swift           Command enum, help, version, Meta (identity from the embedded plist)
+  MCP/                ServerBootstrap (server loop; stdin EOF is unconditional shutdown),
+                      ToolRegistry (names, schemas, annotations), ToolHandlers (dispatch,
+                      argument handling, ToolError codes)
+  Calendar/           Models (DTOs), Limits, TimeSemantics, CalendarScope, EventSearch,
+                      Journal (Phase 5 substrate, no caller yet)
+  EventKit/           CalendarStore (the ONLY file that touches calendar content),
+                      AuthorizationState (five states, not six)
+  Diagnostics/        Doctor, SetupFlow, TCCInspector
+Tests/AppleCalendarMCPTests/    swift-testing; TestSupport.swift locates the repo and binary
+scripts/                        build, sign, trust and test scripts
+docs/IMPLEMENTATION-PLAN.md     the canonical plan
+_ai-context/                    project memory (see above)
+```
+
+The conceptual layers are `MCPLayer → CalendarKit → EventKitAdapter`; the directory names
+above do **not** mirror them, and the on-disk layout wins.

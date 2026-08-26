@@ -10,9 +10,9 @@
 
 | Cadence | What | Last run |
 |---|---|---|
-| Before every push (once tests exist) | `swift test` and `bash -n scripts/*.sh`. Three review rounds each found real defects in hand-verified code; the consistent failure was exercising only the path the author built |
+| Before every push | `./scripts/test.sh` (never plain `swift test`) and `bash -n scripts/*.sh`. Three review rounds each found real defects in hand-verified code; the consistent failure was exercising only the path the author built. **CI now runs the same commands on every push and pull request**, which makes this a backstop rather than the only guard | 2026-08-22 |
 | Before every push | Re-run the sanitisation sweep across tracked files: the author's macOS username and absolute home paths, personal email addresses, the host terminal app's bundle identifier, other apps observed in the TCC database, and this machine's code-signing fingerprint. None belong in a public repo, and `_ai-context/` ships with it. Keep the search terms out of this file — a checklist that names what it scrubs leaks it |
-| Every phase exit | Re-read the phase's exit criteria in `docs/IMPLEMENTATION-PLAN.md` §15 and confirm each is objectively met before moving on | — |
+| Every phase exit | Re-read the phase's exit criteria in `docs/IMPLEMENTATION-PLAN.md` — per-phase in its own section (Phase 4's are in §5), overall in §12 — and confirm each is objectively met before moving on. **Record the ones that are not met**; Phase 4's orphan criterion sat unmet and unstated for three phases | 2026-08-22 |
 | Every EventKit claim | Verify against the local SDK headers and cite `file:line`. Never against Apple's web docs — they are JavaScript-rendered and unreadable to tooling | 2026-08-18 |
 | Every containment-control change | Run `evaluate_governance`, then write the amendment back to `PROJECT-MEMORY.md` **in the same turn**. Three controls once drifted because this was left for "later" | 2026-08-18 |
 | Before any plan/spec approval | Run a fresh-context review pass. Author review does not catch author contradictions, and this document reversed direction three times | 2026-08-18 |
@@ -23,6 +23,13 @@
 | Condition | What to do when it fires |
 |---|---|
 | A containment control (C3-C7) would be weakened, amended, or dropped | Stop. Run `evaluate_governance`, then write the amendment into `PROJECT-MEMORY.md` in the same turn |
+| A control is about to be recorded as configured, live, or in force | Observe the artifact that carries it — grep the config, read the binary, find the call path — and cite what you saw. For an SDK/framework guard, also inspect its enclosing condition, effective runtime configuration, and default. Recorded-but-never-applied has happened three times here (C1's allowlist, C3-C6 "Live", `toolPolicy`) |
+| A measurement is about to be recorded from a null result | State what would have had to be true for a POSITIVE result, and verify that precondition held. Two write-prompt tests measured absent mechanisms |
+| A test touches persistent state | Inject a temporary root and assert the resolved path is not beneath `Runtime.stateDirectory`. Never let a unit test append to live user state |
+| A protocol or platform document is used to claim external behavior | Keep the evidence levels separate: a protocol defines semantics, an SDK header proves exposed capability, and only platform documentation or a controlled integration test proves a specific framework call's behavior |
+| A document states a test count, a tool count, or a plan revision number | Delete it and point at the command or the file that reports it. Every one of these has drifted at least once |
+| A response field would restate a request argument rather than describe the payload | Derive it from the payload. `effective_time_zone` echoed the caller's zone while timestamps used another, and every timestamp still looked valid |
+| A payload gains a field | Declare it in the `outputSchema` in the same change, and add it to `required` if it is always emitted. An undeclared field is validated by nobody |
 | A probe or `--doctor` reports `inherited-*` rather than `disclaimed-child` | The self-disclaiming re-exec is not running — either the private symbol vanished on a macOS update or the spawn failed. Calendar access is then the host's, not ours. Do not ship a release in this state without saying so in the README |
 | Calendar access stops working after moving or reinstalling the binary | Expected: the TCC grant is keyed to the absolute path. Re-run `--setup` at the new path |
 | A Calendar call returns denied while `--doctor` reports green | Suspect the macOS 26.5 silent-denial trap: hardened runtime present, entitlement missing or cdhash drifted |
@@ -34,19 +41,21 @@
 
 | Granted | Limits | When |
 |---|---|---|
+| Fix a proven contract defect in the shipped read surface without a fresh decision | The promise must be *currently made* by the canonical plan or a tool's own schema, and the defect must be demonstrated in source. Expanding the tool surface is NOT covered | 2026-08-22 |
 | Write capability (create, update, delete, restore) on the user's real calendar | Only under containment controls C3-C7, and only once a write tool is confirmed to prompt; any weakening needs fresh governance | 2026-08-20 |
 | Licence is Apache-2.0 | — | 2026-08-17 |
 | Run fresh-context review agents at plan approval and after substantial phases without asking each time | Small edits do not warrant it | 2026-08-18 |
-| Undo stays model-callable rather than CLI-only | Behind guards 5-9; premise (Cowork has no terminal) still unverified | 2026-08-18 |
+| Undo stays model-callable rather than CLI-only | Behind the restore guards in `SPECIFICATION.md` ("Planned guards" 4-8) and the gates in plan §6. The earlier "guards 5-9" numbering matched no document, and the authorization routed through C4a, which C7 superseded. Premise (Cowork has no terminal) confirmed 2026-08-19: Cowork runs locally in Claude Desktop | 2026-08-18 |
 
 ## Metrics
 
 | Metric | Definition | Baseline |
 |---|---|---|
 | Claims recorded as verified without a `file:line` | Count across plan + memory | 0 (was 5 on 2026-08-17 — all wrong) |
-| Internal contradictions found by fresh-context review | Per approval pass | 4 at rev. 2; target 0 |
+| Internal contradictions found by fresh-context review | Per approval pass | Historical baseline: 4 at the rev. 2 review, 11 at the rev. 4 audit. **2026-08-22 audit: 4 dangerous, 10 misleading, 7 cosmetic — all accepted and fixed.** Target 0 |
 | Mutating code paths outside `commit()` | Should be structurally impossible | 0 |
-| Tool surface size | Total MCP tools | 14 (6 read, 4 propose, 4 commit) |
+| Tool surface size | Total MCP tools **shipped** | **5, all read-only.** The 14-tool figure (6 read, 4 propose, 4 commit) is the *planned* surface and was recorded here as though it were the current one. Asserted in the suite (`ToolRegistry.all().count == 5`) rather than tracked by hand |
+| Volatile counts duplicated in durable docs | Test counts, tool counts, plan revision numbers restated in prose | 0. The test count reached four different values across four files before this was made a rule |
 
 ---
 

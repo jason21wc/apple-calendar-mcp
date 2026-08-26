@@ -13,10 +13,13 @@ credentials.
 > no OS-level setting that makes this tool read-only. Every safety property here is a
 > property of the implementation, and nothing else.
 >
-> **Undo is not undo.** Deleted events can be recreated from a local journal, but the
-> recreated event is a *new* event. The original identifier does not come back, and
-> invitation state — organizer, attendees, RSVP responses — cannot be restored, because
-> EventKit exposes `attendees` as read-only.
+> **Undo will not be undo — and today there is no undo at all.** No write tool exists yet, so
+> nothing here deletes anything; but read this before that changes. When the write surface
+> ships, a deleted event will be recreated from a local journal, and the recreated event is a
+> *new* event: the original identifier does not come back, and invitation state — organizer,
+> attendees, RSVP responses — cannot be restored, because EventKit exposes `attendees` as
+> read-only. The journal exists in the codebase already; **the restore path that would use it
+> does not**, and until it does, nothing reverses anything.
 >
 > **AI assistants can be manipulated by calendar content.** Meeting invitations arrive from
 > other people and their titles, notes and locations are attacker-controlled text that
@@ -24,9 +27,9 @@ credentials.
 > or manipulated model and make each change reviewable. **They do not prevent it.**
 >
 > **The safeguards do not defend against a compromised machine — and the consequence is
-> worse than "they bypass the server".** The journal and its snapshots are
-> ordinary files owned by your user account. Anything running as you — including the coding
-> agent this server talks to — can edit or delete them without going through this server.
+> worse than "they bypass the server".** The journal and its snapshots are ordinary files
+> owned by your user account. Anything running as you — including the coding agent this
+> server talks to — can truncate or delete them without going through this server.
 >
 > More seriously, anything running as you can **become** this server. Setup installs a
 > code-signing certificate that signs without a password prompt, and macOS checks the
@@ -47,11 +50,15 @@ credentials.
 
 **Read-only and usable.** Five read tools work against your real calendar from Claude Code,
 Codex and Claude Desktop: permission status, list calendars, list events, search events, and
-busy intervals. 95 tests pass.
+busy intervals.
 
 **No write tools exist yet.** Create, update and delete are designed but unbuilt — see
 `docs/IMPLEMENTATION-PLAN.md` §6. Nothing this server currently exposes can change your
 calendar.
+
+Run `./scripts/test.sh` to see the test suite pass. (A count is not quoted here: it was
+quoted in four documents, drifted to four different numbers, and running the suite is the
+only way to know it anyway.)
 
 ## How it protects you
 
@@ -60,14 +67,29 @@ public before the capability is.
 
 | Control | What it does |
 |---|---|
-| Host approval on every write | Write tools are configured `"ask"` in your MCP client, which prompts per call and offers no "always allow". This is the only control here that the AI model cannot reach — it is enforced in the client, not in this server |
-| Attendee refusal | Events with other people on them cannot be modified at all — deleting one sends a decline or cancellation to real people, and nothing can take that back. The refusal returns the date, time and calendar so you can find and decline it yourself |
-| Restorable by construction | Every change is snapshotted first, and anything this server can delete it can put back. **Restore recreates an equivalent event with the same information — it is not the original object, and its identifier will differ.** That is sufficient precisely because the one field a snapshot cannot reproduce is the attendee list, and events with attendees are refused outright |
+| Human approval on every write | **Mechanism not yet settled — see below.** The intent is that every write requires per-call human confirmation, which would be the only control here the AI model cannot reach. Two candidates are being measured; neither is in place, and no write tool exists yet |
+| Events with other people on them | Removing one requires your explicit confirmation, and the prompt says what is actually true: that the event will be removed through EventKit, that this **may notify the other participants**, and that the attendee list **cannot be put back**. macOS gives this server no way to suppress such a notification, and no way to send a proper RSVP either — so it calls the operation *remove*, and does not pretend it is the same as clicking Decline in Calendar.app |
+| Restorable by construction, with one exception | Every change is snapshotted first, and anything this server deletes it can put back — **except the attendee list**, which EventKit exposes as read-only and which nothing can reconstruct. **Restore recreates an equivalent event with the same information; it is not the original object, and its identifier will differ.** If you remove a meeting with other people on it, getting back on it means asking to be re-invited |
 | Mutation journal | Every change is recorded with a full pre-state snapshot, and a restore is recorded as a new entry referencing the original rather than erasing it |
 | No bulk operations | One event per call |
 
 **Writable means whatever macOS says is writable**, including calendars shared with you. If
 you can write to it in Calendar.app, this server can too.
+
+## Compatibility
+
+**0.2.0 changes what already-shipped read tools return.** Same events, same instants — but if
+you built anything against 0.1.0 output, read this:
+
+| Change | Effect |
+|---|---|
+| `time_zone` now renders **every** timestamp, not only all-day dates | Same instants, different offsets. Parse RFC 3339; do not compare timestamp strings |
+| `occurrence_date` is now **always UTC**, regardless of `time_zone` | It is a key, not a display value, so it no longer shifts with a display preference |
+| `limits_applied` reshaped | `limit` is the effective per-call cap and may be `null`; `max_interval_days` may be `null`; new `max_result_limit` |
+| New required field `unmatched_calendar_ids` | Calendar ids that matched nothing. Non-empty means those calendars were **not** searched — an empty result may mean "your ids are stale", not "you are free" |
+| Errors now lead with a stable code | `INTERVAL_TOO_LARGE: interval is 45 days…`. The code is contractual; the prose is not |
+| A search now covers the whole window | `total_matched` counts every match. Previously it counted matches among the first 500 events by start order, so a real match could be reported as none |
+| The interval cap counts seconds | A 31.9-day window used to pass a 31-day limit |
 
 ## Requirements
 
@@ -77,7 +99,8 @@ Inspector against it.
 ## Installing
 
 ```bash
-git clone <this repo> && cd apple-calendar
+git clone https://github.com/jason21wc/apple-calendar-mcp.git
+cd apple-calendar-mcp
 swift build -c release
 
 ./scripts/make-signing-cert.sh     # once per machine
@@ -125,6 +148,42 @@ claude mcp add --transport stdio apple-calendar -- /usr/local/bin/apple-calendar
 command = "/usr/local/bin/apple-calendar-mcp"
 args = []
 ```
+
+**Claude Desktop** — in `claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "apple-calendar": {
+      "command": "/usr/local/bin/apple-calendar-mcp",
+      "args": ["--read-only"]
+    }
+  }
+}
+```
+
+### Two things you configure, not this server
+
+**`--read-only`** withholds every mutating tool, so they never appear in `tools/list` and
+injected calendar text has nothing to name. It ships now, before any write tool exists, so a
+client configured today keeps the restriction instead of silently gaining write access later.
+It is a real reduction against a mistaken or manipulated model — and it is **not** a boundary:
+it comes from argv, and argv comes from config files anything running as you can edit.
+
+**Per-call approval** would be the one control the model cannot reach, because the client
+enforces it rather than this server. In Claude Desktop that is `toolPolicy` on the server
+entry, where `"ask"` is documented to prompt on every call with no permanent "always allow".
+
+**It is unverified, and stated here as unverified deliberately.** It has not been demonstrated
+working on any machine this project has tested, and a measurement previously recorded as
+evidence for it turned out to have been taken with the key not set at all. No write tool exists
+yet, so nothing depends on it today — but if you are reading this to decide whether writes will
+be gated when they arrive, the honest answer is that the mechanism has not been settled. Follow
+`docs/IMPLEMENTATION-PLAN.md` §6 rather than assuming this paragraph.
+
+Neither `--read-only` nor per-call approval is configured for you, and this server cannot check
+whether you did it. If you want a host that is genuinely write-incapable, install a second copy
+built without write support at its own path — the Calendar grant is path-keyed, so it needs its
+own `--setup`.
 
 ## Not in scope
 

@@ -1,7 +1,7 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # Session State
 
-**Last Updated:** 2026-08-20
+**Last Updated:** 2026-08-24
 **Memory Type:** Working (transient)
 **Lifecycle:** Prune at session start per §7.0.4
 
@@ -12,14 +12,17 @@
 
 ## Current Position
 
-- **Phase:** Phases 1–4 complete, published, in daily use. Phase 5 substrate (`Journal.swift`)
-  built. **Next work is the write surface**, redesigned this session.
+- **Phase:** Phases 1–4 complete, published, in daily use. **Five read-only tools shipped; no
+  write tool exists.** Phase 5 substrate (`Journal.swift`) built, with no caller.
 - **Mode:** Standard
 - **Repo:** https://github.com/jason21wc/apple-calendar-mcp (public, Apache-2.0)
-- **Active Task:** None in flight. **Agreed next code is BACKLOG #19** (bound EventKit
-  operations + fail fast once wedged) — a live defect in shipped read-only code that does NOT
-  depend on the open blocker. It touches the executor, so plan it before writing it. Awaiting
-  the human's go.
+- **Active Task:** C6/C7 attendee-deletion policy reconsideration. The human's current leaning
+  is that blanket refusal and a mandatory second-account test are stricter than needed, but no
+  containment amendment is final yet.
+- **Next code:** **BACKLOG #26** — isolate `JournalTests` from the live state directory before
+  trusting another suite result. Then **BACKLOG #19** — bound EventKit operations, fail fast once wedged. A live
+  defect in shipped read-only code, independent of the write blocker. It touches
+  `DedicatedThreadExecutor` / `CalendarStore`, so plan it and get a contrarian review first.
 - **After that:** `calendar_create_event`, gated on **Blocked On #1**.
 
 ## Quick Reference
@@ -28,136 +31,193 @@
 |--------|-------|
 | Project | **apple-calendar-mcp** |
 | Installed at | `/usr/local/bin/apple-calendar-mcp` (root:wheel), granted, `--doctor` clean |
-| Install verified | **2026-08-20 18:33** — cdhash `43b6bc57…` matches the signed build; zero allowlist strings in the shipped binary, so the writability fix is live |
-| Tests | **99 passing** via `./scripts/test.sh` |
-| Tool surface | **5, all read-only.** No write tool exists yet |
-| Desktop config | `--read-only`, `toolPolicy: {"*": "ask"}` (backup taken before edit) |
-| Containment controls | C3, C4, C5, C6, **C7 (new)**. C1 withdrawn; C2/C2a/C4a superseded |
-| Governance audits | 6 logged; latest `gov-120ca260c415` (REVIEW, no veto) |
-| Plan | **rev. 6** — §4, §6, §13 rewritten 2026-08-20 |
+| Install verified | **2026-08-20 18:33** — cdhash matched the signed build. **The installed binary now predates the 2026-08-22 read-surface fixes**; reinstall before relying on them in a client |
+| Tests | **Baseline not trustworthy until BACKLOG #26 is fixed.** `JournalTests` writes to the live state directory and contains an unsynchronized corrupt-line fixture. No count recorded here on purpose |
+| Tool surface | **5, all read-only.** No write tool exists |
+| Desktop config | `--read-only` only. **`toolPolicy` is NOT set — for any server, and never was.** Verified 2026-08-22 against the live config, `config.json`, and both August backups. The previous entry here claimed it was configured; that was false when written |
+| Containment controls | C3, C4, C5, C6, **C7**. C1 withdrawn; C2/C2a/C4a superseded |
+| Latest governance | `gov-d463782d41dd` (REVIEW, no S-Series trigger) — evidence-layer and test-isolation corrections |
+| Plan | `docs/IMPLEMENTATION-PLAN.md` — **now canonical and repo-owned.** The revision number lives in the plan itself and is not restated here |
+| CI | `.github/workflows/ci.yml` — macOS runner, build + tests + shell checks, **no signing** |
 
-## What changed this session — the write design was reframed twice
+## What changed 2026-08-22 — drift fixed at the cause, and the read contract audited
 
-Both changes came from the human, and both **removed** design surface rather than adding it.
+### 1. The plan is no longer a copy of a file outside the repository
 
-### 1. Reads must never prompt; writes must always prompt
+It was a copy of a private plan, to be re-copied on every revision — and it failed exactly as
+designed to: a stale rev. 3 copy sat in the repo while `OPERATIONS.md` named it authoritative.
+`docs/IMPLEMENTATION-PLAN.md` is now the original. Every other document summarises or links to
+it instead of restating volatile detail.
 
-Confirmed working: a read query in Cowork returned results with no approval prompt.
-`readOnlyHint: true` is doing that. What is **not yet confirmed** is that a write tool *does*
-prompt under the same config — see Blocked On #1.
+### 2. Volatile counts are gone from durable documents
 
-### 2. "Full ability to revert" was a symptom, not a specification
+The passing-test count had been written into four files and had drifted to four different
+numbers. Durable docs now say "`./scripts/test.sh` is green". The tool count is asserted in
+the suite (`ToolRegistry.all().count == 5`) rather than repeated in prose.
 
-> *"I don't specifically need it to 'revert'. I need to be able to put things back the way it
-> was, but it doesn't have to be the exact calendar event — it can be a new one with all the
-> same info."*
+### 3. False claims in the SHIPPED read surface, found by audit and fixed
 
-This dissolved the problem three previous designs died on. Every blocker — `eventIdentifier`
-changing on sync, invitation state being unrecoverable, series membership being unrestorable —
-exists **only** if restoration must return the original object. It does not have to.
+Not one of these came from a bug report — they came from reading each tool's contract against
+its implementation. All are fixed, with synthetic tests that need no Calendar grant. The full
+table is in plan §5:
 
-**And the boundary was already drawn.** Attendees are the single field a snapshot cannot
-reproduce (`readonly` in EventKit), and **C6 already refuses to touch events with attendees**.
-So the set of events this tool may delete is exactly the set it can fully put back. Two
-constraints drawn for unrelated reasons landed on the same line.
+- `calendar_permission_status` and `calendar_list_calendars` returned `structuredContent` with
+  **no `outputSchema`** at all.
+- `limits_applied` was **emitted and declared nowhere**, so the conformance suite skipped it —
+  and it reported the hard ceiling (500) as the limit in force (100).
+- `effective_time_zone` named the **caller's** zone while timestamps rendered in the machine's.
+  Now one zone per request renders every timestamp and is what gets reported.
+- `calendar_find_events` filtered only the **first 500 events**, so `total_matched` counted
+  matches within a page and a real match at position 501 came back as *no matching events*.
+- `calendar_list_calendars` returned calendar and source titles — attacker-influenceable —
+  without `openWorldHint`.
+- Failures carried prose and **no stable code**. Eight `UPPER_SNAKE` codes now lead every error.
+- An unknown tool name returned **`PERMISSION_DENIED`** on a machine without a grant, because
+  the access gate ran before the name check.
 
-Recorded as **C7** in PROJECT-MEMORY, replacing C2/C2a/C4a.
+### 4. The Phase 4 orphan gate is met, after three phases open
 
-### 3. C1 (writable-calendar allowlist) withdrawn — and it was a live defect, not just a decision
+`ServerLifecycleTests` launches the real binary, waits for the disclaimed child, and asserts no
+survivor under stdin EOF, SIGTERM, and SIGKILL-then-EOF. It was never hard — it needed a
+command that stays up, and every earlier subprocess test used `--version`. Mutation-checked:
+disabling signal forwarding fails the SIGTERM case and leaves the other two passing.
 
-Human's decision, governance-evaluated (`gov-120ca260c415`, REVIEW, no S-Series veto).
-Writable now means whatever EventKit reports via `allowsContentModifications` — including
-calendars shared with the user later, with no config change. Their reasoning: the OS already
-decides what they may write to, and a second gate only this tool honours adds friction without
-changing who can reach the data.
+### 5. A fresh-context coherence audit then found four more, and they were the worse ones
 
-**This also kills the `source_type == .local` guard** proposed earlier the same day. Its whole
-rationale was CalDAV propagation on shared calendars — which is now explicitly wanted.
+Run after the fixes above, by a subagent with no session context. All 21 findings were verified
+independently against source and accepted; all are fixed. The four that mattered:
 
-**Grepping before recording the reversal found the allowlist live in shipped code.** It decided
-`calendar_list_calendars`'s `writable` flag, defaulted to empty, and failed closed — so with no
-config file present (this machine included) **every calendar was reported `writable: false`,
-reason "not in the allowlist"**. `Allowlist.swift` is deleted; `writable` is now
-`allowsContentModifications` alone. Four regression tests added, including one asserting no
-refusal string mentions an allowlist — the reason text is user-facing, and a stale one sends
-someone hunting for a config file that no longer exists. **Not yet verified live:** the
-installed binary at `/usr/local/bin` still predates this fix (see Next Actions).
+- The plan tabulated **C3–C6 as "Live"** while the server has no mutation path for any of them
+  to gate, and `ARCHITECTURE.md` republished it. They are **adopted, not enforced**.
+- **`--doctor` printed "tool surface: read and write"** on a build with no write tool, because
+  it keyed off `--read-only` rather than off what is compiled in.
+- **`CalendarScope.unmatchedIds`** was computed, tested, documented as "reported rather than
+  swallowed" — and discarded by the adapter. A stale calendar id therefore returned an empty
+  result indistinguishable from an empty week. Now surfaced as `unmatched_calendar_ids`.
+- The **README said deleted events "can be recreated"** from the journal, present tense, in the
+  paragraph that softens the deletion warning. Nothing can: the journal has no caller.
 
-The governance evaluation surfaced `acct-ledger-integrity-le2-audit-trail-immutability`, and it
-is the right frame for C7: *corrections are made through reversing entries, never by editing or
-deleting the original record.* Restoration is a **new forward operation that references the
-original journal entry**, not a rollback.
+Also fixed: two superseded gotchas (16, 20) that contradicted later ones without a label, four
+wrong section cross-references, the stale `Package.swift` testability comment, `main.swift`'s
+"this is NOT the MCP server" header, and `--read-only` / `toolPolicy` being undocumented in the
+README for a public repo.
+
+### 6. An independent Codex review then found the search fix was bounded in the wrong dimension
+
+- **The 31-day window bounds time, not count.** `eventsMatchingPredicate` returns an array, so
+  EventKit always materialised every matching event; my change added a DTO per event on top.
+  Fixed by ordering, not by a ceiling: `CalendarStore.searchEvents` now matches on the
+  `EKEvent` and converts only the returned page. `redact()` became dead and was deleted —
+  withholding is now structural rather than a pass that could be forgotten.
+- **`occurrence_date` had become a zone-dependent key.** It is half of the
+  `(eventIdentifier, occurrenceDate)` addressing key, and I had it following the caller's
+  display zone. Now always UTC; `start`/`end` still follow `effective_time_zone`.
+- **The interval cap truncated**, so 31.9 days passed a 31-day limit. Now compares seconds.
+- **Bumped to 0.2.0** with a compatibility table in the README. The wire changes are not all
+  purely additive: `time_zone` now governs every timestamp, and `limits_applied` changed shape.
+- Declined, with reasons recorded: Codex's streaming `enumerateEventsMatchingPredicate` plus a
+  `SEARCH_SCOPE_TOO_DENSE` error. The ordering fix removes the cost it was designed to bound
+  without adding a new failure mode to the shipped surface. Its unknown-tool spec point is
+  **BACKLOG #22**, not silently applied.
+
+Codex could not run `./scripts/test.sh` (its toolchain reported Swift 6.3.3 against a 6.3.2
+SDK), so its review is source-reasoning only. The suite runs clean here.
 
 ## Blocked On (human decisions)
 
 | # | Decision | Blocks |
 |---|---|---|
-| **1** | **Does a WRITE tool prompt in COWORK specifically?** Ask Cowork (Claude Desktop, where `toolPolicy` actually applies) to *draft* — not send — an email via `apple-mail`'s `create_draft`. Report whether a **permission prompt** appeared, as distinct from any governance output. | All write work |
-| 2 | Does Cowork run locally or remotely? | Whether restore needs to be model-callable |
-| 3 | Confirm C6 formally; verify in Phase 6 that deleting an invited event really notifies the organizer | README wording |
+| **1** | **Demonstrate a real human-approval round trip in Claude Desktop/Cowork through an enforced mechanism before any write tool ships.** Candidate paths are measured host `toolPolicy` or explicitly guarded server elicitation; neither is proven today. The two prior experiments each measured the wrong layer (gotcha 83). | All write work |
+| 2 | Confirm C6 formally, and verify in Phase 6 that deleting an invited event really notifies the organizer | README wording |
 
-### Why the 2026-08-19 test did NOT answer #1
+## The 2026-08-22 write-prompt result, and what it actually established
 
-A test report came back covering `create_draft` and `delete_draft`. **It ran through the
-remote-devices bridge, not Cowork.** What fired was this project's own ai-governance PreToolUse
-hook — a different layer from the host's `toolPolicy` approval prompt, and only the second one
-is the control being relied on. The report never mentions an approval prompt. #1 is still open
-and needs a run in Claude Desktop specifically.
+The human ran `apple-mail`'s `create_draft` twice and `delete_draft` once in Cowork. **No
+approval prompt appeared.** Before recording that as the answer to Blocked On #1, the config
+was checked — and `toolPolicy` is absent from all nine servers, from `config.json`, and from
+both August backups taken during this project's own work. It has never been set here.
 
-The same report supplied the strongest argument yet for why `toolPolicy` is the only approval
-mechanism worth counting: **the agent waved itself through an ESCALATE verdict** on a delete,
-on the strength of a standing instruction from a turn earlier. Reasonable in that instance;
-fatal as a control. See gotcha 67.
+**So the gating question is still open**, and something worse is now known:
 
-## Findings adopted from the sibling-server report (2026-08-19 test, received 2026-08-20)
+- **With no `toolPolicy`, there is no host-level gate on writes for any MCP server on this
+  machine.** A mutating tool and a destructive tool both ran unprompted.
+- `apple-mail` runs behind a governance proxy whose `--always-allow` list contains read tools
+  only, so `create_draft` and `delete_draft` were **not** proxy-allowlisted — and executed
+  anyway. The only thing between an injected instruction and a mutation was a model-reachable
+  layer, which is the one already recorded as waving itself through an ESCALATE (gotcha 67).
+- Gotcha 61 ("reads do not prompt even with `toolPolicy` set") is **retracted**: it measured
+  the same absent control.
 
-Gotchas 64–67, lessons logged, BACKLOG #19–#21. The one that matters:
+**This is the third control recorded as live while it was not** — after the C1 allowlist
+deciding a shipped tool's `writable` flag while unconfigured, and C3–C6 tabulated "Live" with
+no mutation path to gate. See gotcha 81.
 
-**No EventKit call in this server has a timeout**, and `CalendarStore` is a serial actor on one
-dedicated thread — so one blocked call wedges the entire calendar surface for the process's
-lifetime, not just its own caller. `apple-mail`'s measured hang was per-call; ours would be
-total. A blocking synchronous EventKit call **cannot be cancelled**, so a timeout cannot free
-the thread. The fix must bound the *caller's* wait AND mark the store wedged so later calls
-fail fast with "calendar subsystem is blocked, restart the server" rather than each burning a
-full timeout. **This affects shipped read-only code today.** BACKLOG #19.
+**The `apple-mail` maintainers answered, and refuted the annotation hypothesis while supplying
+a third confound.** Their write tools declare `readOnlyHint: false` and their deletes
+`destructiveHint: true` — a host has everything it needs to classify them. But:
 
-Already fine on our side: the report's timestamp recommendation (finding C) is the convention
-this server already implements — `autoupdatingCurrent` plus an explicit formatter zone — so
-apple-calendar is the reference the other servers are being pointed at, and there is nothing
-to change here.
+- Their governance proxy **consumes no verdict**. `--govern-all` checks whether
+  `evaluate_governance` was called within a TTL and forwards if so. PROCEED/REVIEW/ESCALATE are
+  advisory text nothing reads. There is no state in which an ESCALATE blocks a call. Gotcha 67
+  is corrected accordingly — the model does not *bypass* the verdict; nothing consumes it.
+- **The two tools tested never ask.** `create_draft` elicits only when `send_now=True`;
+  `delete_draft` deliberately has no elicitation ("recoverable from Trash").
+
+So the silence had three sufficient explanations and attributes to none (gotcha 83).
+
+**The useful consequence: elicitation is a control we may be able to own.** The pinned SDK
+0.12.1 exposes `Server.requestElicitation`, but its capability validator runs only in strict
+mode; strict defaults false and this server supplies no strict configuration. Any future
+mutation path must check the required client capability itself and refuse when absent.
+Whether Desktop/Cowork declares the capability or completes a real round trip is unmeasured.
+See **BACKLOG #24**.
 
 ## Next Actions
 
-1. **BACKLOG #19 — bound EventKit operations, fail fast once wedged.** Agreed as the next work.
-   Independent of the blocker. Architecture-bearing (touches `DedicatedThreadExecutor` /
-   `CalendarStore`), so plan it, get a contrarian review, then build.
-2. **Blocked on #1** before any write tool. A write tool that does not prompt fails the human's
-   stated requirement outright.
-3. **Switch `toolPolicy` from `{"*": "ask"}` to per-tool.** Writes `"ask"`, reads unlisted.
-   Encodes the requirement directly and removes the open question of whether the `*` wildcard
-   was even honoured.
-4. **Build order:** `calendar_create_event` → `calendar_delete_event` **with restore in the
-   same change** → `calendar_update_event`. Delete never ships ahead of its restore path.
-5. **Re-run the §6 gates** — items 1, 3, 4, 5 still apply; item 2 (`source_type`) is withdrawn.
+1. **Report Desktop/Cowork's declared elicitation sub-capabilities** through the existing
+   permission-status surface (BACKLOG #24). If the human approves expanding the public tool
+   surface, then add a harmless elicitation round-trip probe. Only after both measurements
+   decide whether elicitation replaces or supplements `toolPolicy`.
+2. **Set `toolPolicy` on one server and re-run the write test** (BACKLOG #23 — human's call,
+   config edit). Until the key exists there is nothing to measure. Pick a probe tool that does
+   NOT elicit server-side, so any prompt attributes to the host.
+3. **Reinstall the signed binary** if the read-surface fixes should be live in clients — the
+   copy at `/usr/local/bin` predates them. `./scripts/sign.sh`, then `sudo cp`, then verify
+   with `codesign --verify --strict`. **No new grant is needed**: same path, and the
+   designated requirement is identity-based.
+4. **BACKLOG #19** — bound EventKit operations, fail fast once wedged. Architecture-bearing:
+   plan it, contrarian-review it, then build.
+5. **Blocked On #1** before any write tool.
+6. If #23 proves host policy and the human retains it, move to per-tool `toolPolicy`
+   (BACKLOG #2): writes `"ask"`, reads unlisted.
+7. **Build order:** `calendar_create_event` → `calendar_delete_event` **with restore in the
+   same change** → `calendar_update_event`.
+
+## Not measured, and not to be assumed
+
+- The §5 concurrency criterion (a 500-event fetch not delaying a concurrent `tools/list` by
+  250 ms) needs a populated real calendar. **Unmeasured.**
+- The CLOEXEC exemption is still not directly observed.
+- macOS 14.0–26.4 permission behaviour is unverified; only 26.5 has been exercised.
 
 ## Open item belonging to the human, not to this repo
 
 **A test draft is still sitting in iCloud Drafts** — subject "Test draft from apple-mail MCP",
-to jason.collier@me.com. `apple-mail`'s `delete_draft` hung twice at 60s and never removed it.
-Needs deleting by hand in Mail.app. Nothing in this project can clear it.
+addressed to the author's own iCloud address. `apple-mail`'s `delete_draft` hung twice and
+never removed it. Needs deleting by hand in Mail.app. Nothing in this project can clear it.
 
-## Plan of Record
-
-**`docs/IMPLEMENTATION-PLAN.md`** — **rev. 6**, §4/§6/§13 rewritten 2026-08-20. It is a **copy**
-of `~/.claude/plans/proceed-with-writing-the-linear-iverson.md`; replace it from there on every
-revision (a stale rev. 3 copy was once live while `OPERATIONS.md` named it authoritative).
+(The address itself is not repeated here: `_ai-context/` ships with a public repository, and
+`OPERATIONS.md` commits to sweeping personal addresses out of tracked files before every push.
+It was committed once, in 934f7a8, so it is already in the public history — removing it here
+stops it spreading, and only a history rewrite would remove it retroactively.)
 
 ## Resuming After a Restart
 
-1. Read `AGENTS.md` → `_ai-context/PROJECT-MEMORY.md` (controls, 63 gotchas, the human's stated
-   requirements table) → `docs/IMPLEMENTATION-PLAN.md` §6.
-2. Phases 1–4 are built, tested, published and in daily use. The journal is built.
-3. **Start at Blocked On #1.** It is the only thing in the way.
+1. Read `AGENTS.md` → `_ai-context/PROJECT-MEMORY.md` (controls, gotcha table, the human's
+   stated requirements) → `docs/IMPLEMENTATION-PLAN.md`.
+2. Run `./scripts/test.sh` for a known-good baseline.
+3. The read surface is shipped and audited. **Start at BACKLOG #19**, or at Blocked On #1 if
+   the write path is what matters this session.
 
 ## Security Posture
 
@@ -172,9 +232,9 @@ paths look identical; distinguish via `TCC.db` (`tccutil` cannot target either �
 `claude_desktop_config.json` under `apple-mail` → `APPLE_MAIL_MCP_IMAP_PASSWORD_ICLOUD`. Raised;
 the human has scoped Apple Mail and QuickBooks guardrails to their own projects.
 
-The allowlist is gone, but the journal and snapshots remain **same-uid writable** — reductions,
-not boundaries. `toolPolicy` is the one control in this project the model cannot reach, because
-it is enforced in the host process.
+The journal and snapshots are **same-uid writable** — reductions, not boundaries. A configured
+and verified host `toolPolicy` would be outside the model's reach because it is enforced in the
+host process; no such policy is configured today.
 
 ## Phase Results (condensed)
 
@@ -190,13 +250,11 @@ refuses to run under inherited identity, structurally preventing the Phase 1 fai
 proves ownership with no privilege: a disclaimed process sees only its own grant, so
 `disclaimed-child` + `fullAccess` **is** the proof (gotchas 28–29).
 
-**Phase 4 — passed, then failed in real use, then fixed.** Five read tools shipped with every
-event tool returning numbers where its own schema promised strings — Swift encodes `Date` as
-seconds since 2001, and the SDK validates `structuredContent` in memory before serialization.
-DTOs now carry pre-formatted RFC 3339 strings; 6 schema-conformance tests added with a positive
-control. A second real-use report found timestamps pinned to `Z`: `ISO8601DateFormatter` defaults
-to GMT, and `TimeZone.current` is a snapshot that would keep the departure city's offset after a
-flight. Now `autoupdatingCurrent` with an explicit formatter zone, so travel adjusts by itself.
+**Phase 4 — passed, then failed in real use, then fixed, then audited.** Five read tools shipped
+with every event tool returning numbers where its own schema promised strings (gotcha 46); DTOs
+now carry pre-formatted RFC 3339 strings. A second real-use report found timestamps pinned to
+`Z`; now `autoupdatingCurrent` with an explicit formatter zone. The 2026-08-22 contract audit
+found seven further false claims — all fixed, and the orphan exit criterion finally met.
 
 **Verified 2026-08-20:** the disclaim works under a real MCP client. Claude Desktop ships its own
 Anthropic-signed `disclaimer` helper using the same private API (gotcha 44), so it had already

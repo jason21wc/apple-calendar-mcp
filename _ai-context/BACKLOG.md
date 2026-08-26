@@ -8,30 +8,85 @@
 
 ## Active (Implement Now/Soon)
 
-- **#1 — CONFIRM WRITES PROMPT. Blocks all write work.** Ask Cowork to *draft* (not send) an
-  email via `apple-mail`'s `create_draft`; its proxy auto-approves only read tools. If no
-  prompt appears, the human's stated requirement is unmet and no write tool should be built
-  until a mechanism that does prompt is found. ~2 minutes, no new code.
+- **#1 — PROVE AN ENFORCED HUMAN-APPROVAL ROUND TRIP. Blocks all write work.** Before any
+  write tool ships, demonstrate that Claude Desktop/Cowork reaches a human and that absence,
+  refusal, cancellation, error or non-response cannot proceed to mutation. Candidate paths
+  are measured host `toolPolicy` (#23) and explicitly guarded server elicitation (#24). The
+  prior `apple-mail` experiment is not to be repeated as evidence: three independent confounds
+  made its null result attribute to nothing (gotcha 83).
 
-- **#2 — Switch `toolPolicy` from `{"*": "ask"}` to per-tool.** Write tools `"ask"`, read tools
+- **#26 — `JournalTests` writes to the user's REAL state directory, and the suite is now
+  intermittently red because of it.** Verified 2026-08-24: every current journal line is test
+  output (`test_create`, `test_outcome`, `test_corrupt`, `test_perms`, or the malformed-line
+  fixture), and the file grows on every run. `intentPrecedesOutcome` failed once during this
+  session and passed on re-runs. Two defects share the same missing storage boundary:
+  **(a) No test isolation.** `Journal` writes to `Runtime.stateDirectory`, a `static let` with
+  no injection point, so a test cannot redirect it — and `HOME` cannot redirect it either,
+  because `homeDirectoryForCurrentUser` reads the passwd database (gotcha 37). The immediate
+  race is more specific than "parallel appends": `Journal` serializes its own O_APPEND writes,
+  but `corruptLineIsSkipped` opens that same live file independently, seeks to the end, and
+  writes outside both `writeQueue` and O_APPEND. It can race a journal append. Other suites
+  avoid the state directory deliberately; this one does not.
+  **(b) `entries()` reads and decodes the ENTIRE file on every call**, then throws away all but
+  `.suffix(limit)`. `orphanedIntents()` does this at `limit: 1000`. Cost grows without bound
+  within a month, and this is the read path a future `calendar_recent_mutations` would use.
+  Fix (a) before trusting the suite — a test that fails once in four is not evidence of
+  anything, per this project's own standard. Fix (b) before the journal has a caller.
+  Do not delete the live journal as part of the code fix. Cleanup is a separate, explicit
+  operation outside the repository even though current inspection found test output only.
+
+- **#24 — Measure server elicitation, then decide whether it replaces or supplements
+  `toolPolicy`.** The pinned SDK supports `Server.requestElicitation`, but its validator is a
+  no-op under this server's effective default (`strict: false`; gotcha 84). Sequence:
+  **(1)** capture the connected client's declared elicitation sub-capabilities at initialize
+  and surface them through `calendar_permission_status`; **(2)** pending human approval to add
+  a sixth public tool, run one harmless form-elicitation round trip; **(3)** for future writes,
+  explicitly require the needed form capability and refuse on absence, decline, cancellation,
+  error or non-response. A declaration is eligibility to try, not proof that a human responded,
+  and a successful diagnostic probe is not authorization for a later write.
+
+- **#25 — Verify what this project's OWN governance hook actually enforces.** `CLAUDE.md`
+  describes a PreToolUse hook that "BLOCKS Bash/Edit/Write until the required governance tools
+  are called" — which is the **same order-gate shape** the `apple-mail` proxy turned out to
+  have (gotcha 67): it gates on a call having been *made*, not on the verdict that call
+  returned. If so, this project's own enforcement claim ("structural, not advisory") needs the
+  same correction I just applied to the sibling's, and `CLAUDE.md` overstates it. Read the hook
+  implementation before repeating the claim. Not urgent, but it is a stated control and this
+  project has now mis-stated three.
+
+- **#23 — `toolPolicy` has never been set on this machine. Establish whether it works at all
+  before designing around it.** Verified 2026-08-22: absent from all nine servers in
+  `claude_desktop_config.json`, from `config.json`, and from both August backups. Two
+  "measurements" were taken on top of the assumption that it was configured, and both actually
+  measured the no-policy default. Sequence: add `toolPolicy` to ONE server entry, restart
+  Desktop (stdio servers respawn, but the config is read at launch), call a read tool and a
+  write tool, and record what each does. **Choose the write tool so the result attributes:**
+  the 2026-08-22 attempt used two tools that never elicit server-side, on a server whose proxy
+  only order-gates, with no policy set — three sufficient explanations for one silence
+  (gotcha 83). A tool that does NOT elicit is the right probe once the policy IS set, because
+  then any prompt is attributable to the host. If the key is silently ignored by the installed
+  Desktop version, then the compensating control the whole write design rests on does not
+  exist, and the design needs a different one — that is a stop-and-redesign outcome, not a
+  detail. Human's call: it is an edit to their host configuration.
+
+- **#2 — If #23 proves `toolPolicy` and the human retains it, configure it per-tool.** There is
+  nothing to switch from today. Write tools `"ask"`, read tools
   unlisted. Encodes "never prompt on read, always prompt on write" directly instead of relying
   on `readOnlyHint` overriding a wildcard — a mechanism never confirmed from the minified
   bundle. Backup of `claude_desktop_config.json` already taken.
 
-- **#3 — README destructive-capability warning.** Must state plainly: the server can delete
-  calendar events; restore **recreates an equivalent event with the same information — it is
-  not the original object**, and the event identifier will differ. Say why that is sufficient:
-  the only field a snapshot cannot reproduce is `attendees`, and C6 refuses those events
-  outright, so nothing this tool can delete is anything it cannot put back. A license warranty
-  disclaimer is not a substitute for this.
-
-- **#8 — Confirm C6 (attendee refusal) formally**, and verify the premise in Phase 6 with a
+- **#8 — Confirm C6 (attendee refusal) formally**, and note the second-account test is more
+  important than recorded: it is not merely "does deleting notify people", it is **"what does
+  `removeEvent` on an invited event actually DO?"** EventKit has no decline API
+  (`participantStatus` is readonly, gotcha 91), so `removeEvent` is the only lever and its
+  behaviour over CalDAV is unknown — it may produce a proper decline, a silent local removal
+  that desyncs on next sync, or a cancellation. Those are three very different outcomes and
+  only one of them is acceptable. Until measured, refusal is the only defensible policy.
+  Original item follows.
+- **#8a — original:** confirm C6 formally, and verify the premise in Phase 6 with a
   second account: does deleting an invited event actually send a decline to the organizer
   and attendees? The refusal is cheap enough to keep either way, but the README rationale
   should not state an unverified claim as fact.
-- **#9 — Answer whether Cowork runs locally or remotely.** A remote sandbox cannot reach a
-  local `EKEventStore`, which would undo the justification for keeping restore model-callable.
-
 - **#17 — Restore must ship in the SAME change as delete, never after.** C7 is the primary
   user-facing control now that C1 is withdrawn; shipping the destructive half first leaves a
   window with no way back. Test it end to end against a disposable calendar: create → delete →
@@ -42,39 +97,23 @@
   `availability`, `calendar_id`, and the recurrence rule. The read DTO withholds `notes`, `url`
   and `location` unless requested — a snapshot built from it would silently drop them and the
   loss would only appear at restore time, when the original is already gone.
+- **#22 — Decide whether an unknown tool should be a JSON-RPC protocol error rather than
+  `isError`.** Raised by an independent review (Codex, 2026-08-22), citing the MCP spec, which
+  classifies unknown tools as protocol errors and reserves `isError` for validation, API and
+  business-logic failures. We return `isError` with `UNKNOWN_TOOL: ... This server provides:
+  <list>`. **Not** changed on the spot, because it predates the read-surface work and the
+  trade-off is unmeasured: a JSON-RPC error can carry the same message, but hosts surface
+  protocol errors differently from tool errors and some may not return the text to the model
+  at all — which would cost a caller the list of valid tool names precisely when it has just
+  used a wrong one. Settle by checking what Claude Desktop and Claude Code actually show the
+  model for each, then pick. Low severity either way.
+
 - **#10 — Verify `calshow:` opens Calendar.app at a date.** If it works, the C6 refusal can
   hand the user a clickable jump instead of just coordinates.
 - **#7 — Third-party attribution file.** If any expression is borrowed from either MIT
   reference repo, add a `NOTICE` / `THIRD-PARTY-NOTICES.md` carrying the original MIT text
   and copyright line, and mark provenance in the borrowing file's header. Not needed if
   only ideas are adopted.
-
-- **#11 — Verify supervisor/child orphan behaviour under SIGTERM and SIGKILL.** Signal
-  forwarding is implemented in `Reexec.swift` but **could not be empirically confirmed** —
-  the probe exits in milliseconds, so there is no live child to observe. Requires a
-  long-running process, so test in **Phase 4** when the server loop exists: `kill -TERM` and `kill -KILL` the supervisor, then
-  check with `ps -o pid,ppid,pgid` that no child survives holding the client's stdout pipe.
-  A surviving orphan means a Calendar-authorized process the client thinks is dead.
-- **#12 — The Phase 4 server loop MUST treat stdin EOF as unconditional shutdown.** This is the
-  only defence against the SIGKILL case, which no signal handler can cover: stdin is
-  inherited directly, so the client's pipe closure reaches the child even when the
-  supervisor is already gone.
-- **#13 — Decide whether `unsafeFlags` in `Package.swift` is acceptable.** SwiftPM refuses
-  to resolve any package using `unsafeFlags` as a *dependency*, so this repo can never be
-  consumed via `.package(url:)` — clone-and-build only. Fine if that is the intended
-  distribution, but it should be a stated decision, and the `-sectcreate` path is relative
-  to the invoker's cwd so builds must run from the package root.
-
-- **#15 — CI on a macOS runner, once tests exist.** GitHub Actions running `swift build`,
-  `swift test`, `bash -n` on every script, and a grep gate for the recurring traps
-  (unguarded `| grep -q` under `pipefail`, unpinned PATH in scripts that invoke `codesign`
-  or `security`). Every defect found so far was caught by a human or an agent reading code;
-  none by automation. Signing and Calendar access cannot run in CI, so the matrix stops at
-  "builds, unit-tests pass, scripts parse".
-- **#16 — The `security-scan` skill is broken.** Invoking it fails with
-  `command not found: cmd` — a malformed shell substitution in the skill definition, not in
-  this project. It has never actually run here; the security coverage to date came from the
-  `security-auditor` agent instead. Either repair the skill or stop reaching for it.
 
 - **#19 — Bound every EventKit operation, and fail fast once wedged.** No call in `CalendarStore` has a
   timeout (gotcha 64). Because the store is a serial actor on one dedicated thread, a single blocked call
@@ -108,6 +147,29 @@
   phase if ever wanted.
 - **#6 — Reminders (`EKReminder`) support.** Out of scope for v1; would widen the
   entitlement and tool surface.
+
+## Not this repository's work
+
+- **The `security-scan` skill is broken** — invoking it fails with `command not found: cmd`,
+  a malformed shell substitution in the **skill definition**, which lives outside this repo.
+  It has never run here; the security coverage to date came from the `security-auditor` agent
+  instead. Kept as a note so nobody reaches for the skill again expecting it to work, and
+  removed from Active because it is not implementation work for this project. Fixing it means
+  editing files this project does not own.
+
+## Closed 2026-08-22
+
+Removed after verifying each against the repository rather than against memory:
+
+| Was | Why it is closed |
+|---|---|
+| #3 README destructive-capability warning | The README carries it: the warning block, "restore recreates an equivalent event... it is not the original object", and the C6 rationale for why that suffices |
+| #9 Does Cowork run locally or remotely | Answered 2026-08-19 and recorded in PROJECT-MEMORY Open Questions #1: locally, inside Claude Desktop on this Mac. It was open in two files with different answers |
+| #11 Orphan behaviour under SIGTERM / SIGKILL | Verified and automated — `ServerLifecycleTests` launches the real binary, waits for the disclaimed child, and asserts no survivor under stdin EOF, SIGTERM, and SIGKILL-then-EOF. Mutation-checked: disabling signal forwarding fails the SIGTERM case |
+| #12 stdin EOF as unconditional shutdown | Implemented in `ServerBootstrap.run()` and now covered by the same lifecycle test |
+| #13 `unsafeFlags` decision | Decided and recorded in PROJECT-MEMORY: accepted, clone-and-build only |
+| #15 CI on a macOS runner | `.github/workflows/ci.yml` — build, `./scripts/test.sh`, `bash -n`, shell checks. No signing, keychain, TCC or Calendar access, none of which can work on a hosted runner |
+| #16 `security-scan` skill | Routed above as external; not this repo's work |
 
 ---
 

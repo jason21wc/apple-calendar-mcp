@@ -1,35 +1,63 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # Specification
 
-**Status:** Specified, not yet built. Field-level schemas, guards, error codes and phase
-gates are in `docs/IMPLEMENTATION-PLAN.md` (rev. 3) §6–§11 — authoritative. This is the
-summary.
+**Status:** the read surface is **built and shipped**; the write surface is **specified and
+not built**. This document separates the two throughout — an earlier version described the
+whole fourteen-tool design under a single "not yet built" banner, which made the shipped
+half invisible and the unbuilt half look imminent.
+
+Field-level schemas, guards, error codes and phase gates live in
+`docs/IMPLEMENTATION-PLAN.md` — the repository-owned canonical plan, and authoritative. This
+is the summary.
 
 ---
 
-## What it does
+## What it does today
 
-Lets an AI assistant inspect calendars, retrieve bounded sets of events, reason about
-availability, and create, update, delete and undo events on the user's macOS Calendar —
-with every mutation proposed first and confirmed second.
+Lets an AI assistant inspect calendars, retrieve bounded sets of events, and reason about
+availability on the user's macOS Calendar. **Nothing it exposes can change a calendar.**
 
-## Tool surface (14)
+## What it is specified to do later
 
-**Read (6)** — `permission_status` (never prompts), `list_calendars`, `list_events`,
-`find_events`, `busy_intervals`, `recent_mutations` (journal **metadata only**).
+Create, update, delete and restore events, with every mutation proposed first and confirmed
+second, under containment controls C3–C7. Gated: see "Not built" below.
 
-**Propose (4)** — `propose_create`, `propose_update`, `propose_delete`, `propose_undo`.
-Read-only; each returns a preview plus a single-use token and a server-minted
-`confirm_summary` string.
+## Shipped tool surface (5, all read-only)
 
-**Commit (4)** — `commit_create`, `commit_update`, `commit_delete`, `commit_undo`. Each is
-~5 lines over one guarded `commit()`. Takes `(token, confirm_summary)`; the summary must
-be echoed byte-exactly and is verified against the server's own value.
+| Tool | Purpose |
+|---|---|
+| `calendar_permission_status` | Authorization state, identity, and where the machine thinks it is. Never prompts |
+| `calendar_list_calendars` | Event-supporting calendars and whether each is writable |
+| `calendar_list_events` | Bounded interval query |
+| `calendar_find_events` | Text search across the whole window |
+| `calendar_busy_intervals` | Availability without titles |
 
-Permission setup is **not** a tool — a TCC prompt needs a foreground process, which a
-stdio-launched server cannot present. That is `--setup`, with `--doctor` alongside.
+Each declares an `outputSchema` and returns `structuredContent` plus a text summary. Each is
+annotated `readOnlyHint: true`, `destructiveHint: false`; the three returning
+externally-authored text also carry `openWorldHint: true`.
 
-## The mutation flow
+Failures return `isError` with a stable code leading the message:
+`PERMISSION_DENIED`, `BAD_TIMESTAMP`, `BAD_TIME_ZONE`, `END_NOT_AFTER_START`,
+`INTERVAL_TOO_LARGE`, `MISSING_ARGUMENT`, `UNKNOWN_TOOL`, `CALENDAR_STORE_UNAVAILABLE`.
+The code is contractual; the prose after it is not.
+
+**Response envelope:** `items`, `truncated`, `total_matched`, `effective_time_zone`,
+`limits_applied`, `trust` — all declared and all required. `effective_time_zone` is the zone
+every timestamp in that response was rendered in. `limits_applied` reports what the call
+actually applied, with `null` where a limit does not apply to it.
+
+## Not built
+
+**No write tool exists.** The propose/commit design below is specification. `Journal.swift`
+is built as substrate and has no caller, so nothing reverses anything yet.
+
+`calendar_recent_mutations` — reading the journal — arrives with the write surface.
+
+Permission setup is **not** a tool and never will be — a TCC prompt needs a foreground
+process, which a stdio-launched server cannot present. That is `--setup`, with `--doctor`
+alongside.
+
+## The planned mutation flow
 
 ```
 find_events(query:"standup")     → candidates + ids
@@ -39,12 +67,18 @@ propose_delete(id, occurrence_date?, span)
 commit_delete(token, confirm_summary)
 ```
 
-## Guards (all inside `commit()`, all against refetched ground truth)
+## Planned guards (all inside `commit()`, all against refetched ground truth)
 
-1. **Attendees / external organizer → refuse.** Deleting an invited event sends a decline
-   to the organizer and everyone invited; deleting one you organized sends a cancellation.
-   Irreversible, with a human audience. The refusal returns title, start, calendar,
-   organizer and attendee count so the user can find and decline it by hand.
+1. **Attendees / external organizer → CONFIRM, not refuse** *(amended 2026-08-25)*. Removing
+   such an event is permitted behind a per-call human confirmation stating plainly that the
+   tool will remove it through EventKit, that this may notify other participants, and that
+   attendee/invitation state cannot be restored. The operation is called **remove** — never
+   presented as equivalent to Calendar.app's Decline, because EventKit exposes no RSVP setter
+   (`participantStatus` is `readonly`) and what an account server does with a removal has not
+   been measured here. The confirmation carries title, start, calendar, organizer and attendee
+   count. What stays **refused**: setting `attendees`, and setting RSVP status explicitly —
+   neither is expressible in EventKit at all.
+
 2. **Writability** — `allowsContentModifications`, EventKit's own answer and nothing else.
    Not `isImmutable`, which governs the calendar object rather than its contents. The
    writable-calendar allowlist was **withdrawn 2026-08-20**; a calendar shared with the user
@@ -71,7 +105,8 @@ needed, never guessed. Half-open `[start, end)`, matching by *overlap*. All-day 
 date-only and never round-tripped through UTC. Explicit sort; EventKit guarantees no order.
 
 **Limits** — 31-day max interval, 100 default / 500 hard result cap, no unbounded query, no
-server-side pagination, no caching.
+server-side pagination, no caching. A search covers the **whole** window before it filters and
+caps, so `total_matched` counts every match rather than the matches in the first page.
 
 ## Out of scope for v1
 
