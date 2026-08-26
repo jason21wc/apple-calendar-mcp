@@ -31,14 +31,14 @@
 |--------|-------|
 | Project | **apple-calendar-mcp** |
 | Installed at | `/usr/local/bin/apple-calendar-mcp` (root:wheel), granted, `--doctor` clean |
-| Install verified | **2026-08-20 18:33** — cdhash matched the signed build. **The installed binary now predates the 2026-08-22 read-surface fixes**; reinstall before relying on them in a client |
+| Install verified | **2026-08-20 18:33.** **The installed binary predates every fix in `026b0eb` and still reports version 0.1.0**; reinstall before relying on the corrected read surface in any client. Same path, so no new grant is needed |
 | Tests | **Baseline not trustworthy until BACKLOG #26 is fixed.** `JournalTests` writes to the live state directory and contains an unsynchronized corrupt-line fixture. No count recorded here on purpose |
 | Tool surface | **5, all read-only.** No write tool exists |
 | Desktop config | `--read-only` only. **`toolPolicy` is NOT set — for any server, and never was.** Verified 2026-08-22 against the live config, `config.json`, and both August backups. The previous entry here claimed it was configured; that was false when written |
 | Containment controls | C3, C4, C5, C6, **C7**. C1 withdrawn; C2/C2a/C4a superseded |
-| Latest governance | `gov-d463782d41dd` (REVIEW, no S-Series trigger) — evidence-layer and test-isolation corrections |
+| Latest governance | `gov-800ad831a848` (PROCEED, no S-Series) — **the C6/C7 amendment, approved by the human**. Also this session: `gov-73d2d27428b5`, `gov-cec327c3a310`, `gov-d463782d41dd` |
 | Plan | `docs/IMPLEMENTATION-PLAN.md` — **now canonical and repo-owned.** The revision number lives in the plan itself and is not restated here |
-| CI | `.github/workflows/ci.yml` — macOS runner, build + tests + shell checks, **no signing** |
+| CI | `.github/workflows/ci.yml` — macOS runner, build + tests + shell checks, **no signing**. First run green 2026-08-26, which also proves the suite is hermetic: it passes with no Calendar grant, no certificate and no state directory |
 
 ## What changed 2026-08-22 — drift fixed at the cause, and the read contract audited
 
