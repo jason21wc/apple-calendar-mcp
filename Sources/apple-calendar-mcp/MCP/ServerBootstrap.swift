@@ -64,7 +64,16 @@ enum ServerBootstrap {
         }
 
         let transport = StdioTransport()
-        try await server.start(transport: transport)
+        // The initialize hook is the ONLY way to see what the client declared: the SDK keeps
+        // `clientCapabilities` private. Records only -- it gates nothing today, and a
+        // declaration is not an approval.
+        try await server.start(transport: transport) { info, capabilities in
+            await ClientSession.shared.record(info: info, capabilities: capabilities)
+            log("client: \(info.name) \(info.version), elicitation="
+                + (capabilities.elicitation == nil ? "not declared"
+                   : "declared(form=\(capabilities.elicitation?.form != nil), "
+                     + "url=\(capabilities.elicitation?.url != nil))"))
+        }
         log("serving on stdio (read-only)")
 
         // Park until the transport closes. StdioTransport ends when stdin reaches EOF, which

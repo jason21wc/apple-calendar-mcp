@@ -278,9 +278,27 @@ struct PermissionStatusDTO: Codable, Sendable, Hashable {
     let systemTimeZone: String
     let systemUtcOffsetSeconds: Int
     let currentTime: String
+    /// What the connected MCP client declared about itself at initialize. Null before the
+    /// handshake completes. **A declaration is a claim, not a capability that has been
+    /// exercised, and never an approval** -- see ClientSession.
+    let client: ClientSnapshot?
+
+    /// Hand-written so `client` is present-and-null rather than absent when unknown: "no
+    /// client has connected" and "the server did not say" are different answers.
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(status, forKey: .status)
+        try c.encode(canReadEvents, forKey: .canReadEvents)
+        try c.encode(guidance, forKey: .guidance)
+        try c.encode(identity, forKey: .identity)
+        try c.encode(systemTimeZone, forKey: .systemTimeZone)
+        try c.encode(systemUtcOffsetSeconds, forKey: .systemUtcOffsetSeconds)
+        try c.encode(currentTime, forKey: .currentTime)
+        try c.encode(client, forKey: .client)
+    }
 
     enum CodingKeys: String, CodingKey {
-        case status, guidance, identity
+        case status, guidance, identity, client
         case canReadEvents = "can_read_events"
         case systemTimeZone = "system_time_zone"
         case systemUtcOffsetSeconds = "system_utc_offset_seconds"

@@ -15,16 +15,21 @@
   prior `apple-mail` experiment is not to be repeated as evidence: three independent confounds
   made its null result attribute to nothing (gotcha 83).
 
-- **#26 — journal test isolation. (a) DONE 2026-08-26; (b) still open.**
-  **(a) Test isolation — fixed.** `Journal`'s storage location is now an explicit `root:`
-  parameter defaulting to `Runtime.stateDirectory`, threaded through `directory`,
+- **#26 — journal storage isolation. Current behavior fixed; regression guarantee and read path remain.**
+  **(a) Test isolation — CLOSED 2026-08-26, and the first fix was insufficient.** `Journal`'s
+  storage location is an explicit `root:` parameter with **no default**, threaded through
+  `directory`,
   `currentFile`, `recordIntent`, `recordOutcome`, `entries` and `orphanedIntents`. Production
   call sites are unchanged; the tests pass a temporary directory they own and delete.
   Deliberately **not** a settable static — a mutable global redirecting where calendar history
-  is written is the shape this project has twice been bitten by. A guard test asserts no
-  journal test can resolve a path beneath the real state directory, so dropping the argument
-  fails the suite rather than silently writing to the user's home. **Verified: three
+  is written is the shape this project has twice been bitten by. **Verified: three
   consecutive full runs added zero lines to the live journal** (was ~10 per run).
+  **(a2) Regression guard — incomplete.** `testRootsNeverTouchLiveState()` proves only that
+  `directory(root:)` and `currentFile(root:)` resolve safely when given a temporary root. It
+  cannot detect another test omitting `root:` and silently taking the production default.
+  Remove defaults from test-reachable entry points and pass `Runtime.stateDirectory` explicitly
+  at a production wrapper/caller so omission fails at compile time without introducing a
+  mutable global redirect.
   **(b) `entries()` still reads and decodes the ENTIRE monthly file on every call**, then
   discards all but `.suffix(limit)`; `orphanedIntents()` does it at `limit: 1000`. Cost grows
   without bound within a month, and this is the read path `calendar_recent_mutations` would
@@ -32,15 +37,23 @@
   Do not delete the live journal as part of a code fix — that is a separate, explicit
   operation, even though inspection found only test output.
 
-- **#24 — Measure server elicitation, then decide whether it replaces or supplements
-  `toolPolicy`.** The pinned SDK supports `Server.requestElicitation`, but its validator is a
-  no-op under this server's effective default (`strict: false`; gotcha 84). Sequence:
-  **(1)** capture the connected client's declared **form** elicitation capability at initialize
-  and surface it through `calendar_permission_status`; **(2)** pending human approval to add
-  a sixth public tool, run one harmless form-elicitation round trip; **(3)** for future writes,
-  explicitly require the needed form capability and refuse on absence, decline, cancellation,
-  error or non-response. A declaration is eligibility to try, not proof that a human responded,
-  and a successful diagnostic probe is not authorization for a later write.
+- **#24a — report the connected client's declared capabilities. DONE 2026-08-26.**
+  `calendar_permission_status` now carries a `client` block: name, version,
+  `elicitation_declared`, `elicitation_form_supported`, `elicitation_url_supported`. Captured
+  via the `Server.start` initialize hook, the only place they are visible. Form is reported
+  separately from the top-level declaration on purpose — measured against a synthetic url-only
+  client, which reads `declared: true, form: false`. Held in an actor, not `Runtime`. Nothing
+  consumes it as permission, and a test asserts no handler does.
+
+- **#24b — the live elicitation round trip. BLOCKED BY DESIGN, deliberately not built.**
+  A capability declaration proves the client CLAIMS it can ask a human; only a completed round
+  trip returning `.accept` shows one answered. **That probe must not be written until timeout
+  and abandoned-request cleanup are designed** — `requestElicitation` awaits `task.value` with
+  nothing bounding it, and wrapping it in a timeout abandons the request rather than cancelling
+  it, leaving an entry in the SDK's `pendingRequests` keyed by id. Building the probe first
+  would ship the hang along with the measurement. Prerequisites: decide the bound, decide what
+  cleanup means when the SDK offers no cancellation, and make non-response, decline, cancel and
+  error all fail closed. Then measure.
 
 - **#25 — Verify what this project's OWN governance hook actually enforces.** `CLAUDE.md`
   describes a PreToolUse hook that "BLOCKS Bash/Edit/Write until the required governance tools
@@ -98,7 +111,15 @@
   and copyright line, and mark provenance in the borrowing file's header. Not needed if
   only ideas are adopted.
 
-- **#19 — Bound every EventKit operation, and fail fast once wedged.** No call in `CalendarStore` has a
+- **#19 — Bound every EventKit operation, and fail fast once wedged.** **Same policy problem
+  as #24b, different cleanup problem — treat them together in design and apart in code.** Both
+  are an unbounded wait on something outside the process, and both need the same answer to
+  "what does the caller do when no reply comes, and how does the system avoid staying wedged".
+  The implementations cannot be shared: a blocking synchronous EventKit call **cannot be
+  cancelled at all**, so the thread is lost and the remedy is to mark the store wedged; an
+  abandoned MCP request **can** in principle be reaped, but the SDK exposes no cancellation, so
+  the remedy is different again. A single "add a timeout" helper across both would paper over
+  that difference. No call in `CalendarStore` has a
   timeout (gotcha 64). Because the store is a serial actor on one dedicated thread, a single blocked call
   takes the whole calendar surface down for the process's lifetime. A blocking synchronous EventKit call
   **cannot be cancelled**, so the timeout cannot free the thread — the design has to be: bound the

@@ -375,6 +375,21 @@ existing decisions, diff it against those decisions explicitly before proposing 
 that reads as coherent can still be a silent reversal, and "industry practice" is not
 authority over a decision the human already made.**
 
+**2026-08-26 — My isolation fix guarded the call that was already correct.** I gave `Journal`
+a `root:` parameter with a production default and wrote a test asserting the temp root
+resolved outside the user's home. That checks a call that passed one. The failure that
+mattered — a test simply omitting `root:` and silently getting the live directory — was
+invisible to it, and was the mode reachable by forgetting rather than by deciding. Removing
+the default made omission a compile error. **Rule: when writing a guard, ask which failure it
+can actually see. A runtime check inspects the arguments it is handed and is blind to the call
+that omitted one; prefer a guarantee the compiler enforces.**
+
+**2026-08-26 — A linter that lives in the file it lints always finds its own text.** The
+assertion that no journal test passes the live root matched the line holding the search
+strings. `test-shell.sh` had already met this and solved it by excluding itself; here scanner
+and subject are the same file by design, so the needles are built from fragments. **Rule: a
+source-text check must be written so that it is not an instance of what it forbids.**
+
 ---
 
 ## Graduated Patterns

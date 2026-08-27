@@ -53,6 +53,7 @@ hardened-runtime binary missing the calendars entitlement — potentially unreco
 | Custom `SerialExecutor` over a continuation bridge | An actor releases isolation at every `await`, so it would not serialize; a custom executor makes synchronous EventKit calls genuinely non-reentrant. **Built in Phase 4 and it did not need `@unchecked Sendable`** |
 | Serving is the argless default | There is no `serve` subcommand; a bare `serve` argument exits `EX_USAGE`. MCP clients launch the binary with no arguments |
 | One rendering zone per response | `effective_time_zone` reports the zone every timestamp was rendered in. Previously the field named the caller's zone while timestamps used the machine's — a claim nothing downstream could detect as false, since each timestamp still carried a valid offset |
+| Journal storage root is an explicit dependency | Production uses `Runtime.stateDirectory`; tests use owned temporary roots. There is no mutable global redirect. Test-reachable APIs should require a root so omission fails at compile time rather than silently selecting production storage |
 
 ## The security boundary
 

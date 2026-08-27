@@ -16,14 +16,15 @@
   write tool exists.** Phase 5 substrate (`Journal.swift`) built, with no caller.
 - **Mode:** Standard
 - **Repo:** https://github.com/jason21wc/apple-calendar-mcp (public, Apache-2.0)
-- **Active Task:** Isolate journal tests before further implementation. C6/C7 are decided:
-  attendee/external-organizer removal is
+- **Active Task:** Close the remaining #26(a) regression-guard gap, then measure Cowork's
+  declared elicitation form capability. C6/C7 are decided: attendee/external-organizer removal is
   permitted behind per-call confirmation, with a named restorability exception for invitation
   state and social recovery if the user needs to be re-invited.
-- **Next code:** **BACKLOG #26** — isolate `JournalTests` from the live state directory before
-  trusting another suite result. Then **BACKLOG #19** — bound EventKit operations, fail fast once wedged. A live
-  defect in shipped read-only code, independent of the write blocker. It touches
-  `DedicatedThreadExecutor` / `CalendarStore`, so plan it and get a contrarian review first.
+- **Next code:** **BACKLOG #19** — bound EventKit operations, fail fast once wedged. It is now
+  on the critical path twice over: it is a live defect in shipped read-only code, and it is the
+  same policy problem as the elicitation wait that gates #24b.
+  *(Done 2026-08-26: journal root is compile-time required, #26(a); capability reporting
+  shipped, #24a.)*
 - **After that:** `calendar_create_event`, gated on **Blocked On #1**.
 
 ## Quick Reference
@@ -33,7 +34,7 @@
 | Project | **apple-calendar-mcp** |
 | Installed at | `/usr/local/bin/apple-calendar-mcp` (root:wheel), granted, `--doctor` clean |
 | Install verified | **2026-08-20 18:33.** **The installed binary predates every fix in `026b0eb` and still reports version 0.1.0**; reinstall before relying on the corrected read surface in any client. Same path, so no new grant is needed |
-| Tests | **Baseline not trustworthy until BACKLOG #26 is fixed.** `JournalTests` writes to the live state directory and contains an unsynchronized corrupt-line fixture. No count recorded here on purpose |
+| Tests | Journal tests use owned temporary roots; three consecutive full runs after `b9cc465` added zero lines to live state. The baseline is usable. One regression gap remains: the guard test proves its supplied root is safe but cannot detect another test omitting `root:` and taking the production default |
 | Tool surface | **5, all read-only.** No write tool exists |
 | Desktop config | `--read-only` only. **`toolPolicy` is NOT set — for any server, and never was.** Verified 2026-08-22 against the live config, `config.json`, and both August backups. The previous entry here claimed it was configured; that was false when written |
 | Containment controls | C3, C4, C5, C6, **C7**. C1 withdrawn; C2/C2a/C4a superseded |
@@ -174,25 +175,30 @@ See **BACKLOG #24**.
 
 ## Next Actions
 
-1. **BACKLOG #26** — inject a temporary journal root and assert tests cannot resolve beneath
-   `Runtime.stateDirectory`. Do this before treating repeated local suite runs as trustworthy.
-2. **BACKLOG #24** — report Desktop/Cowork's declared elicitation **form** capability, then
-   complete a harmless real round trip. Capability reporting alone does not establish that a
-   human can be reached. Only after both measurements decide whether elicitation replaces or
-   supplements `toolPolicy`; the final design must also fail closed on non-response.
-3. **Set `toolPolicy` on one server and re-run the write test** (BACKLOG #23 — human's call,
+1. ~~Finish #26(a)'s regression guarantee~~ — **DONE 2026-08-26.** `root:` has no default, so
+   omission does not compile (mutation-verified); deliberate use of the live root is caught by
+   a source-text assertion (also mutation-verified). Three full runs added zero lines to the
+   live journal.
+2. ~~BACKLOG #24a — capability only~~ — **DONE 2026-08-26.** `calendar_permission_status`
+   carries a `client` block reporting `elicitation_form_supported` separately from
+   `elicitation_declared`; a url-only client reads `declared: true, form: false`. **Read it
+   from Cowork after the reinstall** — that is the measurement, and it establishes only
+   eligibility to try, never that a human is reachable.
+3. **Bound external waits before a real probe.** BACKLOG #19 covers EventKit's dedicated-thread
+   wedge. Elicitation also needs its own answer for timeout and removal of abandoned SDK
+   `pendingRequests`; sharing a policy does not imply sharing cleanup code.
+4. **BACKLOG #24b — real round trip:** after the wait lifecycle is safe, run one harmless probe
+   and verify accept, decline, cancel, absence, error and non-response behavior.
+5. **Set `toolPolicy` on one server and re-run the write test** (BACKLOG #23 — human's call,
    config edit). Until the key exists there is nothing to measure. Pick a probe tool that does
    NOT elicit server-side, so any prompt attributes to the host.
-4. **Reinstall the signed binary** if the read-surface fixes should be live in clients — the
-   copy at `/usr/local/bin` predates them. `./scripts/sign.sh`, then `sudo cp`, then verify
-   with `codesign --verify --strict`. **No new grant is needed**: same path, and the
-   designated requirement is identity-based.
-5. **BACKLOG #19** — bound EventKit operations, fail fast once wedged. Architecture-bearing:
-   plan it, contrarian-review it, then build.
-6. **Blocked On #1** before any write tool.
-7. If #23 proves host policy and the human retains it, move to per-tool `toolPolicy`
+6. **Install once at the measurement boundary.** If #24 work starts now, avoid reinstalling
+   0.2.0 and then immediately replacing it: build/sign/install the probe-capable binary once,
+   then verify version and signature. Same path, so no new grant is needed.
+7. **Blocked On #1** before any write tool.
+8. If #23 proves host policy and the human retains it, move to per-tool `toolPolicy`
    (BACKLOG #2): writes `"ask"`, reads unlisted.
-8. **Build order:** `calendar_create_event` → `calendar_delete_event` **with restore in the
+9. **Build order:** `calendar_create_event` → `calendar_delete_event` **with restore in the
    same change** → `calendar_update_event`.
 
 ## Not measured, and not to be assumed

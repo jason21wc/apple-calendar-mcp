@@ -24,17 +24,39 @@ struct JournalTests {
         return try body(root)
     }
 
-    @Test("no journal test can resolve a path inside the real state directory")
-    func testRootsNeverTouchLiveState() {
-        // The guard that keeps the fix from silently regressing. If a future edit drops the
-        // `root:` argument, the default is Runtime.stateDirectory and this fails.
+    @Test("no test can reach the live journal — by omission, or on purpose")
+    func testsNeverTouchLiveState() throws {
+        // TWO different failure modes, and only one of them is a runtime property.
+        //
+        // OMISSION is handled by the compiler: `root` has no default, so a call that leaves
+        // it out does not build. That is the important one, because it is the one reachable
+        // by forgetting rather than by deciding. Verified by mutation: deleting `root:` from
+        // a call here fails the build with "missing argument for parameter 'root'".
+        //
+        // DELIBERATE use of the live root still compiles -- nothing can stop a test naming
+        // `Runtime.stateDirectory` on purpose -- so that is asserted against the source text,
+        // the same technique this project already uses for the dlsym-failure branch it cannot
+        // exercise. A reviewer would catch it; this catches it first.
+        // The needles are assembled from fragments so this scanner is not itself a match --
+        // a linter that lives in the file it lints will otherwise always find one violation,
+        // its own. scripts/test-shell.sh hit this and solved it by exclusion; here the
+        // scanner and the subject are the same file by design, so the strings are split.
+        let call = "Journal" + "."
+        let liveRoot = "Runtime." + "stateDirectory"
+        let source = try Repo.source("Tests/AppleCalendarMCPTests/JournalTests.swift")
+        for (i, line) in source.split(separator: "\n").enumerated()
+        where line.contains(call) && line.contains(liveRoot) {
+            Issue.record("""
+                JournalTests.swift:\(i + 1) passes the live state directory to Journal. Tests                 write to a temporary root they own; the live journal holds the user's real                 calendar history.
+                """)
+        }
+
+        // And the roots the tests DO use resolve outside the real directory.
         withTemporaryRoot { root in
             let real = Runtime.stateDirectory.standardizedFileURL.path
             for path in [Journal.directory(root: root).standardizedFileURL.path,
                          Journal.currentFile(root: root).standardizedFileURL.path] {
-                #expect(!path.hasPrefix(real), """
-                    a journal test resolved \(path), which is inside the user's real state                     directory \(real). Tests must never write there.
-                    """)
+                #expect(!path.hasPrefix(real), "resolved \(path), inside the real \(real)")
             }
         }
     }

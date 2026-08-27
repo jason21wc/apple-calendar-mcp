@@ -220,6 +220,60 @@ struct ReadContractTests {
             """)
     }
 
+    // MARK: - Client capability reporting
+
+    @Test("a declared capability is reported as a claim, and form is checked separately")
+    func clientCapabilitiesAreReportedHonestly() throws {
+        // form and url are INDEPENDENT sub-capabilities. A url-only client satisfies a
+        // top-level `elicitation != nil` check while being unable to answer the form request
+        // a confirmation would actually send, so the two are reported apart.
+        let urlOnly = ClientSnapshot(name: "c", version: "1", elicitationDeclared: true,
+                                     elicitationFormSupported: false, elicitationURLSupported: true)
+        #expect(urlOnly.elicitationDeclared)
+        #expect(!urlOnly.elicitationFormSupported, """
+            a url-only client must NOT read as able to answer a confirmation; that conflation             is what a top-level capability check would have hidden.
+            """)
+
+        let none = ClientSnapshot(name: nil, version: nil, elicitationDeclared: false,
+                                  elicitationFormSupported: false, elicitationURLSupported: false)
+        #expect(!none.elicitationFormSupported)
+    }
+
+    @Test("the permission report carries the client block, present-and-null when unknown")
+    func permissionReportCarriesClient() throws {
+        // Null before the handshake is a real answer -- "no client has connected" is not the
+        // same as "the server did not say".
+        let unknown = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(ToolHandlers.permissionPayload(client: nil))) as? [String: Any]
+        let u = try #require(unknown)
+        #expect(u.keys.contains("client"))
+        #expect(u["client"] is NSNull)
+
+        let known = ClientSnapshot(name: "claude-ai", version: "0.1", elicitationDeclared: true,
+                                   elicitationFormSupported: true, elicitationURLSupported: false)
+        let withClient = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(ToolHandlers.permissionPayload(client: known))) as? [String: Any]
+        let block = try #require((withClient?["client"]) as? [String: Any])
+        #expect(block["elicitation_form_supported"] as? Bool == true)
+        #expect(block["elicitation_url_supported"] as? Bool == false)
+        #expect(block["name"] as? String == "claude-ai")
+    }
+
+    @Test("reporting a capability is not the same as having asked a human")
+    func capabilityIsNotApproval() throws {
+        // The property that must never quietly change: nothing in the read surface consumes
+        // this field as permission. There is no write path yet, and when there is, it must
+        // perform its OWN elicitation and require an explicit accept -- a declaration made at
+        // handshake time says nothing about whether a person answers later.
+        let handlers = try Repo.source("Sources/apple-calendar-mcp/MCP/ToolHandlers.swift")
+        #expect(!handlers.contains("elicitationFormSupported"), """
+            ToolHandlers now reads the elicitation capability. If that is gating anything, a             declaration is being treated as an approval.
+            """)
+        let session = try Repo.source("Sources/apple-calendar-mcp/MCP/ClientSession.swift")
+        #expect(session.contains("not evidence that a human is present"),
+                "the warning that a declaration is not evidence of a human was removed")
+    }
+
     // MARK: - Annotations
 
     @Test("every tool is annotated read-only and non-destructive, because every tool is")

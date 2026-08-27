@@ -89,23 +89,29 @@ enum Journal {
 
     /// Where the journal lives.
     ///
-    /// `root` is a parameter with a production default rather than a fixed constant, and it
-    /// is threaded through every entry point below. The tests need to write somewhere they
-    /// own: they used to append to the user's REAL journal, which grew on every run and --
-    /// worse -- gave parallel tests a shared mutable file to race over.
+    /// `root` is REQUIRED and has no default, deliberately.
     ///
-    /// Deliberately NOT a settable static. A mutable global that redirects where calendar
-    /// history gets written is exactly the shape this project has twice been bitten by: a
-    /// value the caller hands you cannot authenticate its own setter. A defaulted parameter
-    /// keeps production call sites unchanged while making the location explicit and
-    /// impossible to redirect from a distance.
-    static func directory(root: URL = Runtime.stateDirectory) -> URL {
+    /// It began as a defaulted parameter, which fixed the tests that passed one and did
+    /// nothing about the failure that actually matters: a test that simply OMITS it. With a
+    /// default of `Runtime.stateDirectory`, omission is silent and writes calendar history
+    /// into the user's home -- the exact bug this parameter exists to prevent, reachable by
+    /// forgetting rather than by doing anything wrong. A runtime guard cannot see that; it
+    /// can only check the roots it is handed.
+    ///
+    /// With no default, omission does not compile. `Journal` has no production caller yet, so
+    /// this costs nothing today and obliges the write surface to state where it writes at
+    /// every call site, which is the right thing to be explicit about.
+    ///
+    /// Deliberately NOT a settable static either. A mutable global redirecting where calendar
+    /// history lands is the shape this project has twice been bitten by: a value handed to
+    /// you cannot authenticate its own setter.
+    static func directory(root: URL) -> URL {
         root.appendingPathComponent("journal", isDirectory: true)
     }
 
     /// Monthly files, so a long-lived install does not accumulate one unbounded file and a
     /// human looking for "what happened in August" has somewhere obvious to look.
-    static func currentFile(now: Date = Date(), root: URL = Runtime.stateDirectory) -> URL {
+    static func currentFile(now: Date = Date(), root: URL) -> URL {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeSemantics.systemZone
@@ -115,7 +121,7 @@ enum Journal {
 
     /// Record an intent and return its id. Call BEFORE mutating.
     @discardableResult
-    static func recordIntent(root: URL = Runtime.stateDirectory,
+    static func recordIntent(root: URL,
                              operation: String,
                              calendarId: String, calendarTitle: String, calendarSource: String,
                              payload: [String: String]) -> String {
@@ -137,7 +143,7 @@ enum Journal {
     }
 
     /// Record what actually happened. Call AFTER the save, whatever the result.
-    static func recordOutcome(root: URL = Runtime.stateDirectory,
+    static func recordOutcome(root: URL,
                               entryId: String, operation: String,
                               calendarId: String, calendarTitle: String, calendarSource: String,
                               eventId: String?, payload: [String: String],
@@ -213,7 +219,7 @@ enum Journal {
     /// Entries for the current month, oldest first. Malformed lines are skipped rather than
     /// aborting the read -- a truncated final line from an interrupted write must not make
     /// the whole history unreadable.
-    static func entries(limit: Int = 100, root: URL = Runtime.stateDirectory) -> [JournalEntry] {
+    static func entries(limit: Int = 100, root: URL) -> [JournalEntry] {
         guard let data = try? Data(contentsOf: currentFile(root: root)),
               let text = String(data: data, encoding: .utf8) else { return [] }
         let decoder = JSONDecoder()
@@ -223,7 +229,7 @@ enum Journal {
     }
 
     /// Intents with no matching outcome: writes that began and never reported back.
-    static func orphanedIntents(root: URL = Runtime.stateDirectory) -> [JournalEntry] {
+    static func orphanedIntents(root: URL) -> [JournalEntry] {
         let all = entries(limit: 1000, root: root)
         let completed = Set(all.filter { $0.phase == .outcome }.map(\.entryId))
         return all.filter { $0.phase == .intent && !completed.contains($0.entryId) }

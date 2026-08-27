@@ -52,7 +52,7 @@ enum ToolHandlers {
         do {
             // Permission status is answerable in every state -- it is the tool you reach for
             // WHEN access is broken, so gating it behind access would be circular.
-            if params.name == "calendar_permission_status" { return permissionStatus() }
+            if params.name == "calendar_permission_status" { return await permissionStatus() }
 
             // Name validity does not depend on permission. Checked BEFORE the access gate
             // because otherwise a typo'd tool name on a machine without a grant reports
@@ -75,7 +75,7 @@ enum ToolHandlers {
             }
 
             switch params.name {
-            case "calendar_permission_status": return permissionStatus()
+            case "calendar_permission_status": return await permissionStatus()
             case "calendar_list_calendars":    return try await listCalendars(store)
             case "calendar_list_events":       return try await listEvents(params, store)
             case "calendar_find_events":       return try await findEvents(params, store)
@@ -99,7 +99,8 @@ enum ToolHandlers {
 
     /// Built from a typed DTO rather than assembled inline, so the payload this tool returns
     /// can be checked against the schema it advertises without a calendar or a grant.
-    static func permissionPayload(now: Date = Date()) -> PermissionStatusDTO {
+    static func permissionPayload(now: Date = Date(),
+                                  client: ClientSnapshot? = nil) -> PermissionStatusDTO {
         let state = AuthorizationState.current
         let zone = TimeSemantics.systemZone
         return PermissionStatusDTO(
@@ -111,11 +112,12 @@ enum ToolHandlers {
             // itself. Reported live rather than snapshotted, so it is right after travel.
             systemTimeZone: zone.identifier,
             systemUtcOffsetSeconds: zone.secondsFromGMT(),
-            currentTime: TimeSemantics.format(now, in: zone))
+            currentTime: TimeSemantics.format(now, in: zone),
+            client: client)
     }
 
-    private static func permissionStatus() -> CallTool.Result {
-        let payload = permissionPayload()
+    private static func permissionStatus() async -> CallTool.Result {
+        let payload = permissionPayload(client: await ClientSession.shared.current())
         do {
             return try CallTool.Result(
                 content: [.text(

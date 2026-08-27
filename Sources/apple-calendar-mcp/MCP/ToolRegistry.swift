@@ -324,11 +324,42 @@ enum ToolRegistry {
                 "current_time": .object([
                     "type": .string("string"), "format": .string("date-time"),
                 ]),
+                "client": .object([
+                    "type": .array([.string("object"), .string("null")]),
+                    "description": .string(
+                        "What the connected MCP client DECLARED about itself at initialize. "
+                        + "Null before the handshake. A declaration is a claim, not a "
+                        + "capability that has been exercised, and never an approval: "
+                        + "elicitation_form_supported means the client says it can put a "
+                        + "question to a human, NOT that a human is present or that one has "
+                        + "agreed to anything. Checked as `form` specifically because form "
+                        + "and url elicitation are independent sub-capabilities and a "
+                        + "url-only client would satisfy a top-level check while being unable "
+                        + "to answer the form request a confirmation would send."),
+                    "properties": .object([
+                        "name": .object([
+                            "type": .array([.string("string"), .string("null")]),
+                            "description": .string("Client-supplied, therefore untrusted text."),
+                        ]),
+                        "version": .object([
+                            "type": .array([.string("string"), .string("null")]),
+                        ]),
+                        "elicitation_declared": .object(["type": .string("boolean")]),
+                        "elicitation_form_supported": .object(["type": .string("boolean")]),
+                        "elicitation_url_supported": .object(["type": .string("boolean")]),
+                    ]),
+                    "required": .array([
+                        .string("name"), .string("version"), .string("elicitation_declared"),
+                        .string("elicitation_form_supported"),
+                        .string("elicitation_url_supported"),
+                    ]),
+                ]),
             ]),
             "required": .array([
                 .string("status"), .string("can_read_events"), .string("guidance"),
                 .string("identity"), .string("system_time_zone"),
                 .string("system_utc_offset_seconds"), .string("current_time"),
+                .string("client"),
             ]),
         ])
     }
