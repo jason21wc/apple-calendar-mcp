@@ -53,7 +53,8 @@ hardened-runtime binary missing the calendars entitlement — potentially unreco
 | Custom `SerialExecutor` over a continuation bridge | An actor releases isolation at every `await`, so it would not serialize; a custom executor makes synchronous EventKit calls genuinely non-reentrant. **Built in Phase 4 and it did not need `@unchecked Sendable`** |
 | Serving is the argless default | There is no `serve` subcommand; a bare `serve` argument exits `EX_USAGE`. MCP clients launch the binary with no arguments |
 | One rendering zone per response | `effective_time_zone` reports the zone every timestamp was rendered in. Previously the field named the caller's zone while timestamps used the machine's — a claim nothing downstream could detect as false, since each timestamp still carried a valid offset |
-| Journal storage root is an explicit dependency | Production uses `Runtime.stateDirectory`; tests use owned temporary roots. There is no mutable global redirect. Test-reachable APIs should require a root so omission fails at compile time rather than silently selecting production storage |
+| Journal storage root is an explicit dependency | Production callers must name `Runtime.stateDirectory`; tests name owned temporary roots. Every entry point requires `root:`, so omission fails compilation. There is no mutable global redirect |
+| Client capabilities are actor-isolated diagnostic claims | The initialize hook is the only place the SDK exposes them. `ClientSession` records per-connection declarations behind an actor; the report distinguishes form from URL elicitation. No declaration is approval or proof that a human can be reached |
 
 ## The security boundary
 
@@ -95,8 +96,10 @@ Five tools, all read-only, all annotated `readOnlyHint: true` / `destructiveHint
 
 Tools returning externally-authored text — event titles and notes, and calendar and source
 titles, all of which arrive from other people — carry `openWorldHint: true`.
-The two that do not are `calendar_busy_intervals`, which returns times and counts with no
-text at all, and `calendar_permission_status`, which returns only this machine's own state.
+`calendar_busy_intervals` returns times and counts with no text. `calendar_permission_status`
+was closed-world, but #24a currently adds client-supplied name/version while retaining
+`openWorldHint: false`; BACKLOG #24a requires removing that unnecessary metadata or explicitly
+reclassifying the tool before installation.
 
 The fourteen-tool surface with propose/commit pairs is the **plan**, not the server.
 

@@ -227,14 +227,14 @@ struct ReadContractTests {
         // form and url are INDEPENDENT sub-capabilities. A url-only client satisfies a
         // top-level `elicitation != nil` check while being unable to answer the form request
         // a confirmation would actually send, so the two are reported apart.
-        let urlOnly = ClientSnapshot(name: "c", version: "1", elicitationDeclared: true,
+        let urlOnly = ClientSnapshot(elicitationDeclared: true,
                                      elicitationFormSupported: false, elicitationURLSupported: true)
         #expect(urlOnly.elicitationDeclared)
         #expect(!urlOnly.elicitationFormSupported, """
             a url-only client must NOT read as able to answer a confirmation; that conflation             is what a top-level capability check would have hidden.
             """)
 
-        let none = ClientSnapshot(name: nil, version: nil, elicitationDeclared: false,
+        let none = ClientSnapshot(elicitationDeclared: false,
                                   elicitationFormSupported: false, elicitationURLSupported: false)
         #expect(!none.elicitationFormSupported)
     }
@@ -249,14 +249,18 @@ struct ReadContractTests {
         #expect(u.keys.contains("client"))
         #expect(u["client"] is NSNull)
 
-        let known = ClientSnapshot(name: "claude-ai", version: "0.1", elicitationDeclared: true,
+        let known = ClientSnapshot(elicitationDeclared: true,
                                    elicitationFormSupported: true, elicitationURLSupported: false)
         let withClient = try JSONSerialization.jsonObject(
             with: JSONEncoder().encode(ToolHandlers.permissionPayload(client: known))) as? [String: Any]
         let block = try #require((withClient?["client"]) as? [String: Any])
         #expect(block["elicitation_form_supported"] as? Bool == true)
         #expect(block["elicitation_url_supported"] as? Bool == false)
-        #expect(block["name"] as? String == "claude-ai")
+        // Booleans only -- no client-chosen identity strings reach the payload.
+        #expect(block["name"] == nil && block["version"] == nil,
+                "client identity is being reported; it answers nothing the measurement asks")
+        #expect(Set(block.keys) == ["elicitation_declared", "elicitation_form_supported",
+                                    "elicitation_url_supported"])
     }
 
     @Test("reporting a capability is not the same as having asked a human")

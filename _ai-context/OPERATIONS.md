@@ -65,9 +65,13 @@
 
 - **stdout is protocol-only, forever.** Any stray write corrupts the MCP stream. All
   diagnostics go to stderr, control-character-escaped — including calendar and source
-  names, which are attacker-influenceable.
+  names and MCP client metadata, which are externally supplied.
 - **Never log** event titles, notes, attendees, locations or URLs by default, and never
-  return raw framework errors across the MCP boundary.
+  return raw framework errors across the MCP boundary. **The same minimalism applies to
+  non-calendar metadata**: the connected client's name and version were reported and logged
+  for one commit before being removed, on the grounds that data answering no question asked
+  does not belong in a payload entering the model's context. "Not calendar content" is not an
+  exemption from the minimal-field rule.
 - **Any borrowing of *expression* from the MIT reference repos gets flagged to the human
   before it lands**, with attribution and license implications. Ideas and approaches carry
   no obligation; code, comments, string literals and test fixtures do.

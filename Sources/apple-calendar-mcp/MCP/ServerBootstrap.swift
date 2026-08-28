@@ -67,9 +67,12 @@ enum ServerBootstrap {
         // The initialize hook is the ONLY way to see what the client declared: the SDK keeps
         // `clientCapabilities` private. Records only -- it gates nothing today, and a
         // declaration is not an approval.
-        try await server.start(transport: transport) { info, capabilities in
-            await ClientSession.shared.record(info: info, capabilities: capabilities)
-            log("client: \(info.name) \(info.version), elicitation="
+        try await server.start(transport: transport) { _, capabilities in
+            await ClientSession.shared.record(capabilities: capabilities)
+            // Capabilities only. The client's name and version arrive here too and are
+            // deliberately neither stored nor logged: client-chosen strings that answer
+            // nothing the measurement asks.
+            log("client elicitation: "
                 + (capabilities.elicitation == nil ? "not declared"
                    : "declared(form=\(capabilities.elicitation?.form != nil), "
                      + "url=\(capabilities.elicitation?.url != nil))"))

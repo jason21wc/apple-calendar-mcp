@@ -15,7 +15,7 @@
   prior `apple-mail` experiment is not to be repeated as evidence: three independent confounds
   made its null result attribute to nothing (gotcha 83).
 
-- **#26 — journal storage isolation. Current behavior fixed; regression guarantee and read path remain.**
+- **#26 — journal storage. (a) CLOSED; read path remains.**
   **(a) Test isolation — CLOSED 2026-08-26, and the first fix was insufficient.** `Journal`'s
   storage location is an explicit `root:` parameter with **no default**, threaded through
   `directory`,
@@ -24,12 +24,9 @@
   Deliberately **not** a settable static — a mutable global redirecting where calendar history
   is written is the shape this project has twice been bitten by. **Verified: three
   consecutive full runs added zero lines to the live journal** (was ~10 per run).
-  **(a2) Regression guard — incomplete.** `testRootsNeverTouchLiveState()` proves only that
-  `directory(root:)` and `currentFile(root:)` resolve safely when given a temporary root. It
-  cannot detect another test omitting `root:` and silently taking the production default.
-  Remove defaults from test-reachable entry points and pass `Runtime.stateDirectory` explicitly
-  at a production wrapper/caller so omission fails at compile time without introducing a
-  mutable global redirect.
+  `root:` now has no default on any entry point, so omission is a compile error. Deliberate use
+  of `Runtime.stateDirectory` in the journal test source is separately source-checked. Both
+  guards were mutation-verified at `2f28bc1`; #26(a) is closed.
   **(b) `entries()` still reads and decodes the ENTIRE monthly file on every call**, then
   discards all but `.suffix(limit)`; `orphanedIntents()` does it at `limit: 1000`. Cost grows
   without bound within a month, and this is the read path `calendar_recent_mutations` would
@@ -38,12 +35,19 @@
   operation, even though inspection found only test output.
 
 - **#24a — report the connected client's declared capabilities. DONE 2026-08-26.**
-  `calendar_permission_status` now carries a `client` block: name, version,
-  `elicitation_declared`, `elicitation_form_supported`, `elicitation_url_supported`. Captured
-  via the `Server.start` initialize hook, the only place they are visible. Form is reported
+  `calendar_permission_status` now carries a `client` block of three booleans —
+  `elicitation_declared`, `elicitation_form_supported`, `elicitation_url_supported` — captured
+  via the `Server.start` initialize hook, the only place they are visible. **Name and version
+  are deliberately excluded** from both the payload and the startup log: client-chosen strings
+  that the measurement does not need. Form is reported
   separately from the top-level declaration on purpose — measured against a synthetic url-only
   client, which reads `declared: true, form: false`. Held in an actor, not `Runtime`. Nothing
   consumes it as permission, and a test asserts no handler does.
+  **Pre-install trust-boundary correction:** the payload and startup log also carry client name
+  and version, which are client-supplied strings. That makes the previously closed-world
+  permission tool return external text, contradicts `ARCHITECTURE.md`, and logs unescaped input
+  despite the diagnostics contract. The capability measurement needs none of it: retain only
+  the declared/form/url booleans, or explicitly reclassify and escape every string before use.
 
 - **#24b — the live elicitation round trip. BLOCKED BY DESIGN, deliberately not built.**
   A capability declaration proves the client CLAIMS it can ask a human; only a completed round

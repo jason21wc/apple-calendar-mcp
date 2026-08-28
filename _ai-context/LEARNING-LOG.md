@@ -12,6 +12,12 @@
 
 ## Active Lessons
 
+**2026-08-27 — Safe handling is sink-specific.** #24a JSON-encoded client metadata safely but
+also interpolated the same client-supplied strings raw into stderr, where controls can forge
+diagnostic lines. **Rule:** when adding external data, audit every output sink independently;
+encoding for one sink proves nothing about another. Prefer omitting diagnostic decoration that
+the feature does not need.
+
 **2026-08-18 — A "verified facts" table with no source pointer per row is where wrong
 claims hide.** Five EventKit claims were recorded as verified and five were wrong,
 including one (`isImmutable`) that would have shipped a guard rejecting the user's own

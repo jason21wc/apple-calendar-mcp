@@ -1,7 +1,7 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # Session State
 
-**Last Updated:** 2026-08-26
+**Last Updated:** 2026-08-27
 **Memory Type:** Working (transient)
 **Lifecycle:** Prune at session start per §7.0.4
 
@@ -16,13 +16,13 @@
   write tool exists.** Phase 5 substrate (`Journal.swift`) built, with no caller.
 - **Mode:** Standard
 - **Repo:** https://github.com/jason21wc/apple-calendar-mcp (public, Apache-2.0)
-- **Active Task:** Close the remaining #26(a) regression-guard gap, then measure Cowork's
+- **Active Task:** Correct #24a's trust-boundary regression, then reinstall and measure Cowork's
   declared elicitation form capability. C6/C7 are decided: attendee/external-organizer removal is
   permitted behind per-call confirmation, with a named restorability exception for invitation
   state and social recovery if the user needs to be re-invited.
-- **Next code:** **BACKLOG #19** — bound EventKit operations, fail fast once wedged. It is now
-  on the critical path twice over: it is a live defect in shipped read-only code, and it is the
-  same policy problem as the elicitation wait that gates #24b.
+- **Next code:** Remove client-supplied name/version from #24a's payload and startup log (or
+  reclassify the tool as open-world and escape the log). The capability measurement needs only
+  the three booleans. Then **BACKLOG #19** — bound EventKit operations, fail fast once wedged.
   *(Done 2026-08-26: journal root is compile-time required, #26(a); capability reporting
   shipped, #24a.)*
 - **After that:** `calendar_create_event`, gated on **Blocked On #1**.
@@ -34,7 +34,7 @@
 | Project | **apple-calendar-mcp** |
 | Installed at | `/usr/local/bin/apple-calendar-mcp` (root:wheel), granted, `--doctor` clean |
 | Install verified | **2026-08-20 18:33.** **The installed binary predates every fix in `026b0eb` and still reports version 0.1.0**; reinstall before relying on the corrected read surface in any client. Same path, so no new grant is needed |
-| Tests | Journal tests use owned temporary roots; three consecutive full runs after `b9cc465` added zero lines to live state. The baseline is usable. One regression gap remains: the guard test proves its supplied root is safe but cannot detect another test omitting `root:` and taking the production default |
+| Tests | Journal roots are compile-time required; omission does not compile, deliberate use of live state is source-checked, and repeated full runs add zero live-journal lines. #26(a) is closed |
 | Tool surface | **5, all read-only.** No write tool exists |
 | Desktop config | `--read-only` only. **`toolPolicy` is NOT set — for any server, and never was.** Verified 2026-08-22 against the live config, `config.json`, and both August backups. The previous entry here claimed it was configured; that was false when written |
 | Containment controls | C3, C4, C5, C6, **C7**. C1 withdrawn; C2/C2a/C4a superseded |
@@ -184,21 +184,25 @@ See **BACKLOG #24**.
    `elicitation_declared`; a url-only client reads `declared: true, form: false`. **Read it
    from Cowork after the reinstall** — that is the measurement, and it establishes only
    eligibility to try, never that a human is reachable.
-3. **Bound external waits before a real probe.** BACKLOG #19 covers EventKit's dedicated-thread
+3. **Fix #24a's trust classification before reinstall.** The report and startup log currently
+   include client-supplied name/version. That contradicts `calendar_permission_status` being
+   closed-world and the diagnostics contract requiring control-character escaping. Prefer
+   dropping both strings: the measurement needs only declared/form/url booleans.
+4. **Bound external waits before a real probe.** BACKLOG #19 covers EventKit's dedicated-thread
    wedge. Elicitation also needs its own answer for timeout and removal of abandoned SDK
    `pendingRequests`; sharing a policy does not imply sharing cleanup code.
-4. **BACKLOG #24b — real round trip:** after the wait lifecycle is safe, run one harmless probe
+5. **BACKLOG #24b — real round trip:** after the wait lifecycle is safe, run one harmless probe
    and verify accept, decline, cancel, absence, error and non-response behavior.
-5. **Set `toolPolicy` on one server and re-run the write test** (BACKLOG #23 — human's call,
+6. **Set `toolPolicy` on one server and re-run the write test** (BACKLOG #23 — human's call,
    config edit). Until the key exists there is nothing to measure. Pick a probe tool that does
    NOT elicit server-side, so any prompt attributes to the host.
-6. **Install once at the measurement boundary.** If #24 work starts now, avoid reinstalling
+7. **Install once at the measurement boundary.** If #24 work starts now, avoid reinstalling
    0.2.0 and then immediately replacing it: build/sign/install the probe-capable binary once,
    then verify version and signature. Same path, so no new grant is needed.
-7. **Blocked On #1** before any write tool.
-8. If #23 proves host policy and the human retains it, move to per-tool `toolPolicy`
+8. **Blocked On #1** before any write tool.
+9. If #23 proves host policy and the human retains it, move to per-tool `toolPolicy`
    (BACKLOG #2): writes `"ask"`, reads unlisted.
-9. **Build order:** `calendar_create_event` → `calendar_delete_event` **with restore in the
+10. **Build order:** `calendar_create_event` → `calendar_delete_event` **with restore in the
    same change** → `calendar_update_event`.
 
 ## Not measured, and not to be assumed

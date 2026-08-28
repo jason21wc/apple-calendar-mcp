@@ -22,11 +22,14 @@
 import Foundation
 import MCP
 
-/// A read-only view of the connected client, safe to put in a tool payload.
+/// A read-only view of what the connected client can do. Booleans only.
+///
+/// **Deliberately carries no client name or version.** Both are strings the client chooses for
+/// itself, they answer no question the capability measurement asks, and a payload is not the
+/// place for untrusted text that nothing consumes. The same reasoning keeps them out of the
+/// startup log. This project already withholds calendar fields unless asked for; identifying
+/// metadata that serves no purpose should not get an exemption for being non-calendar.
 struct ClientSnapshot: Codable, Sendable, Hashable {
-    /// Client-supplied, therefore untrusted text. Reported for diagnosis, never interpreted.
-    let name: String?
-    let version: String?
     /// The client declared the elicitation capability at all.
     let elicitationDeclared: Bool
     /// It declared FORM elicitation specifically -- the mode a confirmation would use.
@@ -38,7 +41,6 @@ struct ClientSnapshot: Codable, Sendable, Hashable {
     let elicitationURLSupported: Bool
 
     enum CodingKeys: String, CodingKey {
-        case name, version
         case elicitationDeclared = "elicitation_declared"
         case elicitationFormSupported = "elicitation_form_supported"
         case elicitationURLSupported = "elicitation_url_supported"
@@ -51,10 +53,11 @@ actor ClientSession {
     private var snapshot: ClientSnapshot?
 
     /// Called once from the initialize hook. Records; decides nothing.
-    func record(info: Client.Info, capabilities: Client.Capabilities) {
+    ///
+    /// Takes only the capabilities. `Client.Info` is available at the same point and is
+    /// deliberately not stored -- see the note on ClientSnapshot.
+    func record(capabilities: Client.Capabilities) {
         snapshot = ClientSnapshot(
-            name: info.name,
-            version: info.version,
             elicitationDeclared: capabilities.elicitation != nil,
             elicitationFormSupported: capabilities.elicitation?.form != nil,
             elicitationURLSupported: capabilities.elicitation?.url != nil)

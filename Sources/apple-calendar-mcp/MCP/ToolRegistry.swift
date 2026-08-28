@@ -335,21 +335,17 @@ enum ToolRegistry {
                         + "agreed to anything. Checked as `form` specifically because form "
                         + "and url elicitation are independent sub-capabilities and a "
                         + "url-only client would satisfy a top-level check while being unable "
-                        + "to answer the form request a confirmation would send."),
+                        + "to answer the form request a confirmation would send. Booleans "
+                        + "only: the client's name and version arrive at the same point and "
+                        + "are deliberately not reported, being client-chosen strings that "
+                        + "answer nothing this measurement asks."),
                     "properties": .object([
-                        "name": .object([
-                            "type": .array([.string("string"), .string("null")]),
-                            "description": .string("Client-supplied, therefore untrusted text."),
-                        ]),
-                        "version": .object([
-                            "type": .array([.string("string"), .string("null")]),
-                        ]),
                         "elicitation_declared": .object(["type": .string("boolean")]),
                         "elicitation_form_supported": .object(["type": .string("boolean")]),
                         "elicitation_url_supported": .object(["type": .string("boolean")]),
                     ]),
                     "required": .array([
-                        .string("name"), .string("version"), .string("elicitation_declared"),
+                        .string("elicitation_declared"),
                         .string("elicitation_form_supported"),
                         .string("elicitation_url_supported"),
                     ]),
