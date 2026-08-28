@@ -5,19 +5,24 @@
 **Framework:** AI Coding Methods (current version)
 **Mode:** Standard
 
-> **Start here.** Phases 1-4 are built, tested, published and in daily use. **Five read-only
-> tools are shipped and no write tool exists.** The Phase 5 journal substrate is built but has
-> no caller. The next code is `BACKLOG` #19 — bound EventKit calls and fail fast once the
-> store wedges — and **all write work is blocked** on confirming that a write tool prompts in
-> Claude Desktop.
+> **Start here.** Phases 1-4 are complete, published and in daily use. **Five read-only tools
+> are shipped and no write tool exists**; the Phase 5 journal substrate is built with no caller.
+> `main` is pushed and CI-green, and `0.2.0` is installed at `/usr/local/bin`.
 >
-> Read `_ai-context/PROJECT-MEMORY.md` (containment controls C3-C7, and the gotcha table —
-> mostly measured platform behaviour that will cost you hours if rediscovered), then
+> **The write surface is blocked on one thing: no approval mechanism has been demonstrated.**
+> `toolPolicy` has never been configured on this machine, and server elicitation is measured
+> only as far as what the client *declares*. The permission model itself is decided — reads
+> silent, every write confirmed, refuse only what EventKit cannot express (plan §4a).
+>
+> Read `_ai-context/SESSION-STATE.md` for the current position and the next action, then
+> `_ai-context/PROJECT-MEMORY.md` (containment controls C3-C7 and the gotcha table — mostly
+> measured platform behaviour that will cost you hours if rediscovered), then
 > `docs/IMPLEMENTATION-PLAN.md`, which is the canonical plan and lives in this repo.
 >
-> Two things to know before touching anything: the Calendar grant is keyed to the binary's
-> **absolute path**, and the server only owns that grant because it re-spawns itself with a
-> disclaim attribute at startup. Run `./scripts/test.sh`, not `swift test`.
+> Three things to know before touching anything: the Calendar grant is keyed to the binary's
+> **absolute path**; the server only owns that grant because it re-spawns itself with a
+> disclaim attribute at startup; and a control recorded as configured has three times turned
+> out not to be — verify the artifact, not the note. Run `./scripts/test.sh`, not `swift test`.
 
 ## Memory Files
 
