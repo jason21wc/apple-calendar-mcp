@@ -396,6 +396,15 @@ strings. `test-shell.sh` had already met this and solved it by excluding itself;
 and subject are the same file by design, so the needles are built from fragments. **Rule: a
 source-text check must be written so that it is not an instance of what it forbids.**
 
+**2026-08-27 — I committed a peer's factual claim without running the one command that checked
+it.** A review reported the installed binary as `notDetermined` with an invalid entitlement
+blob; I reviewed the diff, agreed it read sensibly, and pushed it. Measuring before the
+reinstall showed `fullAccess` and a perfectly valid entitlement. The claim was about a
+machine's live state, checkable in seconds, and I treated it as a documentation edit because it
+arrived as one. **Rule: a review's *reasoning* can be assessed by reading; a review's *facts*
+have to be measured, and a claim about live state that arrives inside a documentation diff is
+still a claim about live state.**
+
 ---
 
 ## Graduated Patterns

@@ -32,7 +32,7 @@
 |--------|-------|
 | Project | **apple-calendar-mcp** |
 | Installed at | `/usr/local/bin/apple-calendar-mcp` (root:wheel), currently version 0.1.0 |
-| Install verified | **2026-08-27:** the old installed binary reports `disclaimed-child` but `notDetermined`; `codesign -d` warns its entitlement blob is invalid and ignored. Sign/install `df43307`, then trust the resulting `--doctor`, not the old memory claim. The same path and designated requirement should preserve any existing TCC row, but if the new doctor still reports `notDetermined`, run `--setup` at that path |
+| Install verified | **Measured directly 2026-08-27, before reinstall:** the installed 0.1.0 reports `disclaimed-child` + **`fullAccess`**, its calendars entitlement is present and readable, and `codesign --verify --strict` passes. An earlier entry here claimed `notDetermined` and an invalid entitlement blob; that was **wrong and was committed without being checked** — the check took one command. It also reports `tools: read and write`, the false claim `df43307` fixes. `0.2.0` is signed and staged at `.build/release`; installing needs a `sudo cp` the assistant cannot run |
 | Tests | Journal roots are compile-time required; omission does not compile, deliberate use of live state is source-checked, and repeated full runs add zero live-journal lines. #26(a) is closed |
 | Tool surface | **5, all read-only.** No write tool exists |
 | Desktop config | `--read-only` only. **`toolPolicy` is NOT set — for any server, and never was.** Verified 2026-08-22 against the live config, `config.json`, and both August backups. The previous entry here claimed it was configured; that was false when written |
