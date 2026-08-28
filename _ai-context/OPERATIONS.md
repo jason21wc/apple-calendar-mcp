@@ -31,7 +31,8 @@
 | A response field would restate a request argument rather than describe the payload | Derive it from the payload. `effective_time_zone` echoed the caller's zone while timestamps used another, and every timestamp still looked valid |
 | A payload gains a field | Declare it in the `outputSchema` in the same change, and add it to `required` if it is always emitted. An undeclared field is validated by nobody |
 | A probe or `--doctor` reports `inherited-*` rather than `disclaimed-child` | The self-disclaiming re-exec is not running — either the private symbol vanished on a macOS update or the spawn failed. Calendar access is then the host's, not ours. Do not ship a release in this state without saying so in the README |
-| Calendar access stops working after moving or reinstalling the binary | Expected: the TCC grant is keyed to the absolute path. Re-run `--setup` at the new path |
+| Calendar access stops working after moving the binary to a different path | Expected: the TCC grant is keyed to the absolute path. Re-run `--setup` at the new final path |
+| Calendar access stops working after replacing the binary at the same path | First verify the embedded signature, designated requirement, `disclaimed-child` mode, and authorization. A same-path build signed by the same identity should retain the grant; do not assume reauthorization is required |
 | A Calendar call returns denied while `--doctor` reports green | Suspect the macOS 26.5 silent-denial trap: hardened runtime present, entitlement missing or cdhash drifted |
 | Any code is copied (not merely patterned) from `che-ical-mcp` or `orchard-mcp` | Flag to the human before it lands; add `NOTICE` + a provenance header |
 | Writes start failing after an iCloud resync | `eventIdentifier` drifts on sync; re-find the event by content rather than by stored id |

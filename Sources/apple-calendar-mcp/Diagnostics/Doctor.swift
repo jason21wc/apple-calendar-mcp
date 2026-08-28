@@ -131,8 +131,14 @@ enum Doctor {
         // The grant is path-keyed, which is the single most common way this breaks after it
         // once worked, so say it every time rather than only on failure.
         log("")
-        log("Reminder: the grant belongs to this binary at this PATH. Moving or reinstalling")
-        log("it requires running --setup again at the new location.")
+        // "Moving OR REINSTALLING" was wrong about the second half and sent people to re-run
+        // --setup after an ordinary upgrade. Measured twice, most recently 2026-08-27 across a
+        // 0.1.0 -> 0.2.0 replacement: the grant survived with fullAccess intact. The designated
+        // requirement is identity-based (identifier + certificate root), so a new build signed
+        // by the same certificate at the same path still satisfies it. Only the PATH matters.
+        log("Reminder: the grant belongs to this binary at this PATH.")
+        log("Replacing it in place with a build signed by the same certificate KEEPS the grant.")
+        log("Moving or copying it to a different path needs --setup again at that new path.")
 
         return failures.isEmpty ? 0 : 1
     }

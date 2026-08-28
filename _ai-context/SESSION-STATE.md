@@ -16,7 +16,7 @@
   write tool exists.** Phase 5 substrate (`Journal.swift`) built, with no caller.
 - **Mode:** Standard
 - **Repo:** https://github.com/jason21wc/apple-calendar-mcp (public, Apache-2.0)
-- **Active Task:** Sign and reinstall `df43307`, verify the installed binary, then measure
+- **Active Task:** Install the already signed `df43307`, verify the installed binary, then measure
   Cowork's declared elicitation form capability. C6/C7 are decided: attendee/external-organizer removal is
   permitted behind per-call confirmation, with a named restorability exception for invitation
   state and social recovery if the user needs to be re-invited.
@@ -31,8 +31,8 @@
 | Metric | Value |
 |--------|-------|
 | Project | **apple-calendar-mcp** |
-| Installed at | `/usr/local/bin/apple-calendar-mcp` (root:wheel), currently version 0.1.0 |
-| Install verified | **Measured directly 2026-08-27, before reinstall:** the installed 0.1.0 reports `disclaimed-child` + **`fullAccess`**, its calendars entitlement is present and readable, and `codesign --verify --strict` passes. An earlier entry here claimed `notDetermined` and an invalid entitlement blob; that was **wrong and was committed without being checked** — the check took one command. It also reports `tools: read and write`, the false claim `df43307` fixes. `0.2.0` is signed and staged at `.build/release`; installing needs a `sudo cp` the assistant cannot run |
+| Installed at | `/usr/local/bin/apple-calendar-mcp` (root:wheel), **version 0.2.0**, installed 2026-08-27 |
+| Install verified | **2026-08-27, measured after the install:** signature verifies strictly (`cp` preserved it), `disclaimed-child`, **`fullAccess`**, tool surface reports read-only. **The grant survived the same-path replacement — no `--setup` was needed**, which is gotcha 26 confirmed a second time on a real version upgrade |
 | Tests | Journal roots are compile-time required; omission does not compile, deliberate use of live state is source-checked, and repeated full runs add zero live-journal lines. #26(a) is closed |
 | Tool surface | **5, all read-only.** No write tool exists |
 | Desktop config | `--read-only` only. **`toolPolicy` is NOT set — for any server, and never was.** Verified 2026-08-22 against the live config, `config.json`, and both August backups. The previous entry here claimed it was configured; that was false when written |
@@ -185,10 +185,11 @@ See **BACKLOG #24**.
    eligibility to try, never that a human is reachable.
 3. ~~Fix #24a's trust classification~~ — **DONE 2026-08-27 (`df43307`).** Client name/version
    are discarded; the payload and startup log carry capability booleans only.
-4. **Sign and install `df43307`, then verify.** Run `./scripts/sign.sh`, copy the signed release
-   binary to `/usr/local/bin`, run `codesign --verify --strict`, then `--doctor`. Expect version
-   0.2.0, `disclaimed-child`, and a read-only tool surface. Do not assume the old grant is usable:
-   the installed 0.1.0 currently reports `notDetermined`; run `--setup` if the new doctor does too.
+4. **Install the signed `df43307`, then verify.** Signing is complete. Copy `.build/release/apple-calendar-mcp`
+   to `/usr/local/bin/apple-calendar-mcp` with `sudo`, run `codesign --verify --strict`, then
+   `--doctor`. Expect version 0.2.0, `disclaimed-child`, a read-only tool surface, and `fullAccess`.
+   This is a same-path replacement under the same designated requirement, so the existing grant
+   should remain usable; run `--setup` only if the new doctor reports otherwise.
 5. **Read `calendar_permission_status` from Cowork.** `elicitation_form_supported: false`
    closes server elicitation as the Cowork approval path and leaves measured `toolPolicy` (#23).
    `true` establishes eligibility only, never that a human is reachable.

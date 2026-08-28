@@ -108,6 +108,21 @@ struct DocumentationCoherenceTests {
         }
     }
 
+    @Test("the doctor does not tell users a same-path reinstall needs re-granting")
+    func doctorDistinguishesMovingFromReplacing() throws {
+        // It said "Moving or reinstalling it requires running --setup again", which is wrong
+        // about the second half and sends people to re-run --setup after an ordinary upgrade.
+        // Measured twice, most recently across a 0.1.0 -> 0.2.0 same-path replacement: the
+        // grant survived. The designated requirement is identity-based, so only the PATH
+        // matters. The plan's risk table asserts --doctor "says so in plain English", which
+        // makes this a claim the code has to keep true.
+        let doctor = try read("Sources/apple-calendar-mcp/Diagnostics/Doctor.swift")
+        #expect(!doctor.contains("Moving or reinstalling"), """
+            --doctor tells users that reinstalling costs them the grant. It does not, and             this is the one message a worried user reads.
+            """)
+        #expect(doctor.contains("KEEPS the grant"), "the reminder no longer states what is preserved")
+    }
+
     @Test("no current document points at a plan outside this repository")
     func theCanonicalPlanIsInTheRepo() throws {
         // The repo plan was a COPY of a private file, to be re-copied on every revision. A

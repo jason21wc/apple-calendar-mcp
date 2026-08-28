@@ -551,7 +551,7 @@ forwarding **is** now covered (§5).
 
 | Risk | Mitigation |
 |---|---|
-| Reinstalling or moving the binary loses the grant | Path-keyed by design; `--setup` runs at the final path; `--doctor` says so in plain English |
+| Moving the binary to a different path loses the grant | Path-keyed by design; `--setup` runs at the final path; `--doctor` says so in plain English. A same-path replacement signed by the same identity retains the grant |
 | Hardened runtime without the entitlement → silent permanent denial | Ship both always; `sign.sh` asserts both on the signed binary |
 | Removing an invited event may notify real people or behave differently from Calendar.app's Decline | C6 requires per-call confirmation that discloses the uncertainty and C7's attendee-state exception. A second-account test is optional characterization, not a release gate |
 | Prompt injection driving a mutation | The guarded commit path, refetched ground-truth checks, per-call confirmation, and C7 restorability with its named attendee-state exception. **Not** the allowlist (C1 withdrawn 2026-08-20), and **not yet** any human-approval mechanism — `toolPolicy` was never configured and elicitation is unmeasured (§6, BACKLOG #1). Reduces blast radius and improves reviewability; does **not** prevent a find → propose → commit chain |
