@@ -96,10 +96,9 @@ Five tools, all read-only, all annotated `readOnlyHint: true` / `destructiveHint
 
 Tools returning externally-authored text — event titles and notes, and calendar and source
 titles, all of which arrive from other people — carry `openWorldHint: true`.
-`calendar_busy_intervals` returns times and counts with no text. `calendar_permission_status`
-was closed-world, but #24a currently adds client-supplied name/version while retaining
-`openWorldHint: false`; BACKLOG #24a requires removing that unnecessary metadata or explicitly
-reclassifying the tool before installation.
+The two closed-world tools are `calendar_busy_intervals`, which returns times and counts, and
+`calendar_permission_status`, which returns local state plus three client-declared capability
+booleans. Client name/version are explicitly discarded and never reach the payload or log.
 
 The fourteen-tool surface with propose/commit pairs is the **plan**, not the server.
 

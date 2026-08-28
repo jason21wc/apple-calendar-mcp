@@ -34,22 +34,23 @@
   Do not delete the live journal as part of a code fix — that is a separate, explicit
   operation, even though inspection found only test output.
 
-- **#24a — report the connected client's declared capabilities. DONE 2026-08-26.**
-  `calendar_permission_status` now carries a `client` block of three booleans —
-  `elicitation_declared`, `elicitation_form_supported`, `elicitation_url_supported` — captured
-  via the `Server.start` initialize hook, the only place they are visible. **Name and version
-  are deliberately excluded** from both the payload and the startup log: client-chosen strings
-  that the measurement does not need. Form is reported
-  separately from the top-level declaration on purpose — measured against a synthetic url-only
-  client, which reads `declared: true, form: false`. Held in an actor, not `Runtime`. Nothing
-  consumes it as permission, and a test asserts no handler does.
-  **Pre-install trust-boundary correction:** the payload and startup log also carry client name
-  and version, which are client-supplied strings. That makes the previously closed-world
-  permission tool return external text, contradicts `ARCHITECTURE.md`, and logs unescaped input
-  despite the diagnostics contract. The capability measurement needs none of it: retain only
-  the declared/form/url booleans, or explicitly reclassify and escape every string before use.
+- **#27 — `log()` does not escape control characters, and the plan says it must.** Verified
+  2026-08-27: `log()` in `main.swift` is `fputs("[apple-calendar-mcp] " + message + "\n",
+  stderr)` with no sanitisation, while plan §8 requires *"diagnostics to stderr with control
+  characters escaped — including calendar and source names, which are attacker-influenceable"*
+  (gotcha 18). **A documented control that was never implemented** — the same class this
+  session spent its length removing, found while checking a reviewer's claim rather than by
+  any test. **Currently latent**: the one untrusted string that reached the logger was the MCP
+  client's name, removed in `df43307`, and nothing else attacker-influenceable is logged today.
+  It stops being latent the moment the write surface logs what it is about to change, which is
+  exactly when a title containing an escape sequence would reach a terminal. Fix before any
+  mutating code logs, and prefer escaping inside `log()` over remembering at each call site —
+  a rule enforced at one choke point cannot be forgotten at the twentieth.
 
 - **#24b — the live elicitation round trip. BLOCKED BY DESIGN, deliberately not built.**
+  #24a is complete: `calendar_permission_status` reports declared/form/url booleans only;
+  client identity is discarded. The remaining Cowork observation is an operational step in
+  `SESSION-STATE`, not implementation work.
   A capability declaration proves the client CLAIMS it can ask a human; only a completed round
   trip returning `.accept` shows one answered. **That probe must not be written until timeout
   and abandoned-request cleanup are designed** — `requestElicitation` awaits `task.value` with

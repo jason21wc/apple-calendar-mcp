@@ -16,13 +16,12 @@
   write tool exists.** Phase 5 substrate (`Journal.swift`) built, with no caller.
 - **Mode:** Standard
 - **Repo:** https://github.com/jason21wc/apple-calendar-mcp (public, Apache-2.0)
-- **Active Task:** Correct #24a's trust-boundary regression, then reinstall and measure Cowork's
-  declared elicitation form capability. C6/C7 are decided: attendee/external-organizer removal is
+- **Active Task:** Sign and reinstall `df43307`, verify the installed binary, then measure
+  Cowork's declared elicitation form capability. C6/C7 are decided: attendee/external-organizer removal is
   permitted behind per-call confirmation, with a named restorability exception for invitation
   state and social recovery if the user needs to be re-invited.
-- **Next code:** Remove client-supplied name/version from #24a's payload and startup log (or
-  reclassify the tool as open-world and escape the log). The capability measurement needs only
-  the three booleans. Then **BACKLOG #19** — bound EventKit operations, fail fast once wedged.
+- **Next code:** After the Cowork capability read, **BACKLOG #19** — bound EventKit operations
+  and fail fast once wedged. #24b remains separately blocked on SDK pending-request cleanup.
   *(Done 2026-08-26: journal root is compile-time required, #26(a); capability reporting
   shipped, #24a.)*
 - **After that:** `calendar_create_event`, gated on **Blocked On #1**.
@@ -32,8 +31,8 @@
 | Metric | Value |
 |--------|-------|
 | Project | **apple-calendar-mcp** |
-| Installed at | `/usr/local/bin/apple-calendar-mcp` (root:wheel), granted, `--doctor` clean |
-| Install verified | **2026-08-20 18:33.** **The installed binary predates every fix in `026b0eb` and still reports version 0.1.0**; reinstall before relying on the corrected read surface in any client. Same path, so no new grant is needed |
+| Installed at | `/usr/local/bin/apple-calendar-mcp` (root:wheel), currently version 0.1.0 |
+| Install verified | **2026-08-27:** the old installed binary reports `disclaimed-child` but `notDetermined`; `codesign -d` warns its entitlement blob is invalid and ignored. Sign/install `df43307`, then trust the resulting `--doctor`, not the old memory claim. The same path and designated requirement should preserve any existing TCC row, but if the new doctor still reports `notDetermined`, run `--setup` at that path |
 | Tests | Journal roots are compile-time required; omission does not compile, deliberate use of live state is source-checked, and repeated full runs add zero live-journal lines. #26(a) is closed |
 | Tool surface | **5, all read-only.** No write tool exists |
 | Desktop config | `--read-only` only. **`toolPolicy` is NOT set — for any server, and never was.** Verified 2026-08-22 against the live config, `config.json`, and both August backups. The previous entry here claimed it was configured; that was false when written |
@@ -184,25 +183,27 @@ See **BACKLOG #24**.
    `elicitation_declared`; a url-only client reads `declared: true, form: false`. **Read it
    from Cowork after the reinstall** — that is the measurement, and it establishes only
    eligibility to try, never that a human is reachable.
-3. **Fix #24a's trust classification before reinstall.** The report and startup log currently
-   include client-supplied name/version. That contradicts `calendar_permission_status` being
-   closed-world and the diagnostics contract requiring control-character escaping. Prefer
-   dropping both strings: the measurement needs only declared/form/url booleans.
-4. **Bound external waits before a real probe.** BACKLOG #19 covers EventKit's dedicated-thread
+3. ~~Fix #24a's trust classification~~ — **DONE 2026-08-27 (`df43307`).** Client name/version
+   are discarded; the payload and startup log carry capability booleans only.
+4. **Sign and install `df43307`, then verify.** Run `./scripts/sign.sh`, copy the signed release
+   binary to `/usr/local/bin`, run `codesign --verify --strict`, then `--doctor`. Expect version
+   0.2.0, `disclaimed-child`, and a read-only tool surface. Do not assume the old grant is usable:
+   the installed 0.1.0 currently reports `notDetermined`; run `--setup` if the new doctor does too.
+5. **Read `calendar_permission_status` from Cowork.** `elicitation_form_supported: false`
+   closes server elicitation as the Cowork approval path and leaves measured `toolPolicy` (#23).
+   `true` establishes eligibility only, never that a human is reachable.
+6. **Bound external waits before a real probe.** BACKLOG #19 covers EventKit's dedicated-thread
    wedge. Elicitation also needs its own answer for timeout and removal of abandoned SDK
    `pendingRequests`; sharing a policy does not imply sharing cleanup code.
-5. **BACKLOG #24b — real round trip:** after the wait lifecycle is safe, run one harmless probe
+7. **BACKLOG #24b — real round trip:** after the wait lifecycle is safe, run one harmless probe
    and verify accept, decline, cancel, absence, error and non-response behavior.
-6. **Set `toolPolicy` on one server and re-run the write test** (BACKLOG #23 — human's call,
+8. **Set `toolPolicy` on one server and re-run the write test** (BACKLOG #23 — human's call,
    config edit). Until the key exists there is nothing to measure. Pick a probe tool that does
    NOT elicit server-side, so any prompt attributes to the host.
-7. **Install once at the measurement boundary.** If #24 work starts now, avoid reinstalling
-   0.2.0 and then immediately replacing it: build/sign/install the probe-capable binary once,
-   then verify version and signature. Same path, so no new grant is needed.
-8. **Blocked On #1** before any write tool.
-9. If #23 proves host policy and the human retains it, move to per-tool `toolPolicy`
+9. **Blocked On #1** before any write tool.
+10. If #23 proves host policy and the human retains it, move to per-tool `toolPolicy`
    (BACKLOG #2): writes `"ask"`, reads unlisted.
-10. **Build order:** `calendar_create_event` → `calendar_delete_event` **with restore in the
+11. **Build order:** `calendar_create_event` → `calendar_delete_event` **with restore in the
    same change** → `calendar_update_event`.
 
 ## Not measured, and not to be assumed
