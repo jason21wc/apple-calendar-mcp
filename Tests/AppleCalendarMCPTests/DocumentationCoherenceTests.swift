@@ -180,7 +180,8 @@ struct DocumentationCoherenceTests {
     func errorCodesAreDocumented() throws {
         let plan = try read("docs/IMPLEMENTATION-PLAN.md")
         for code in [ToolError.permissionDenied, .badTimestamp, .badTimeZone, .endNotAfterStart,
-                     .intervalTooLarge, .missingArgument, .unknownTool, .storeUnavailable] {
+                     .intervalTooLarge, .missingArgument, .unknownTool, .storeUnavailable,
+                     .storeBusy, .storeTimedOut, .storeWedged] {
             #expect(plan.contains(code.rawValue), """
                 \(code.rawValue) is returned by the server and appears nowhere in the plan. \
                 A code is a contract; an undocumented one cannot be relied on.

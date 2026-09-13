@@ -12,6 +12,16 @@
 
 ## Active Lessons
 
+**2026-09-13 — Cancellation ends a caller, not a blocking dependency.** A read caller can
+stop waiting while EventKit still occupies its executor. Freeing the admission slot at that
+point would queue more work behind it. **Rule:** retain the operation slot/deadline until
+actual completion, and keep deadline handling outside the blocked executor.
+
+**2026-09-13 — A journal append is not acknowledged just because it returned an ID.** The
+old writer swallowed storage failures, and its reader confused missing history with failed
+I/O. **Rule:** make persistence acknowledgements explicit, distinguish unavailable history
+from empty history, and test recovery across rotation boundaries.
+
 **2026-08-27 — Safe handling is sink-specific.** #24a JSON-encoded client metadata safely but
 also interpolated the same client-supplied strings raw into stderr, where controls can forge
 diagnostic lines. **Rule:** when adding external data, audit every output sink independently;

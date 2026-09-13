@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import Darwin
 @testable import apple_calendar_mcp
 
 // The journal exists so a human can see what changed and put it back by hand. These tests
@@ -8,6 +9,36 @@ import Foundation
 
 @Suite("Mutation journal")
 struct JournalTests {
+    @Test("an in-progress append is busy, not corrupt, for readers and other writers")
+    func concurrentLock() throws {
+        try withTemporaryRoot { root in
+            _ = try intent(root)
+            let fd = open(Journal.currentFile(root: root).path, O_RDWR)
+            try #require(fd >= 0)
+            defer { close(fd) }
+            try #require(flock(fd, LOCK_EX | LOCK_NB) == 0)
+            defer { flock(fd, LOCK_UN) }
+            #expect(throws: JournalError.storageBusy) { try Journal.entries(root: root) }
+            #expect(throws: JournalError.storageBusy) { try intent(root) }
+        }
+    }
+
+    @Test("a record larger than one reader block survives stitching and exact byte budgets")
+    func multiBlockRecord() throws {
+        try withTemporaryRoot { root in
+            let nested = root.appendingPathComponent("nested/state/calendar")
+            let payload = ["notes": String(repeating: "z", count: 150_000)]
+            let id = try Journal.recordIntent(root: nested, operation: "create", calendarId: "C",
+                                              calendarTitle: "T", calendarSource: "S", payload: payload)
+            let size = try Data(contentsOf: Journal.currentFile(root: nested)).count
+            let entries = try Journal.entries(limit: 1, root: nested, byteLimit: size)
+            #expect(entries.first?.entryId == id)
+            #expect(entries.first?.payload == payload)
+            #expect(throws: JournalError.readLimitExceeded) {
+                try Journal.entries(limit: 1, root: nested, byteLimit: size - 1)
+            }
+        }
+    }
 
     /// A journal root this test owns outright, removed when it finishes.
     ///
@@ -61,119 +92,141 @@ struct JournalTests {
         }
     }
 
-    @Test("an intent is recorded BEFORE the outcome, so an interrupted write leaves a trace")
-    func intentPrecedesOutcome() {
-        withTemporaryRoot { root in
-            // The whole point of write-ahead: if the process dies between the two, the intent
-            // survives and says what was being attempted. A single after-the-fact entry would
-            // leave exactly nothing in the case that most needs a record.
-            let id = Journal.recordIntent(
-                root: root, operation: "test_create", calendarId: "CAL-1", calendarTitle: "Test",
-                calendarSource: "Local", payload: ["title": "Interrupted"])
-
-            let orphans = Journal.orphanedIntents(root: root)
-            #expect(orphans.contains { $0.entryId == id },
-                    "an intent with no outcome must be visible as orphaned")
-
-            Journal.recordOutcome(
-                root: root, entryId: id, operation: "test_create", calendarId: "CAL-1", calendarTitle: "Test",
-                calendarSource: "Local", eventId: "EVT-1", payload: ["title": "Interrupted"],
-                outcome: .saved, error: nil)
-
-            #expect(!Journal.orphanedIntents(root: root).contains { $0.entryId == id },
-                    "once the outcome lands the intent is no longer orphaned")
+    @Test("an intent precedes its outcome and both are acknowledged")
+    func intentPrecedesOutcome() throws {
+        try withTemporaryRoot { root in
+            let id = try intent(root)
+            #expect(try Journal.orphanedIntents(root: root).map(\.entryId) == [id])
+            try Journal.recordOutcome(root: root, entryId: id, operation: "create",
+                                      calendarId: "C", calendarTitle: "T", calendarSource: "S",
+                                      eventId: "E", payload: ["title": "Appointment"],
+                                      outcome: .saved, error: nil)
+            #expect(try Journal.orphanedIntents(root: root).isEmpty)
+            #expect(try Journal.entries(root: root).map(\.phase) == [.intent, .outcome])
         }
     }
 
-    @Test("an entry carries enough to reconstruct the change without EventKit")
-    func entryIsSelfContained() throws {
-        try withTemporaryRoot { root in
-            let id = Journal.recordIntent(
-                root: root, operation: "test_create", calendarId: "CAL-2", calendarTitle: "Jason",
-                calendarSource: "iCloud",
-                payload: ["title": "Dentist", "start": "2026-08-21T14:00:00-06:00",
-                          "end": "2026-08-21T15:00:00-06:00"])
+    private func intent(_ root: URL, now: Date = Date()) throws -> String {
+        try Journal.recordIntent(root: root, operation: "create", calendarId: "C",
+                                 calendarTitle: "T", calendarSource: "S",
+                                 payload: ["title": "Appointment"], now: now)
+    }
 
-            let entry = try #require(Journal.entries(limit: 500, root: root).last { $0.entryId == id })
-            // Calendar identity is recorded as all three fields, not just the identifier --
-            // identifiers change on a full sync, so an id alone may not resolve later.
-            #expect(entry.calendarTitle == "Jason")
-            #expect(entry.calendarSource == "iCloud")
-            #expect(entry.payload["title"] == "Dentist")
-            #expect(entry.payload["start"] == "2026-08-21T14:00:00-06:00")
-            // Whether we owned our privacy identity matters when reading history back: an entry
-            // written under an inherited identity means the change was attributed to the host.
-            #expect(!entry.privacyIdentity.isEmpty)
+    @Test("failed intent and outcome storage throws instead of acknowledging a record")
+    func failedStorage() throws {
+        try withTemporaryRoot { root in
+            try Data().write(to: root) // A file cannot serve as a directory.
+            #expect(throws: JournalError.storageFailure) { try intent(root) }
+            #expect(throws: JournalError.storageFailure) {
+                try Journal.recordOutcome(root: root, entryId: "E", operation: "create",
+                                          calendarId: "C", calendarTitle: "T", calendarSource: "S",
+                                          eventId: nil, payload: [:], outcome: .failed, error: nil)
+            }
+            #expect(throws: JournalError.storageFailure) { try Journal.entries(root: root) }
         }
     }
 
-    @Test("all three save outcomes round-trip — a no-op is not a failure")
-    func saveOutcomesAreDistinct() throws {
+    @Test("missing history is empty, but corruption is never mistaken for empty history")
+    func corruptHistory() throws {
         try withTemporaryRoot { root in
-            // EventKit returns NO with a nil error when nothing needed saving. Collapsing that
-            // into "failed" would report a false failure on every unchanged save.
+            #expect(try Journal.entries(root: root).isEmpty)
+            _ = try intent(root)
+            let file = Journal.currentFile(root: root)
+            let handle = try FileHandle(forWritingTo: file)
+            try handle.seekToEnd()
+            try handle.write(contentsOf: Data("{bad record}\n".utf8))
+            try handle.close()
+            #expect(throws: JournalError.corruptHistory) { try Journal.entries(root: root) }
+            #expect(throws: JournalError.corruptHistory) { try Journal.orphanedIntents(root: root) }
+        }
+    }
+
+    @Test("a torn append blocks reading and further appends without altering the evidence")
+    func tornRecord() throws {
+        try withTemporaryRoot { root in
+            _ = try intent(root)
+            let file = Journal.currentFile(root: root)
+            let handle = try FileHandle(forWritingTo: file)
+            try handle.seekToEnd()
+            try handle.write(contentsOf: Data("{partial".utf8))
+            try handle.close()
+            let before = try Data(contentsOf: file)
+            #expect(throws: JournalError.corruptHistory) { try Journal.entries(root: root) }
+            #expect(throws: JournalError.corruptHistory) { try intent(root) }
+            #expect(try Data(contentsOf: file) == before)
+        }
+    }
+
+    @Test("month-end intent/outcome pairing and a 72-hour horizon include yesterday")
+    func monthRollover() throws {
+        try withTemporaryRoot { root in
+            let before = try TimeSemantics.parseTimestamp("2026-08-31T23:59:59Z")
+            let after = before.addingTimeInterval(2)
+            let id = try intent(root, now: before)
+            try Journal.recordOutcome(root: root, entryId: id, operation: "create",
+                                      calendarId: "C", calendarTitle: "T", calendarSource: "S",
+                                      eventId: "E", payload: [:], outcome: .saved, error: nil,
+                                      now: after)
+            let since = after.addingTimeInterval(-72 * 3600)
+            #expect(try Journal.entries(since: since, root: root).count == 2)
+            #expect(try Journal.orphanedIntents(since: since, root: root).isEmpty)
+        }
+    }
+
+    @Test("all outcomes round-trip, including a successful no-op")
+    func saveOutcomes() throws {
+        try withTemporaryRoot { root in
             for outcome in [SaveOutcome.saved, .noChangeNeeded, .failed] {
-                let id = Journal.recordIntent(
-                    root: root, operation: "test_outcome", calendarId: "C", calendarTitle: "T",
-                    calendarSource: "S", payload: [:])
-                Journal.recordOutcome(
-                    root: root, entryId: id, operation: "test_outcome", calendarId: "C", calendarTitle: "T",
-                    calendarSource: "S", eventId: nil, payload: [:],
-                    outcome: outcome, error: outcome == .failed ? "boom" : nil)
-
-                let entry = try #require(Journal.entries(limit: 500, root: root).last { $0.entryId == id && $0.phase == .outcome })
-                #expect(entry.saveOutcome == outcome)
+                let id = try intent(root)
+                try Journal.recordOutcome(root: root, entryId: id, operation: "create",
+                                          calendarId: "C", calendarTitle: "T", calendarSource: "S",
+                                          eventId: nil, payload: [:], outcome: outcome, error: nil)
+                #expect(try Journal.entries(root: root).last?.saveOutcome == outcome)
             }
         }
     }
 
-    @Test("a malformed line does not make the rest of the history unreadable")
-    func corruptLineIsSkipped() throws {
-        // An interrupted write can leave a half-written final line. Aborting the whole read
-        // would turn one bad byte into total history loss.
-        //
-        // THIS TEST USED TO CORRUPT THE LIVE JOURNAL, AND WAS THE SUITE'S OWN RACE.
-        // It opened the real file, seeked to the end, and wrote outside both `writeQueue` and
-        // O_APPEND -- which is precisely the non-atomic append gotcha 54 exists to warn
-        // about, reproduced inside the test suite. Running in parallel with the other journal
-        // tests, it could interleave with a real `Journal` append and destroy the very entry
-        // another test was asserting on. That is what made `intentPrecedesOutcome` flaky, and
-        // it left 36 malformed lines in the user's real state directory.
-        //
-        // The parsing rule under test is a property of the READER, so it is now exercised
-        // against a scratch file the test owns outright. Nothing here touches
-        // Runtime.stateDirectory, and as of BACKLOG #26 neither does any other test here:
-        // `Journal` now takes an explicit `root`, so the write path is isolated too.
-        let sandbox = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("apple-calendar-mcp-journaltest-\(UUID().uuidString).jsonl")
-        defer { try? FileManager.default.removeItem(at: sandbox) }
-
-        let good = #"{"entry_id":"E1","phase":"intent","operation":"test_corrupt"}"#
-        try (good + "\n{ this is not json\n" + good.replacingOccurrences(of: "E1", with: "E2") + "\n")
-            .write(to: sandbox, atomically: true, encoding: .utf8)
-
-        // Same decode-and-skip rule the reader applies: a malformed line is dropped, its
-        // neighbours survive. Asserted on ids so a passing run cannot be an empty one.
-        let decoder = JSONDecoder()
-        struct Probe: Decodable { let entryId: String
-            enum CodingKeys: String, CodingKey { case entryId = "entry_id" } }
-        let text = try String(contentsOf: sandbox, encoding: .utf8)
-        let ids = text.split(separator: "\n")
-            .compactMap { try? decoder.decode(Probe.self, from: Data($0.utf8)) }
-            .map(\.entryId)
-
-        #expect(ids == ["E1", "E2"], "a corrupt neighbour took valid entries with it: \(ids)")
-    }
-
-    @Test("the journal file is not readable by other users")
+    @Test("existing journal permissions are tightened, not just creation defaults")
     func journalIsPrivate() throws {
         try withTemporaryRoot { root in
-            Journal.recordIntent(root: root, operation: "test_perms", calendarId: "C",
-                                 calendarTitle: "T", calendarSource: "S", payload: [:])
-            let attrs = try FileManager.default.attributesOfItem(atPath: Journal.currentFile(root: root).path)
-            let perms = (attrs[.posixPermissions] as? NSNumber)?.intValue ?? 0
-            // It records event titles and times -- real calendar content.
-            #expect(perms & 0o077 == 0, "mode is \(String(perms, radix: 8))")
+            _ = try intent(root)
+            let file = Journal.currentFile(root: root)
+            try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.path)
+            _ = try intent(root)
+            for path in [root, Journal.directory(root: root), file] {
+                let attrs = try FileManager.default.attributesOfItem(atPath: path.path)
+                let perms = (attrs[.posixPermissions] as? NSNumber)?.intValue ?? 0
+                #expect(perms & 0o077 == 0)
+            }
+        }
+    }
+
+    @Test("large histories use a bounded tail; orphan reconciliation cannot silently truncate")
+    func boundedHistory() throws {
+        try withTemporaryRoot { root in
+            let now = Date()
+            _ = try intent(root, now: now)
+            // Test-owned, synthetic history spanning several reader chunks and the old
+            // 1000-entry cutoff. No repeated durable writes are needed to fabricate it.
+            let template = try #require(try Journal.entries(root: root).first)
+            let encoder = JSONEncoder()
+            var data = Data()
+            for i in 0..<1200 {
+                let entry = JournalEntry(entryId: "entry-\(i)", recordedAt: template.recordedAt,
+                                         phase: .intent, operation: "create", calendarId: "C",
+                                         calendarTitle: "T", calendarSource: "S", eventId: nil,
+                                         payload: ["padding": String(repeating: "x", count: 100)],
+                                         saveOutcome: nil, errorDescription: nil, privacyIdentity: "test")
+                data.append(try encoder.encode(entry)); data.append(0x0A)
+            }
+            try data.write(to: Journal.currentFile(now: now, root: root))
+            let tail = try Journal.entries(limit: 2, root: root, byteLimit: 65_536)
+            #expect(tail.map(\.entryId) == ["entry-1198", "entry-1199"])
+            #expect(try Journal.orphanedIntents(root: root).count == 1200)
+            #expect(throws: JournalError.readLimitExceeded) {
+                try Journal.orphanedIntents(root: root, byteLimit: 65_536)
+            }
+            #expect(throws: JournalError.invalidLimit) { try Journal.entries(limit: 0, root: root) }
         }
     }
 }

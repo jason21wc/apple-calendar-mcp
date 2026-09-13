@@ -10,7 +10,7 @@
 // WHY A CUSTOM EXECUTOR RATHER THAN AN ACTOR + CONTINUATION BRIDGE
 //
 // EventKit's fetches are synchronous and blocking, and EK* objects are not thread-safe, so
-// all of it has to happen on one dedicated thread. The obvious shape -- a plain actor whose
+// all access is serialized on a dedicated dispatch queue. The obvious shape -- a plain actor whose
 // methods `await withCheckedContinuation { queue.async { ... } }` -- looks right and is
 // weaker than it appears: an actor releases its isolation at every suspension point, so two
 // operations interleave freely and the actor guarantees nothing beyond protecting its own
@@ -28,9 +28,9 @@ import EventKit
 
 /// Runs actor jobs on one dedicated dispatch queue.
 ///
-/// Not the global concurrent pool: the point is a single thread that owns the EventKit store
-/// for the process's lifetime.
-final class DedicatedThreadExecutor: SerialExecutor {
+/// This guarantees serialization, not affinity to a permanent OS thread. EventKit
+/// explicitly supports dispatch queues for synchronous fetches (EKEventStore.h).
+final class SerialQueueExecutor: SerialExecutor {
     private let queue: DispatchQueue
 
     init(label: String) {
@@ -49,10 +49,15 @@ final class DedicatedThreadExecutor: SerialExecutor {
 }
 
 actor CalendarStore {
-    private let executor = DedicatedThreadExecutor(label: "com.collierhmg.apple-calendar-mcp.eventkit")
+    nonisolated let readGate: CalendarReadGate
+    private let executor = SerialQueueExecutor(label: "com.collierhmg.apple-calendar-mcp.eventkit")
     nonisolated var unownedExecutor: UnownedSerialExecutor { executor.asUnownedSerialExecutor() }
 
-    private let store = EKEventStore()
+    private lazy var store = EKEventStore()
+
+    init(readGate: CalendarReadGate = CalendarReadGate()) {
+        self.readGate = readGate
+    }
 
     // MARK: - Calendars
 
@@ -162,36 +167,17 @@ actor CalendarStore {
 
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: scoped ?? all)
 
-        // Availability decides what counts as busy, not mere existence. A declined meeting or
-        // one marked free is not a commitment, and treating it as one is how an assistant
-        // reports a full day that is actually open.
-        let busy = store.events(matching: predicate).filter { event in
-            if event.status == .canceled { return false }
-            switch event.availability {
-            case .free, .notSupported: return false
-            default: return true
-            }
-        }
+        let periods = store.events(matching: predicate)
+            .filter { Self.countsAsBusy(status: $0.status, availability: $0.availability) }
+            .map { DateInterval(start: $0.startDate, end: $0.endDate) }
+        return (BusyPeriods.merge(periods, zone: zone), scope.unmatchedIds)
+    }
 
-        let periods = busy.map { (start: $0.startDate!, end: $0.endDate!) }
-            .sorted { $0.start < $1.start }
-
-        // Merge on Date, format once at the end. Merging formatted strings would mean
-        // parsing them back to compare, which is how a formatting choice quietly becomes a
-        // correctness bug.
-        var merged: [(start: Date, end: Date, count: Int)] = []
-        for p in periods {
-            if let last = merged.last, p.start <= last.end {
-                merged[merged.count - 1] = (last.start, max(last.end, p.end), last.count + 1)
-            } else {
-                merged.append((p.start, p.end, 1))
-            }
-        }
-        return (merged.map {
-            BusyInterval(start: TimeSemantics.format($0.start, in: zone),
-                         end: TimeSemantics.format($0.end, in: zone),
-                         eventCount: $0.count)
-        }, scope.unmatchedIds)
+    /// Missing availability metadata does not establish that an appointment is free.
+    /// EKEvent.h defines .notSupported as a calendar capability, not an event status.
+    nonisolated static func countsAsBusy(status: EKEventStatus,
+                                        availability: EKEventAvailability) -> Bool {
+        status != .canceled && availability != .free
     }
 
     /// EventKit guarantees no ordering, so sort explicitly with a deterministic tie-breaker.

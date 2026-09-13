@@ -61,13 +61,6 @@ func processPath(_ pid: pid_t) -> String {
     return String(decoding: buf[..<Int(n)], as: UTF8.self)
 }
 
-func log(_ message: String) {
-    // fputs, not FileHandle.write: the latter raises an uncatchable Objective-C exception
-    // on I/O failure. Paired with the SIGPIPE ignore below, a client that closes or
-    // discards stderr can no longer turn a diagnostic line into a fatal.
-    fputs("[apple-calendar-mcp] " + message + "\n", stderr)
-}
-
 // MARK: - Probe record
 
 /// Labels become filenames, so anything outside a safe set is replaced.

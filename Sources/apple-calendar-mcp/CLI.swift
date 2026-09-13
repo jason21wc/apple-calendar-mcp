@@ -55,8 +55,8 @@ enum Meta {
 
 func printHelp() {
     // stderr, not stdout: stdout belongs to the MCP protocol and nothing else may touch it.
-    log("""
-        apple-calendar-mcp \(Meta.version)
+    log("apple-calendar-mcp \(Meta.version)")
+    let help = """
 
         A local MCP server for the macOS Calendar. Run with no arguments to serve over
         stdio -- that is how Claude Code and Codex launch it.
@@ -74,16 +74,15 @@ func printHelp() {
 
         Calendar access is granted to this binary at its ABSOLUTE PATH. Install it where it
         will live permanently, then run --setup there; moving it afterwards loses access.
-        """)
+        """
+    for line in help.components(separatedBy: "\n") { log(line) }
 }
 
 func printVersion() {
-    log("""
-        apple-calendar-mcp \(Meta.version)
-          identifier: \(Meta.bundleIdentifier)
-          path:       \(Meta.executablePath)
-          mode:       \(Runtime.disclaimMode)
-          tools:      read-only -- no write tool exists in this build\
-        \(Runtime.isReadOnly ? "\n  --read-only: yes (mutating tools would be withheld)" : "")
-        """)
+    log("apple-calendar-mcp \(Meta.version)")
+    log("  identifier: \(Meta.bundleIdentifier)")
+    log("  path:       \(Meta.executablePath)")
+    log("  mode:       \(Runtime.disclaimMode)")
+    log("  tools:      read-only -- no write tool exists in this build")
+    if Runtime.isReadOnly { log("  --read-only: yes (mutating tools would be withheld)") }
 }

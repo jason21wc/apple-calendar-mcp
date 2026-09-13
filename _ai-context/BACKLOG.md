@@ -15,38 +15,6 @@
   prior `apple-mail` experiment is not to be repeated as evidence: three independent confounds
   made its null result attribute to nothing (gotcha 83).
 
-- **#26 — journal storage. (a) CLOSED; read path remains.**
-  **(a) Test isolation — CLOSED 2026-08-26, and the first fix was insufficient.** `Journal`'s
-  storage location is an explicit `root:` parameter with **no default**, threaded through
-  `directory`,
-  `currentFile`, `recordIntent`, `recordOutcome`, `entries` and `orphanedIntents`. Production
-  call sites are unchanged; the tests pass a temporary directory they own and delete.
-  Deliberately **not** a settable static — a mutable global redirecting where calendar history
-  is written is the shape this project has twice been bitten by. **Verified: three
-  consecutive full runs added zero lines to the live journal** (was ~10 per run).
-  `root:` now has no default on any entry point, so omission is a compile error. Deliberate use
-  of `Runtime.stateDirectory` in the journal test source is separately source-checked. Both
-  guards were mutation-verified at `2f28bc1`; #26(a) is closed.
-  **(b) `entries()` still reads and decodes the ENTIRE monthly file on every call**, then
-  discards all but `.suffix(limit)`; `orphanedIntents()` does it at `limit: 1000`. Cost grows
-  without bound within a month, and this is the read path `calendar_recent_mutations` would
-  use. Fix before the journal has a caller.
-  Do not delete the live journal as part of a code fix — that is a separate, explicit
-  operation, even though inspection found only test output.
-
-- **#27 — `log()` does not escape control characters, and the plan says it must.** Verified
-  2026-08-27: `log()` in `main.swift` is `fputs("[apple-calendar-mcp] " + message + "\n",
-  stderr)` with no sanitisation, while plan §8 requires *"diagnostics to stderr with control
-  characters escaped — including calendar and source names, which are attacker-influenceable"*
-  (gotcha 18). **A documented control that was never implemented** — the same class this
-  session spent its length removing, found while checking a reviewer's claim rather than by
-  any test. **Currently latent**: the one untrusted string that reached the logger was the MCP
-  client's name, removed in `df43307`, and nothing else attacker-influenceable is logged today.
-  It stops being latent the moment the write surface logs what it is about to change, which is
-  exactly when a title containing an escape sequence would reach a terminal. Fix before any
-  mutating code logs, and prefer escaping inside `log()` over remembering at each call site —
-  a rule enforced at one choke point cannot be forgotten at the twentieth.
-
 - **#24b — the live elicitation round trip. BLOCKED BY DESIGN, deliberately not built.**
   #24a is complete: `calendar_permission_status` reports declared/form/url booleans only;
   client identity is discarded. The remaining Cowork observation is an operational step in
@@ -97,7 +65,8 @@
 
 - **#18 — Snapshot must capture every field needed to reconstruct**, not just the DTO's default
   set: `title`, `startDate`, `endDate`, `isAllDay`, `timeZone`, `location`, `notes`, `url`,
-  `availability`, `calendar_id`, and the recurrence rule. The read DTO withholds `notes`, `url`
+  `availability`, `calendar_id`, the recurrence rule, existing alarms, and structured location. See SPECIFICATION.md
+  "Snapshot completeness gate" for the required field matrix. The read DTO withholds `notes`, `url`
   and `location` unless requested — a snapshot built from it would silently drop them and the
   loss would only appear at restore time, when the original is already gone.
 - **#22 — Decide whether an unknown tool should be a JSON-RPC protocol error rather than
@@ -115,23 +84,6 @@
   reference repo, add a `NOTICE` / `THIRD-PARTY-NOTICES.md` carrying the original MIT text
   and copyright line, and mark provenance in the borrowing file's header. Not needed if
   only ideas are adopted.
-
-- **#19 — Bound every EventKit operation, and fail fast once wedged.** **Same policy problem
-  as #24b, different cleanup problem — treat them together in design and apart in code.** Both
-  are an unbounded wait on something outside the process, and both need the same answer to
-  "what does the caller do when no reply comes, and how does the system avoid staying wedged".
-  The implementations cannot be shared: a blocking synchronous EventKit call **cannot be
-  cancelled at all**, so the thread is lost and the remedy is to mark the store wedged; an
-  abandoned MCP request **can** in principle be reaped, but the SDK exposes no cancellation, so
-  the remedy is different again. A single "add a timeout" helper across both would paper over
-  that difference. No call in `CalendarStore` has a
-  timeout (gotcha 64). Because the store is a serial actor on one dedicated thread, a single blocked call
-  takes the whole calendar surface down for the process's lifetime. A blocking synchronous EventKit call
-  **cannot be cancelled**, so the timeout cannot free the thread — the design has to be: bound the
-  *caller's* wait (well under the client's 60s ceiling), return a structured `error_type: "timeout"`, then
-  **mark the store wedged** so subsequent calls fail immediately with "calendar subsystem is blocked,
-  restart the server" instead of each burning another full timeout. Affects shipped read-only code today,
-  and gets more dangerous the moment writes exist.
 
 - **#20 — Test the create→delete→restore round trip using only ids the tools themselves return.** Gotcha
   65: a sibling server shipped a create whose returned id its own delete could not consume, and the

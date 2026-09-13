@@ -60,7 +60,7 @@ enum ServerBootstrap {
         }
 
         await server.withMethodHandler(CallTool.self) { params in
-            await ToolHandlers.dispatch(params, store: store)
+            try await ToolHandlers.dispatch(params, store: store)
         }
 
         let transport = StdioTransport()

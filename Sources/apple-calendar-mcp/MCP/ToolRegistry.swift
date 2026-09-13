@@ -91,7 +91,7 @@ enum ToolRegistry {
                     Merged busy periods in a window, WITHOUT titles or any other event detail. \
                     Use this for availability questions -- it answers "when am I free" without \
                     disclosing what the commitments are. Events marked free, and cancelled \
-                    events, are not counted as busy.
+                    events, are not counted as busy. Missing/unsupported availability counts as busy.
                     """,
                 inputSchema: busySchema(),
                 annotations: readOnly,

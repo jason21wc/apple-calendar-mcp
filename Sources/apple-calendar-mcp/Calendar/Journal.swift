@@ -20,6 +20,7 @@
 // process memory, where a file writer cannot reach it.
 
 import Foundation
+import Darwin
 
 /// How EventKit's save actually reported. Three outcomes, not two.
 ///
@@ -73,7 +74,18 @@ struct JournalEntry: Codable, Sendable {
     }
 }
 
+enum JournalError: Error, Equatable {
+    case storageFailure
+    case storageBusy
+    case corruptHistory
+    case readLimitExceeded
+    case recordTooLarge
+    case invalidLimit
+}
+
 enum Journal {
+    static let maxRecordBytes = 1_048_576
+    static let maxReadBytes = 16_777_216
 
     /// Serialises appends.
     ///
@@ -114,7 +126,7 @@ enum Journal {
     static func currentFile(now: Date = Date(), root: URL) -> URL {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeSemantics.systemZone
+        f.timeZone = .gmt
         f.dateFormat = "yyyy-MM"
         return directory(root: root).appendingPathComponent("\(f.string(from: now)).jsonl")
     }
@@ -124,11 +136,11 @@ enum Journal {
     static func recordIntent(root: URL,
                              operation: String,
                              calendarId: String, calendarTitle: String, calendarSource: String,
-                             payload: [String: String]) -> String {
+                             payload: [String: String], now: Date = Date()) throws -> String {
         let id = UUID().uuidString
-        append(JournalEntry(
+        try append(JournalEntry(
             entryId: id,
-            recordedAt: TimeSemantics.format(Date()),
+            recordedAt: TimeSemantics.format(now, in: .gmt),
             phase: .intent,
             operation: operation,
             calendarId: calendarId,
@@ -138,7 +150,7 @@ enum Journal {
             payload: payload,
             saveOutcome: nil,
             errorDescription: nil,
-            privacyIdentity: Runtime.disclaimMode), root: root)
+            privacyIdentity: Runtime.disclaimMode), now: now, root: root)
         return id
     }
 
@@ -147,10 +159,10 @@ enum Journal {
                               entryId: String, operation: String,
                               calendarId: String, calendarTitle: String, calendarSource: String,
                               eventId: String?, payload: [String: String],
-                              outcome: SaveOutcome, error: String?) {
-        append(JournalEntry(
+                              outcome: SaveOutcome, error: String?, now: Date = Date()) throws {
+        try append(JournalEntry(
             entryId: entryId,
-            recordedAt: TimeSemantics.format(Date()),
+            recordedAt: TimeSemantics.format(now, in: .gmt),
             phase: .outcome,
             operation: operation,
             calendarId: calendarId,
@@ -160,78 +172,170 @@ enum Journal {
             payload: payload,
             saveOutcome: outcome,
             errorDescription: error,
-            privacyIdentity: Runtime.disclaimMode), root: root)
+            privacyIdentity: Runtime.disclaimMode), now: now, root: root)
     }
 
     // MARK: - Writing
 
-    private static func append(_ entry: JournalEntry, root: URL) {
-        writeQueue.sync { appendLocked(entry, root: root) }
+    /// A successful return means the complete record and directory entry were fsynced.
+    /// This is an OS durability acknowledgement, not a promise against disk failure.
+    /// Callers MUST NOT mutate if intent recording throws. An outcome error after a future
+    /// save means an uncertain recorded outcome, not permission to retry that save.
+    private static func append(_ entry: JournalEntry, now: Date, root: URL) throws {
+        try writeQueue.sync {
+            do { try appendLocked(entry, now: now, root: root) }
+            catch let error as JournalError { throw error }
+            catch { throw JournalError.storageFailure }
+        }
     }
 
-    private static func appendLocked(_ entry: JournalEntry, root: URL) {
-        // Only tighten the process state directory when that IS the root. A test root is the
-        // test's to manage, and calling Runtime here would reach into the user's home
-        // regardless of where the journal was pointed.
-        if root == Runtime.stateDirectory { Runtime.ensureStateDirectory() }
-        try? FileManager.default.createDirectory(
-            at: directory(root: root), withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700])
-
+    private static func appendLocked(_ entry: JournalEntry, now: Date, root: URL) throws {
+        let fm = FileManager.default
+        var parentsToSync = [directory(root: root), root, root.deletingLastPathComponent()]
+        var ancestor = root
+        while !fm.fileExists(atPath: ancestor.path) {
+            let parent = ancestor.deletingLastPathComponent()
+            guard parent != ancestor else { throw JournalError.storageFailure }
+            parentsToSync.append(parent)
+            ancestor = parent
+        }
+        for dir in [root, directory(root: root)] {
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true,
+                                   attributes: [.posixPermissions: 0o700])
+            try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.path)
+        }
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]   // one line per entry; stable field order
-        guard var line = try? encoder.encode(entry) else {
-            log("journal: could not encode a \(entry.phase.rawValue) entry for \(entry.operation)")
-            return
-        }
-        line.append(0x0A)   // newline
+        encoder.outputFormatting = [.sortedKeys]
+        var line = try encoder.encode(entry)
+        line.append(0x0A)
+        guard line.count <= maxRecordBytes else { throw JournalError.recordTooLarge }
 
-        let file = currentFile(root: root)
-
-        // O_APPEND makes each write land at the end atomically, rather than the
-        // seek-then-write pair which another writer can slip between. Created 0600 from the
-        // outset -- it holds event titles and times, so it must never exist world-readable
-        // even briefly.
-        let fd = open(file.path, O_WRONLY | O_APPEND | O_CREAT, 0o600)
-        guard fd >= 0 else {
-            log("journal: could not open \(file.path): \(String(cString: strerror(errno)))")
-            return
-        }
+        let file = currentFile(now: now, root: root)
+        let fd = open(file.path, O_RDWR | O_APPEND | O_CREAT | O_NOFOLLOW, 0o600)
+        guard fd >= 0 else { throw JournalError.storageFailure }
         defer { close(fd) }
-
-        line.withUnsafeBytes { buffer in
+        var info = stat()
+        guard fstat(fd, &info) == 0, (info.st_mode & S_IFMT) == S_IFREG,
+              fchmod(fd, 0o600) == 0 else { throw JournalError.storageFailure }
+        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else { throw JournalError.storageBusy }
+        defer { flock(fd, LOCK_UN) }
+        // Never append a valid record onto an interrupted, unterminated one.
+        let end = lseek(fd, 0, SEEK_END)
+        guard end >= 0 else { throw JournalError.storageFailure }
+        if end > 0 {
+            var last: UInt8 = 0
+            guard pread(fd, &last, 1, end - 1) == 1 else { throw JournalError.storageFailure }
+            guard last == 0x0A else { throw JournalError.corruptHistory }
+        }
+        try line.withUnsafeBytes { buffer in
             var written = 0
             while written < buffer.count {
                 let n = write(fd, buffer.baseAddress!.advanced(by: written), buffer.count - written)
-                // A short write is legal and must be resumed, not treated as done.
-                if n <= 0 {
-                    if errno == EINTR { continue }
-                    log("journal: write failed: \(String(cString: strerror(errno)))")
-                    return
-                }
+                if n < 0 && errno == EINTR { continue }
+                guard n > 0 else { throw JournalError.storageFailure }
                 written += n
             }
+        }
+        guard fsync(fd) == 0 else { throw JournalError.storageFailure }
+        // Persist file/directory creation as well, from the journal directory upwards.
+        for dir in parentsToSync {
+            let directoryFD = open(dir.path, O_RDONLY | O_DIRECTORY)
+            guard directoryFD >= 0 else { throw JournalError.storageFailure }
+            let synced = fsync(directoryFD)
+            close(directoryFD)
+            guard synced == 0 else { throw JournalError.storageFailure }
         }
     }
 
     // MARK: - Reading
 
-    /// Entries for the current month, oldest first. Malformed lines are skipped rather than
-    /// aborting the read -- a truncated final line from an interrupted write must not make
-    /// the whole history unreadable.
-    static func entries(limit: Int = 100, root: URL) -> [JournalEntry] {
-        guard let data = try? Data(contentsOf: currentFile(root: root)),
-              let text = String(data: data, encoding: .utf8) else { return [] }
-        let decoder = JSONDecoder()
-        return text.split(separator: "\n")
-            .compactMap { try? decoder.decode(JournalEntry.self, from: Data($0.utf8)) }
-            .suffix(limit)
+    /// Recent records across monthly files, oldest first. Reads the tail in fixed-size
+    /// blocks rather than decoding an entire month just to return its final records.
+    /// A missing journal is empty; unreadable/corrupt/over-budget history is an error.
+    /// `since` selects a recovery horizon; nil scans all history subject to the byte budget.
+    static func entries(limit: Int = 100, since: Date? = nil, root: URL,
+                        byteLimit: Int = maxReadBytes) throws -> [JournalEntry] {
+        guard limit > 0 else { throw JournalError.invalidLimit }
+        return try readEntries(limit: limit, since: since, root: root, byteLimit: byteLimit)
     }
 
-    /// Intents with no matching outcome: writes that began and never reported back.
-    static func orphanedIntents(root: URL) -> [JournalEntry] {
-        let all = entries(limit: 1000, root: root)
+    /// Do not use a display tail (e.g. 1000 records) to decide which intents lack outcomes.
+    /// Every entry in the requested horizon is reconciled, or the call explicitly fails.
+    static func orphanedIntents(since: Date? = nil, root: URL,
+                               byteLimit: Int = maxReadBytes) throws -> [JournalEntry] {
+        let all = try readEntries(limit: nil, since: since, root: root, byteLimit: byteLimit)
         let completed = Set(all.filter { $0.phase == .outcome }.map(\.entryId))
         return all.filter { $0.phase == .intent && !completed.contains($0.entryId) }
+    }
+
+    private static func readEntries(limit: Int?, since: Date?, root: URL,
+                                    byteLimit: Int) throws -> [JournalEntry] {
+        guard byteLimit > 0 else { throw JournalError.readLimitExceeded }
+        do {
+            // contentsOfDirectory throws for permissions/type errors. Only genuine absence
+            // is empty history; fileExists would also return false for inaccessible paths.
+            let files: [URL]
+            do {
+                files = try FileManager.default.contentsOfDirectory(
+                    at: directory(root: root), includingPropertiesForKeys: nil)
+            } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+                return []
+            }
+            // Include a boundary margin for older files rotated in the machine's local zone.
+            let firstMonth = since.map {
+                currentFile(now: $0.addingTimeInterval(-36 * 3600), root: root).lastPathComponent
+            }
+            let months = files.filter {
+                $0.lastPathComponent.range(of: #"^\d{4}-\d{2}\.jsonl$"#,
+                                            options: .regularExpression) != nil
+                && (firstMonth == nil || $0.lastPathComponent >= firstMonth!)
+            }.sorted { $0.lastPathComponent > $1.lastPathComponent }
+            var remaining = byteLimit
+            var found: [JournalEntry] = []
+            let decoder = JSONDecoder()
+            for file in months {
+                let handle = try FileHandle(forReadingFrom: file)
+                defer { try? handle.close() }
+                guard flock(handle.fileDescriptor, LOCK_SH | LOCK_NB) == 0 else {
+                    throw JournalError.storageBusy
+                }
+                defer { flock(handle.fileDescriptor, LOCK_UN) }
+                var offset = try handle.seekToEnd()
+                var suffix = Data()
+                var checkedTail = false
+                while offset > 0 {
+                    guard remaining > 0 else { throw JournalError.readLimitExceeded }
+                    let count = Int(min(offset, UInt64(min(65_536, remaining))))
+                    offset -= UInt64(count)
+                    try handle.seek(toOffset: offset)
+                    guard let chunk = try handle.read(upToCount: count), chunk.count == count else {
+                        throw JournalError.storageFailure
+                    }
+                    remaining -= chunk.count
+                    if !checkedTail {
+                        guard chunk.last == 0x0A else { throw JournalError.corruptHistory }
+                        checkedTail = true
+                    }
+                    var data = chunk
+                    data.append(suffix)
+                    let lines = data.split(separator: 0x0A, omittingEmptySubsequences: false)
+                    // The first fragment may start in the middle of a record.
+                    let complete = offset == 0 ? lines[...] : lines.dropFirst()
+                    for line in complete.reversed() where !line.isEmpty {
+                        guard line.count <= maxRecordBytes else { throw JournalError.recordTooLarge }
+                        guard let entry = try? decoder.decode(JournalEntry.self, from: Data(line)),
+                              let recorded = try? TimeSemantics.parseTimestamp(entry.recordedAt) else {
+                            throw JournalError.corruptHistory
+                        }
+                        if since == nil || recorded >= since! { found.append(entry) }
+                        if let limit, found.count >= limit { return found.reversed() }
+                    }
+                    suffix = offset == 0 ? Data() : Data(lines[0])
+                    guard suffix.count <= maxRecordBytes else { throw JournalError.recordTooLarge }
+                }
+            }
+            return found.reversed()
+        } catch let error as JournalError { throw error }
+        catch { throw JournalError.storageFailure }
     }
 }

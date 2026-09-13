@@ -38,7 +38,8 @@ externally-authored text also carry `openWorldHint: true`.
 
 Failures return `isError` with a stable code leading the message:
 `PERMISSION_DENIED`, `BAD_TIMESTAMP`, `BAD_TIME_ZONE`, `END_NOT_AFTER_START`,
-`INTERVAL_TOO_LARGE`, `MISSING_ARGUMENT`, `UNKNOWN_TOOL`, `CALENDAR_STORE_UNAVAILABLE`.
+`INTERVAL_TOO_LARGE`, `MISSING_ARGUMENT`, `UNKNOWN_TOOL`, `CALENDAR_STORE_UNAVAILABLE`,
+`CALENDAR_STORE_BUSY`, `CALENDAR_TIMEOUT`, `CALENDAR_STORE_WEDGED`.
 The code is contractual; the prose after it is not.
 
 **Response envelope:** `items`, `truncated`, `total_matched`, `effective_time_zone`,
@@ -84,12 +85,24 @@ commit_delete(token, confirm_summary)
    writable-calendar allowlist was **withdrawn 2026-08-20**; a calendar shared with the user
    is writable the moment macOS says so, with no config change.
 3. **Span required** on any recurring target.
-4. **Restore of a `futureEvents` delete → refuse** (recreating a series tail yields two
-   competing masters).
+4. **A `futureEvents` deletion → refuse while restoration is unsolved.** Do not permit
+   deletion and refuse only its restore; recreating a series tail yields two competing masters.
 5. **Duplicate check** before recreating (best-effort; sync is asynchronous).
 6. **Post-state hash** on restore-of-create, so later human edits are not destroyed.
 7. **Idempotency** by journal-entry id, keyed on the journal tail so it survives a respawn.
 8. **72-hour restore horizon.**
+
+## Snapshot completeness gate
+
+Before delete or update, define and test a typed snapshot for every reconstructable field:
+calendar identity, title, start/end, all-day state, time zone, location, notes, URL,
+availability, recurrence, structured location, and existing alarms (including their timing
+and supported location/action metadata). The read DTO is not a snapshot. Apple exposes
+`alarms` as writable (`EKCalendarItem.h:101`) and structured location as writable
+(`EKEvent.h:96`); omission from a create schema does not justify losing them during restore.
+For any populated field not yet reconstructable, refuse that mutation under C7; only the
+already-approved attendee/invitation exception is exempt. The field matrix and disposable
+calendar round trip remain prerequisites, not implemented recovery guarantees.
 
 ## Semantics
 

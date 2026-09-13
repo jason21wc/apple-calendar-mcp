@@ -87,7 +87,7 @@ future macOS degrades rather than fails to launch. Disclaim state is asked of th
 trusted an environment marker and was forgeable in one line.
 
 Planned layering for Phase 4 onward, unchanged: `MCPLayer → CalendarKit → EventKitAdapter`,
-with `EKEventStore` confined to one dedicated thread and EventKit objects never crossing the
+with `EKEventStore` confined to one serial executor and EventKit objects never crossing the
 adapter boundary.
 
 ---
@@ -245,11 +245,24 @@ pagination, nothing cached.
 
 ### Concurrency
 
-`EKEventStore` confined to one dedicated thread. Prefer an actor with a custom
-`SerialExecutor`: synchronous EventKit calls then contain no suspension points, so the actor
-is genuinely non-reentrant, and `EKEventStore` never crosses an isolation boundary. Fall back
-to a continuation bridge only if the executor approach requires `@unchecked Sendable` — and
-record why.
+`CalendarStore` owns a lazily initialized `EKEventStore` on a custom `SerialExecutor`
+backed by a serial dispatch queue. It guarantees serialization, not affinity to one permanent
+OS thread. EventKit explicitly recommends dispatch queues for synchronous queries
+(`EKEventStore.h:291-293` in the local SDK). EventKit objects never cross the adapter boundary.
+
+`CalendarReadGate` is a separate actor outside that executor. It admits one content read;
+overlap returns `CALENDAR_STORE_BUSY` without submitting another operation. An admitted read
+has a 15-second monotonic deadline. Expiry returns `CALENDAR_TIMEOUT` and permanently closes
+admission; later reads return `CALENDAR_STORE_WEDGED` and request a server restart. Completion
+checks the actual clock too, so delayed timer delivery cannot turn an overdue result into
+success. Caller cancellation returns promptly to the MCP SDK, but the active slot and timer
+remain until the underlying operation ends. Late completion never reopens a wedged gate.
+Permission status and `tools/list` remain outside the gate.
+
+The worker is unstructured: a task group would wait for a noncancellable child before exiting
+and defeat the timeout. EventKit execution itself is not canceled. This wrapper is read-only;
+future mutations require uncertain-outcome reconciliation, and elicitation needs separate
+SDK pending-request cleanup. Neither may reuse the read gate by analogy.
 
 ### Server loop
 
@@ -354,7 +367,7 @@ constraints, all verified in SDK source rather than assumed:
   is insufficient, and strict mode only tests the top level anyway.
 - **There is no timeout.** `sendAndAwait` awaits `task.value` unbounded, so a client that never
   answers strands the tool call and leaves a `pendingRequests` entry. Racing a task around it
-  abandons the request rather than cancelling it. Same class as BACKLOG #19.
+  abandons the request rather than cancelling it. Same class of external wait as the read gate (§5), with different cleanup requirements.
 
 **A capability declaration is not a human.** It says the client claims support. Only an
 observed round trip returning `.accept` demonstrates a person answered, and even that
@@ -377,11 +390,21 @@ directly rather than resting on a wildcard whose handling is inferred.
 
 ### Status
 
-**Built:** `Journal.swift` — write-ahead, intent before the save and outcome after, so an
-interrupted write leaves a visible orphan. Tri-state outcome (`saved` / `noChangeNeeded` /
-`failed`), because `saveEvent` returning NO with a **nil** error is a success. Concurrency-safe
-via `O_APPEND` plus in-process serialisation, after parallel tests reproduced the interleaved
-corruption concurrent tool handlers would cause.
+**Built:** `Journal.swift` records intent before a future save and outcome after. Both calls
+throw on storage failure; a returned intent ID acknowledges a complete record followed by
+`fsync` of the file and directory entries, including newly created ancestors. This is an OS
+flush acknowledgement, not protection against hardware failure. No mutation may follow a
+failed intent write. If outcome recording fails after a future save, callers must report an
+uncertain recorded outcome and reconcile it, never blindly repeat the mutation.
+
+Appends use O_APPEND plus in-process serialization and nonblocking cross-process file locks.
+Readers take shared locks; active writers produce `storageBusy`, not corrupt-history errors.
+The reader scans fixed-size blocks backwards across monthly files, with optional `since`
+filtering for a recovery horizon. Display tails stop when enough entries are found; orphan
+reconciliation never uses a display cutoff. Scans have an explicit byte budget and oversized,
+unreadable, or corrupt history throws rather than silently becoming empty. New rotation uses
+UTC; horizon selection includes a margin for older files rotated in the local zone. No
+production caller exists and no live journal cleanup is performed by these changes.
 
 **Not built:** every guard in §6, and every write tool. The journal is substrate with no
 caller. Nothing reverses anything yet.
@@ -405,6 +428,10 @@ caller. Nothing reverses anything yet.
 6. **Snapshots must capture every reconstructable field**, not the read DTO's default set. The
    DTO withholds `notes`, `url` and `location` unless requested; a snapshot built from it would
    drop them silently, and the loss would surface at restore time, when the original is gone.
+   Include existing alarms and structured locations. The complete snapshot and supported-field
+   matrix must be verified before delete; rejecting alarms on create does not preserve alarms
+   on an existing event. A field outside the attendee/invitation exception that cannot be
+   reconstructed makes that particular mutation unrestorable and therefore refused.
 
 ### Build order
 
@@ -425,7 +452,7 @@ in Calendar.app, which was true before the journal existed.
 ### EventKit specifics to honour when create is written
 
 `event.calendar` must be assigned from a refetched calendar or the save fails. `EKEvent` must be
-constructed on the store's confined thread, or EventKit objects cross the adapter boundary the
+constructed on the store's serial executor, or EventKit objects cross the adapter boundary the
 architecture forbids. `title` is nullable and EventKit will happily save an empty one, producing
 a near-invisible event the user cannot find to delete. `timeZone` does not move the event —
 `startDate` is the instant — so setting one without the other is a silent offset error. `url` is
@@ -479,9 +506,11 @@ travels in the text rather than in `structuredContent`, because a tool declaring
 not have the shape of a success — emitting one anyway hands a strict client a validation
 failure on top of the error it was already reporting.
 
-**Shipped codes** (the read surface can actually produce all eight): `PERMISSION_DENIED`,
+**Shipped codes** (the read surface can produce these): `PERMISSION_DENIED`,
 `BAD_TIMESTAMP`, `BAD_TIME_ZONE`, `END_NOT_AFTER_START`, `INTERVAL_TOO_LARGE`,
-`MISSING_ARGUMENT`, `UNKNOWN_TOOL`, `CALENDAR_STORE_UNAVAILABLE`.
+`MISSING_ARGUMENT`, `UNKNOWN_TOOL`, `CALENDAR_STORE_UNAVAILABLE`, `CALENDAR_STORE_BUSY`,
+`CALENDAR_TIMEOUT`, `CALENDAR_STORE_WEDGED`. Canceled requests propagate cancellation to the
+SDK so it suppresses their replies.
 
 **Planned, for the write surface, and not emitted by anything today:**
 `CALENDAR_NOT_WRITABLE`, `EVENT_HAS_ATTENDEES`, `SPAN_REQUIRED`, `TOKEN_EXPIRED`,
@@ -512,7 +541,10 @@ flag.
 ## 10. Tests
 
 `./scripts/test.sh` (not `swift test` — Command Line Tools ships `Testing.framework` but no
-XCTest, and the module and dyld paths need deriving). CI runs the same script; see §16.
+XCTest, and the module and dyld paths need deriving). The wrapper explicitly selects the
+native SwiftPM engine: the Swift 6.4 default swiftbuild engine on a Command Line Tools-only
+install failed to load TestingMacros. Compiler caches default to `.build`, and framework
+arguments preserve paths with spaces. CI runs the same script; see §16.
 
 **Unit** — five authorization states; RFC 3339 parsing; caps; filtering; stable sort; all-day
 across UTC boundaries; DST and ambiguous local times; occurrence resolution by
@@ -614,14 +646,11 @@ one level up. **Re-verify a cleanup list by grep before believing it.**
 
 ## 15. Phase 5 and 6 — what the next work actually is
 
-**Next code: bound every EventKit operation and fail fast once wedged** (`BACKLOG` #19). No
-call in `CalendarStore` has a timeout, and because the store is an actor on one dedicated
-thread, a single blocked call takes the whole calendar surface down for the process's
-lifetime rather than just its own caller. A blocking synchronous EventKit call cannot be
-cancelled, so a timeout cannot free the thread: bound the *caller's* wait well under the
-client's ceiling, return a structured timeout, then mark the store wedged so later calls fail
-immediately instead of each burning another full timeout. This affects shipped read-only code
-today and is independent of the write gate.
+**Read hardening is implemented:** conservative unsupported-availability handling, the
+bounded read gate in §5, escaped diagnostics, and acknowledged journal storage with
+cross-month history. These are prerequisites, not evidence that write approval or restore
+works. Next is the harmless human-approval round trip after the elicitation cleanup design;
+continue to enforce §6 Gate 1 before adding a mutating caller.
 
 **Then, and only after §6 Gate 1 is answered:** `calendar_create_event` →
 `calendar_delete_event` **with restore in the same change** → `calendar_update_event`.

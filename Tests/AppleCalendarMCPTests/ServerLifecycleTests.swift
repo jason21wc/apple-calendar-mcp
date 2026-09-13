@@ -56,16 +56,19 @@ struct ServerLifecycleTests {
     }
 
     /// Direct children of `pid`, via pgrep. The disclaimed child is the process that matters.
-    private func children(of pid: Int32) -> [Int32] {
+    private func children(of pid: Int32) throws -> [Int32] {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
         task.arguments = ["-P", String(pid)]
         let out = Pipe()
         task.standardOutput = out
         task.standardError = FileHandle.nullDevice
-        guard (try? task.run()) != nil else { return [] }
+        try task.run()
         let data = out.fileHandleForReading.readDataToEndOfFile()
         task.waitUntilExit()
+        guard task.terminationStatus == 0 || task.terminationStatus == 1 else {
+            throw LifecycleError.processInspectionUnavailable
+        }
         return String(decoding: data, as: UTF8.self)
             .split(separator: "\n").compactMap { Int32($0.trimmingCharacters(in: .whitespaces)) }
     }
@@ -92,21 +95,30 @@ struct ServerLifecycleTests {
     private func launchAndSettle() throws -> (Server, Int32) {
         let server = try launch()
         var child: Int32 = 0
-        let appeared = waitUntil { 
-            child = children(of: server.supervisorPid).first ?? 0
-            return child != 0
+        var settled = false
+        defer {
+            if !settled { cleanUp(server, child) }
         }
+        let deadline = Date().addingTimeInterval(10)
+        repeat {
+            child = try children(of: server.supervisorPid).first ?? 0
+            if child != 0 { break }
+            usleep(20_000)
+        } while Date() < deadline
+        let appeared = child != 0
         try #require(appeared, """
             no child appeared under the supervisor within the deadline. Either the \
             self-disclaiming re-exec did not fire -- in which case the process is running \
             under the launching app's Calendar identity -- or the binary failed to start.
             """)
+        settled = true
         return (server, child)
     }
 
     private func cleanUp(_ server: Server, _ child: Int32) {
         // Never leave a Calendar-authorized process behind, whatever the test concluded.
-        if isAlive(child) { kill(child, SIGKILL) }
+        // PID zero targets the whole process group; it is never a child to clean up.
+        if child > 0 && isAlive(child) { kill(child, SIGKILL) }
         if server.task.isRunning { server.task.terminate() }
         try? server.stdinWriter.close()
         _ = waitUntil(5) { !server.task.isRunning }
@@ -162,5 +174,13 @@ struct ServerLifecycleTests {
             unrecoverable case: no signal handler can cover SIGKILL, so if EOF does not \
             shut the child down, nothing does.
             """)
+    }
+}
+
+private enum LifecycleError: Error, CustomStringConvertible {
+    case processInspectionUnavailable
+    var description: String {
+        "pgrep cannot inspect the test server's children in this environment; "
+        + "run the lifecycle suite in an environment with process-inspection permission"
     }
 }

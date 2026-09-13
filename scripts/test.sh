@@ -22,16 +22,19 @@ DEVELOPER_DIR_PATH="$(xcode-select -p)"
 FRAMEWORKS="$DEVELOPER_DIR_PATH/Library/Developer/Frameworks"
 INTEROP="$DEVELOPER_DIR_PATH/Library/Developer/usr/lib"
 
-EXTRA=""
+# Swift 6.4 defaults to swiftbuild, which currently fails to resolve TestingMacros
+# with a Command Line Tools-only install. Keep the native engine used by our CI and
+# executable locator. This is a build-engine choice, not permission to skip tests.
+EXTRA=(--build-system native --cache-path "$PWD/.build/spm-cache")
+export CLANG_MODULE_CACHE_PATH="${CLANG_MODULE_CACHE_PATH:-$PWD/.build/module-cache}"
+export SWIFTPM_MODULECACHE_OVERRIDE="${SWIFTPM_MODULECACHE_OVERRIDE:-$CLANG_MODULE_CACHE_PATH}"
 if [ -d "$FRAMEWORKS/Testing.framework" ]; then
-    EXTRA="-Xswiftc -F -Xswiftc $FRAMEWORKS -Xlinker -rpath -Xlinker $FRAMEWORKS"
+    EXTRA+=(-Xswiftc -F -Xswiftc "$FRAMEWORKS" -Xlinker -rpath -Xlinker "$FRAMEWORKS")
     if [ -f "$INTEROP/lib_TestingInterop.dylib" ]; then
-        EXTRA="$EXTRA -Xlinker -rpath -Xlinker $INTEROP"
+        EXTRA+=(-Xlinker -rpath -Xlinker "$INTEROP")
     fi
 else
     echo "note: Testing.framework not found under $FRAMEWORKS; relying on the default search path"
 fi
 
-# Word splitting of $EXTRA is intended: it is a flag list, not a path.
-# shellcheck disable=SC2086
-exec swift test $EXTRA "$@"
+exec swift test "${EXTRA[@]}" "$@"

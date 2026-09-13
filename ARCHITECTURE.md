@@ -26,9 +26,11 @@ These are conceptual layers. **On disk they are `Sources/apple-calendar-mcp/{MCP
 EventKit,Diagnostics}` and the on-disk names win** — the directories were never renamed to
 match, and the layer names survive here as vocabulary.
 
-`EKEventStore` is confined to one dedicated thread behind an actor with a custom
-`SerialExecutor`; EventKit objects never cross the adapter boundary, and callers receive
-immutable DTOs.
+`EKEventStore` is initialized lazily and confined to an actor with a custom serial-queue
+executor. Serialization does not imply one permanent OS thread. EventKit objects never cross
+the adapter boundary; callers receive immutable DTOs. A separate `CalendarReadGate` bounds
+one active read to 15 seconds, rejects overlap as busy, and permanently refuses further reads
+after timeout until restart. Diagnostics and tool discovery bypass it. See plan §5.
 
 **On "the only file that imports EventKit":** it was never true and is now stated correctly.
 Four files import EventKit — `main.swift`, `CalendarStore`, `AuthorizationState` and

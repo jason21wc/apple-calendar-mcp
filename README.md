@@ -50,7 +50,13 @@ credentials.
 
 **Read-only and usable.** Five read tools work against your real calendar from Claude Code,
 Codex and Claude Desktop: permission status, list calendars, list events, search events, and
-busy intervals.
+busy intervals. Events whose calendars cannot express availability are counted conservatively
+as busy; only explicit free time and canceled events are excluded.
+
+Content reads run one at a time. An overlapping request returns `CALENDAR_STORE_BUSY`; retry
+after the first finishes. A read exceeding 15 seconds returns `CALENDAR_TIMEOUT`; subsequent
+reads return `CALENDAR_STORE_WEDGED` until you restart the server. Permission status and tool
+discovery remain available. The timeout stops waiting, not the underlying EventKit operation.
 
 **No write tools exist yet.** Create, update and delete are designed but unbuilt — see
 `docs/IMPLEMENTATION-PLAN.md` §6. Nothing this server currently exposes can change your

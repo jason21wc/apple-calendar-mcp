@@ -33,6 +33,9 @@ enum ToolError: String {
     case missingArgument = "MISSING_ARGUMENT"
     case unknownTool = "UNKNOWN_TOOL"
     case storeUnavailable = "CALENDAR_STORE_UNAVAILABLE"
+    case storeBusy = "CALENDAR_STORE_BUSY"
+    case storeTimedOut = "CALENDAR_TIMEOUT"
+    case storeWedged = "CALENDAR_STORE_WEDGED"
 
     /// Maps the time layer's errors onto the wire codes, so the two cannot drift apart
     /// silently -- a new TimeError case will not compile without a decision here.
@@ -48,7 +51,7 @@ enum ToolError: String {
 
 enum ToolHandlers {
 
-    static func dispatch(_ params: CallTool.Parameters, store: CalendarStore) async -> CallTool.Result {
+    static func dispatch(_ params: CallTool.Parameters, store: CalendarStore) async throws -> CallTool.Result {
         do {
             // Permission status is answerable in every state -- it is the tool you reach for
             // WHEN access is broken, so gating it behind access would be circular.
@@ -74,24 +77,39 @@ enum ToolHandlers {
                     """)
             }
 
-            switch params.name {
-            case "calendar_permission_status": return await permissionStatus()
-            case "calendar_list_calendars":    return try await listCalendars(store)
-            case "calendar_list_events":       return try await listEvents(params, store)
-            case "calendar_find_events":       return try await findEvents(params, store)
-            case "calendar_busy_intervals":    return try await busyIntervals(params, store)
-            default:
-                // Unreachable: the name was checked against the registry above. Kept so
-                // adding a tool to the registry without a handler fails loudly rather than
-                // falling through to something arbitrary.
-                return failure(.unknownTool, "tool \(params.name) is declared but not handled")
+            // Every content read shares one gate. Diagnostic/protocol methods bypass it.
+            // This closure must remain read-only; future writes need outcome reconciliation.
+            return try await store.readGate.run {
+                switch params.name {
+                case "calendar_list_calendars": return try await listCalendars(store)
+                case "calendar_list_events":    return try await listEvents(params, store)
+                case "calendar_find_events":    return try await findEvents(params, store)
+                case "calendar_busy_intervals": return try await busyIntervals(params, store)
+                default:
+                    return failure(.unknownTool, "tool \(params.name) is declared but not handled")
+                }
             }
         } catch let e as TimeError {
             return failure(ToolError(e), e.description)
+        } catch let error as CalendarReadError {
+            return readFailure(error)
+        } catch is CancellationError {
+            throw CancellationError() // Let the MCP SDK suppress the canceled request's response.
         } catch {
             // Sanitised deliberately: framework errors carry paths and internal detail, and a
             // model cannot act on them anyway.
             return failure(.storeUnavailable, "the calendar store could not complete that request")
+        }
+    }
+
+    static func readFailure(_ error: CalendarReadError) -> CallTool.Result {
+        switch error {
+        case .busy:
+            return failure(.storeBusy, "another calendar read is still running; retry after it finishes")
+        case .timedOut:
+            return failure(.storeTimedOut, "calendar read exceeded its deadline; restart the server before retrying")
+        case .wedged:
+            return failure(.storeWedged, "calendar subsystem is blocked; restart the server")
         }
     }
 
