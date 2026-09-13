@@ -111,5 +111,6 @@ codesign -dvvv "$BIN" 2>&1 | grep -i "^CDHash" || true
 echo
 echo "--- designated requirement: THIS is what the TCC grant is checked against ---"
 echo "    Identity-based, so rebuilds keep the grant. The grant is keyed to the"
-echo "    binary's ABSOLUTE PATH, so moving or reinstalling it needs a fresh --setup."
+echo "    binary's ABSOLUTE PATH. A new path needs --setup; a same-path replacement"
+echo "    signed by the same identity should retain access. Check --doctor first."
 codesign -d -r- "$BIN" 2>&1 | grep designated || true

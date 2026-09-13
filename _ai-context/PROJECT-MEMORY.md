@@ -72,6 +72,15 @@ plan §5 for timeout and cancellation behavior.
 
 ## Key Decisions
 
+**2026-09-13 — Prefer host-managed connection refresh to whole-app restarts.** The human
+wants repeatable setup and updates without repeatedly quitting Codex. Official guidance and
+the installed desktop Restart event path support restarting the selected host's backend
+connection from MCP settings. This is not a per-Calendar restart or a completed UI measurement.
+Keep stdio/EOF shutdown and the one-time identity re-exec; no server watchdog or HTTP daemon
+is justified by missing host discovery. Separate registration, runtime version, permission,
+and approval evidence; see `docs/CLIENT-LIFECYCLE.md`. Prefer user-level registration for
+daily cross-project use once that artifact can be verified.
+
 **2026-09-13 — Client neutrality reaffirmed by the human.** Claude Cowork and ChatGPT/Codex
 Work are peer integration targets alongside Claude Code/Desktop. Starting in Cowork creates
 no dependency on Cowork. Verify through the current host; keep the same tool contracts and

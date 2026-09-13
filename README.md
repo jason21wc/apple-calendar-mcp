@@ -154,8 +154,9 @@ Start verification in the client you are using: call `calendar_permission_status
 Its `client.elicitation_form_supported` field reports that connection's declared support,
 not a demonstrated approval. A shell-launched MCP test reports its own supplied capabilities,
 not those of the app running the shell. A missing tool requires checking that client's
-registration; it does not require switching to Cowork. Restart only when refreshing a stale
-connection or loading changed configuration or an installed binary.
+registration; it does not require switching to Cowork. Use the host's connection refresh
+before considering a full app restart. See [client lifecycle](docs/CLIENT-LIFECYCLE.md) for
+the Codex MCP-settings Restart control and separate setup/update/recovery checks.
 
 **Claude Code**
 ```bash

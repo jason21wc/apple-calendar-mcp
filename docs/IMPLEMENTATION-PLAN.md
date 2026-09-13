@@ -536,6 +536,10 @@ Clean shutdown when stdin closes.
 
 ## 9. Client integration
 
+Connection loading, runtime updates, and recovery follow [CLIENT-LIFECYCLE.md](CLIENT-LIFECYCLE.md).
+The host owns stdio startup and reconnection; a server self-respawn loop cannot refresh the
+host's registration/catalog. Keep the current EOF shutdown and one-time identity re-exec.
+
 **Client neutrality is a project requirement.** Claude Cowork, Claude Code, Claude Desktop,
 and ChatGPT/Codex Work are peer targets. The server's tool contracts and C3–C7 safeguards
 remain the same for equivalent launch configuration. Each client must reach the local macOS

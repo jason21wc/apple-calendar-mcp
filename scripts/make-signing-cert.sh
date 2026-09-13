@@ -15,7 +15,8 @@
 # `git pull && swift build`.
 #
 # Separately: the grant is keyed to the binary's ABSOLUTE PATH, so a stable certificate
-# does not save you from moving or reinstalling the binary. Re-run --grant at the new path.
+# does not save you from moving the binary. Re-run --setup at a new installed path;
+# same-path replacements signed by the same identity should retain the grant.
 #
 # Run once per machine. Idempotent.
 

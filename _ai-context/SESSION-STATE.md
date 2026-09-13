@@ -25,6 +25,9 @@
   is distinct from the successful direct stdio check recorded below.
 - That follow-up is published at `1c52de4`; its full macOS CI passed, including lifecycle
   checks: [verification run](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34782316171).
+- The connection lifecycle is documented in `docs/CLIENT-LIFECYCLE.md`: prefer the host's
+  supported refresh over quitting the desktop app. Codex's MCP Restart event path was
+  inspected in the installed build; its live result in this task remains unverified.
 
 ## Validation
 
@@ -44,6 +47,8 @@
   No tests were excluded in that run. The local sandbox limitation remains environment-specific.
 - No event-data query, permission request, or journal cleanup was made. Tests use synthetic
   values and owned temporary storage. The later project-level client registration is below.
+- The lifecycle documentation and signing-guidance correction passed independent review,
+  shell syntax checks, and all 158 local tests outside the three sandbox-blocked lifecycle cases.
 
 ## Next actions, in order
 
@@ -51,8 +56,11 @@
    Claude Cowork and ChatGPT/Codex Work are peer targets. Call `calendar_permission_status`
    through the current host's native MCP connection once available. A declaration only
    establishes whether a form-elicitation test is worth trying; it never proves approval.
-   A later turn still exposed no native Calendar tools. The human needs to reload the
-   Codex MCP connection/app before this task can measure that connection; see attempts below.
+   A later turn still exposed no native Calendar tools. **Supersedes the quit/reopen advice:**
+   follow `docs/CLIENT-LIFECYCLE.md`: inspect MCP settings, save the appropriate registration,
+   use its Restart control while idle, then verify `/mcp` and a real status call. Installed
+   source shows a backend-connection restart, not an Electron app relaunch. The human must
+   operate that control because Computer Use blocks Codex; a live outcome is still unverified.
 2. **BACKLOG #24b:** design the approval request's timeout and abandoned-request cleanup,
    then demonstrate accept, decline, cancellation, absent support, error, and non-response.
    The read gate is NOT an elicitation implementation and must not be reused for it.
@@ -114,3 +122,6 @@ active work is in `BACKLOG.md`. Governance: `gov-4a43b04d5a39` (implementation) 
 `gov-2ade001e7ce0` (verification/publication); `meta-quality-verification-validation` governs
 separating local test limitations, CI evidence, and installed-host state.
 Client-neutral correction/registration: `gov-a6bea5af4c24`, `gov-905a976a93b6` (PROCEED).
+Lifecycle research/correction: `gov-6797056cbe2e` (REVIEW), `gov-23f2ad693912` (PROCEED).
+`meta-core-systemic-thinking` and `meta-quality-verification-validation`: fix the host-loading
+workflow, retain the server lifecycle, and distinguish implementation evidence from live UI results.
