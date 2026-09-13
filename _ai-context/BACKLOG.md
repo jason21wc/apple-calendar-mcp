@@ -9,16 +9,18 @@
 ## Active (Implement Now/Soon)
 
 - **#1 — PROVE AN ENFORCED HUMAN-APPROVAL ROUND TRIP. Blocks all write work.** Before any
-  write tool ships, demonstrate that Claude Desktop/Cowork reaches a human and that absence,
+  write tool ships, demonstrate that the current client reaches a human and that absence,
   refusal, cancellation, error or non-response cannot proceed to mutation. Candidate paths
-  are measured host `toolPolicy` (#23) and explicitly guarded server elicitation (#24). The
+  are measured client-specific host approval (Claude `toolPolicy` in #23; Codex candidates in
+  plan §6) and explicitly guarded server elicitation (#24). The
   prior `apple-mail` experiment is not to be repeated as evidence: three independent confounds
   made its null result attribute to nothing (gotcha 83).
 
 - **#24b — the live elicitation round trip. BLOCKED BY DESIGN, deliberately not built.**
   #24a is complete: `calendar_permission_status` reports declared/form/url booleans only;
-  client identity is discarded. The remaining Cowork observation is an operational step in
-  `SESSION-STATE`, not implementation work.
+  client identity is discarded. Measure the current host as an operational step in
+  `SESSION-STATE`; no Cowork report is a prerequisite. Repeat approval verification for each
+  client before enabling writes there.
   A capability declaration proves the client CLAIMS it can ask a human; only a completed round
   trip returning `.accept` shows one answered. **That probe must not be written until timeout
   and abandoned-request cleanup are designed** — `requestElicitation` awaits `task.value` with
@@ -48,9 +50,9 @@
   only order-gates, with no policy set — three sufficient explanations for one silence
   (gotcha 83). A tool that does NOT elicit is the right probe once the policy IS set, because
   then any prompt is attributable to the host. If the key is silently ignored by the installed
-  Desktop version, then the compensating control the whole write design rests on does not
-  exist, and the design needs a different one — that is a stop-and-redesign outcome, not a
-  detail. Human's call: it is an edit to their host configuration.
+  Desktop version, reject this candidate for that host and evaluate another enforced approval
+  mechanism. That result does not block verification in other clients; writes still require
+  proven human approval wherever enabled. Human's call: it is an edit to their host configuration.
 
 - **#2 — If #23 proves `toolPolicy` and the human retains it, configure it per-tool.** There is
   nothing to switch from today. Write tools `"ask"`, read tools
@@ -77,8 +79,8 @@
   trade-off is unmeasured: a JSON-RPC error can carry the same message, but hosts surface
   protocol errors differently from tool errors and some may not return the text to the model
   at all — which would cost a caller the list of valid tool names precisely when it has just
-  used a wrong one. Settle by checking what Claude Desktop and Claude Code actually show the
-  model for each, then pick. Low severity either way.
+  used a wrong one. Settle by checking what the supported connected clients, including Codex,
+  actually show the model for each, then pick. Low severity either way.
 
 - **#7 — Third-party attribution file.** If any expression is borrowed from either MIT
   reference repo, add a `NOTICE` / `THIRD-PARTY-NOTICES.md` carrying the original MIT text

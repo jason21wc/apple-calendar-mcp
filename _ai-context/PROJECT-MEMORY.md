@@ -72,6 +72,13 @@ plan §5 for timeout and cancellation behavior.
 
 ## Key Decisions
 
+**2026-09-13 — Client neutrality reaffirmed by the human.** Claude Cowork and ChatGPT/Codex
+Work are peer integration targets alongside Claude Code/Desktop. Starting in Cowork creates
+no dependency on Cowork. Verify through the current host; keep the same tool contracts and
+C3–C7 safeguards across clients with equivalent launch configuration. Connection support and
+approval UI behavior remain per-client measurements. A subprocess's supplied handshake is
+not evidence of the enclosing app's capabilities. No containment control changed.
+
 | Decision | Date | Rationale |
 |----------|------|-----------|
 | Native Swift + EventKit, not AppleScript / sqlite / CalDAV | 2026-08-16 | AppleScript automation is unreliable under TCC; direct `Calendar.sqlitedb` access is SIP-blocked and unsupported; CalDAV requires credentials we refuse to hold. EventKit is the only supported path. |

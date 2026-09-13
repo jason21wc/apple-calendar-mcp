@@ -1,7 +1,13 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # apple-calendar-mcp
 
-**Description:** Local stdio MCP server giving Claude Code, Codex and Claude Desktop access to the macOS user's Apple Calendar via native EventKit. **Read access is shipped; write access is designed, governed and not built.** Swift, personal use, Apache-2.0, published.
+**Description:** Client-neutral local stdio MCP server giving compatible clients access to the macOS user's Apple Calendar via native EventKit. Claude Cowork, Claude Code, Claude Desktop, and ChatGPT/Codex Work are peer integration targets, each requiring a connection to this Mac's server. **Read access is shipped; write access is designed, governed and not built.** Swift, personal use, Apache-2.0, published.
+
+**Use the current client to verify the server.** Do not anchor work or ask the human to switch
+clients because an earlier session used Cowork. Keep tool contracts and server safeguards
+consistent across clients; measure connection availability and human approval per client.
+A subprocess test measures its supplied MCP capabilities, not the enclosing app's handshake.
+
 **Framework:** AI Coding Methods (current version)
 **Mode:** Standard
 

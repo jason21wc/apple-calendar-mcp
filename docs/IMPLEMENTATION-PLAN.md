@@ -373,6 +373,13 @@ constraints, all verified in SDK source rather than assumed:
 observed round trip returning `.accept` demonstrates a person answered, and even that
 demonstrates it for one client at one version.
 
+**Host approval is also client-specific.** Claude Desktop's `toolPolicy` is one candidate,
+not the portable interface. The [OpenAI MCP guide](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
+documents Codex `default_tools_approval_mode = "writes"` and per-tool `approval_mode` overrides.
+These are unverified candidates here, not settings applied by this project. A false form
+elicitation flag does not establish that a client lacks its own tool-approval mechanism.
+Whichever path is selected must demonstrate the same human-confirmation and refusal contract.
+
 **Gate 1, before any write code: demonstrate an enforced human-approval round trip**, and
 demonstrate that absence, refusal, cancellation, error and non-response all fail to a refusal.
 
@@ -385,8 +392,9 @@ all. A null result standing on a stack of sufficient causes is evidence about no
 
 The experiment belongs in **our** binary, where every layer is ours to control — and asking a
 human is orthogonal to mutating anything, so it needs no write tool to exist. See BACKLOG #24.
-Then move to per-tool policy: writes `"ask"`, reads unlisted, so the requirement is encoded
-directly rather than resting on a wildcard whose handling is inferred.
+If host policy is selected, verify that host's per-tool configuration: writes confirmed,
+reads silent. Writes `"ask"` with reads unlisted is a candidate for hosts supporting that
+setting, not a portable configuration or a requirement to use Claude Desktop/Cowork.
 
 ### Status
 
@@ -527,6 +535,18 @@ Clean shutdown when stdin closes.
 ---
 
 ## 9. Client integration
+
+**Client neutrality is a project requirement.** Claude Cowork, Claude Code, Claude Desktop,
+and ChatGPT/Codex Work are peer targets. The server's tool contracts and C3–C7 safeguards
+remain the same for equivalent launch configuration. Each client must reach the local macOS
+stdio process; local execution and client-specific connection support must be verified rather
+than inferred from the product name. No particular client is a prerequisite for development.
+
+Run `calendar_permission_status` through the current client first. Its capability flags
+describe that connection, not universal support; a direct stdio harness describes only its
+own supplied handshake. Approval acceptance and all refusal paths must be demonstrated in
+each client before enabling writes there. A client that cannot enforce approval keeps reads
+available and must refuse writes. Historical Cowork observations elsewhere are scoped evidence.
 
 Absolute path always — the TCC grant is keyed to it. **Serving is what happens with NO
 arguments**; there is no `serve` subcommand, and passing one exits `EX_USAGE` as an unknown

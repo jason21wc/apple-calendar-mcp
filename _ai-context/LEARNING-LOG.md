@@ -12,6 +12,11 @@
 
 ## Active Lessons
 
+**2026-09-13 — Session history became an unintended client dependency.** I made a Cowork
+status report the next gate although the server is client-neutral and work had moved to
+Codex. **Rule:** verify in the current client, separate server guarantees from client
+integration evidence, and never turn the originating host into a product requirement.
+
 **2026-09-13 — Cancellation ends a caller, not a blocking dependency.** A read caller can
 stop waiting while EventKit still occupies its executor. Freeing the admission slot at that
 point would queue more work behind it. **Rule:** retain the operation slot/deadline until

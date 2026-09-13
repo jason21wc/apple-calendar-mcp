@@ -1,8 +1,15 @@
 # apple-calendar-mcp
 
-A local [MCP](https://modelcontextprotocol.io) server that lets Claude Code and Codex work
-with your macOS Calendar through native EventKit. Swift, no network, no cloud, no
-credentials.
+A local [MCP](https://modelcontextprotocol.io) server for your macOS Calendar through native
+EventKit. **Client-neutral:** Claude Cowork, Claude Code, Claude Desktop, and ChatGPT/Codex
+Work are peer integration targets. Starting development in one client does not make that
+client a dependency. Swift, no server-side network or cloud connection, no credentials.
+
+Compatible clients receive the same tool contracts and server safeguards for the same launch
+configuration. Each workflow must have a connection to this Mac's local stdio server;
+the target list is not a claim that every cloud environment can launch a macOS executable.
+Approval support is verified per client connection, without changing the requirement that
+every future write be confirmed by a human.
 
 > ## ⚠️ This software can permanently delete calendar events
 >
@@ -143,6 +150,13 @@ the exact binary contents and you would lose calendar access on every rebuild.
 
 Use the same absolute path you granted permission to.
 
+Start verification in the client you are using: call `calendar_permission_status` there.
+Its `client.elicitation_form_supported` field reports that connection's declared support,
+not a demonstrated approval. A shell-launched MCP test reports its own supplied capabilities,
+not those of the app running the shell. A missing tool requires checking that client's
+registration; it does not require switching to Cowork. Restart only when refreshing a stale
+connection or loading changed configuration or an installed binary.
+
 **Claude Code**
 ```bash
 claude mcp add --transport stdio apple-calendar -- /usr/local/bin/apple-calendar-mcp
@@ -154,6 +168,13 @@ claude mcp add --transport stdio apple-calendar -- /usr/local/bin/apple-calendar
 command = "/usr/local/bin/apple-calendar-mcp"
 args = []
 ```
+
+The [OpenAI MCP configuration guide](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
+also documents trusted-project configuration in `.codex/config.toml` and shared desktop/CLI
+configuration. Select a local execution environment with access to this Mac's server.
+This repository includes a project configuration pointing to the installed binary with
+`--read-only`. It takes effect only when the host loads trusted-project configuration;
+configuration on disk is not proof that a running task has connected.
 
 **Claude Desktop** — in `claude_desktop_config.json`:
 ```json

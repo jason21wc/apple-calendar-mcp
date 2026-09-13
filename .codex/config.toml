@@ -1,0 +1,4 @@
+# Use the installed, signed binary; never grant Calendar access to a .build executable.
+[mcp_servers.apple-calendar]
+command = "/usr/local/bin/apple-calendar-mcp"
+args = ["--read-only"]

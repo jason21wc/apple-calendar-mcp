@@ -24,16 +24,55 @@ private actor HeldRead {
     func release() { continuation?.resume(returning: 42); continuation = nil }
 }
 
+/// Observes actual timer cancellation without assuming how quickly tasks are scheduled.
+private actor TimerCancellationObserver {
+    private var completions: [Bool] = []
+    private var waiters: [(count: Int, continuation: CheckedContinuation<Bool, Never>)] = []
+
+    func sleep(until deadline: ContinuousClock.Instant) async throws {
+        do {
+            try await ContinuousClock().sleep(until: deadline)
+        } catch is CancellationError {
+            recordCompletion(canceled: true)
+            throw CancellationError()
+        } catch {
+            recordCompletion(canceled: false)
+            throw error
+        }
+        // A missing cancellation must fail the assertion after the generous deadline,
+        // rather than leave the test waiting on a continuation forever.
+        recordCompletion(canceled: false)
+    }
+
+    private func recordCompletion(canceled: Bool) {
+        completions.append(canceled)
+        let ready = waiters.filter { $0.count <= completions.count }
+        waiters.removeAll { $0.count <= completions.count }
+        for waiter in ready {
+            waiter.continuation.resume(returning: completions[waiter.count - 1])
+        }
+    }
+
+    func wasCanceled(_ count: Int) async -> Bool {
+        if completions.count >= count { return completions[count - 1] }
+        return await withCheckedContinuation { waiters.append((count, $0)) }
+    }
+}
+
 @Suite("Bounded Calendar reads", .timeLimit(.minutes(1)))
 struct CalendarReadGateTests {
     @Test("ordinary failures release admission without arming a later false timeout")
     func failureReleasesSlot() async throws {
-        let gate = CalendarReadGate(timeout: .milliseconds(80))
+        let timer = TimerCancellationObserver()
+        let gate = CalendarReadGate(timeout: .seconds(5), sleepUntil: {
+            try await timer.sleep(until: $0)
+        })
         await #expect(throws: CalendarReadError.busy) {
             try await gate.run { () -> Int in throw CalendarReadError.busy }
         }
-        try await Task.sleep(for: .milliseconds(120))
+        #expect(await timer.wasCanceled(1))
         #expect(try await gate.run { 7 } == 7)
+        #expect(await timer.wasCanceled(2))
     }
 
     @Test("overdue completion fails even when delivery of the deadline timer is delayed")
@@ -78,10 +117,14 @@ struct CalendarReadGateTests {
 
     @Test("completed operations release admission and canceled timers never wedge")
     func success() async throws {
-        let gate = CalendarReadGate(timeout: .milliseconds(100))
+        let timer = TimerCancellationObserver()
+        let gate = CalendarReadGate(timeout: .seconds(5), sleepUntil: {
+            try await timer.sleep(until: $0)
+        })
         #expect(try await gate.run { 1 } == 1)
-        try await Task.sleep(for: .milliseconds(150))
+        #expect(await timer.wasCanceled(1))
         #expect(try await gate.run { 2 } == 2)
+        #expect(await timer.wasCanceled(2))
     }
 
     @Test("overlap fails immediately instead of submitting a second adapter operation")
