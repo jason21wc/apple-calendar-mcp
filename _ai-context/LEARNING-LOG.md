@@ -12,6 +12,11 @@
 
 ## Active Lessons
 
+**2026-09-13 — Ordinary completion tests accidentally measured scheduler speed.** Two gate
+tests assumed work would beat 80–100 ms fixture deadlines under parallel load. **Rule:**
+observe completion and timer cancellation directly, bound the failure wait, and keep
+separate tests for real timeout behavior.
+
 **2026-09-13 — Session history became an unintended client dependency.** I made a Cowork
 status report the next gate although the server is client-neutral and work had moved to
 Codex. **Rule:** verify in the current client, separate server guarantees from client

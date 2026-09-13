@@ -23,6 +23,8 @@
 - Client-neutral documentation and backlog now treat Claude Cowork and ChatGPT/Codex Work
   as peer targets. Trusted-project Codex registration is included; native connection status
   is distinct from the successful direct stdio check recorded below.
+- That follow-up is published at `1c52de4`; its full macOS CI passed, including lifecycle
+  checks: [verification run](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34782316171).
 
 ## Validation
 
@@ -49,6 +51,8 @@
    Claude Cowork and ChatGPT/Codex Work are peer targets. Call `calendar_permission_status`
    through the current host's native MCP connection once available. A declaration only
    establishes whether a form-elicitation test is worth trying; it never proves approval.
+   A later turn still exposed no native Calendar tools. The human needs to reload the
+   Codex MCP connection/app before this task can measure that connection; see attempts below.
 2. **BACKLOG #24b:** design the approval request's timeout and abandoned-request cleanup,
    then demonstrate accept, decline, cancellation, absent support, error, and non-response.
    The read gate is NOT an elicitation implementation and must not be reused for it.
@@ -91,6 +95,16 @@
   saved in `.codex/config.toml`, pointing to the installed binary with `--read-only`.
   `codex mcp get apple-calendar --json` resolves it as enabled with the expected command/args.
   Native connection and capability measurement remain unverified until the host loads it.
+- Native verification attempts on 2026-09-13: installed CLI `0.153.4` still resolves the
+  project registration. Its documented app-server API includes MCP reload/status/tool-call
+  methods, but `app-server proxy` found no control socket. A temporary backend failed before
+  initialization because its state database could not initialize, including with escalation.
+  No diagnostic task or native MCP call was created. Computer Use explicitly prohibits
+  operating the Codex app, so app-side refresh must be performed by the human. These are
+  execution-environment limits, not evidence against Calendar server compatibility or approval.
+- The journal checkpoint was analyzed and its accepted memory proposals applied. Its receipt
+  command returned `accepted: false, reason: state_unavailable`, including with escalation;
+  the governance cache has not acknowledged that checkpoint.
 
 ## Resuming
 
