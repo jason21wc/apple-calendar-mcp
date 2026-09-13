@@ -26,10 +26,31 @@ the user-level entry is verified; avoid divergent definitions for the same serve
 The [OpenAI configuration guide](https://learn.chatgpt.com/docs/extend/mcp?surface=desktop)
 describes both scopes and desktop/CLI sharing. Hosted web chats do not read those local files.
 
+**Check editability first.** This desktop build makes project-origin MCP entries read-only:
+both the gear and enable toggle are disabled. Restart is conditional on a successful
+settings-page mutation; it is not an always-visible reconnect button. A file edited outside
+Settings does not itself set that UI flag. The September 13 screenshot exposed this missing
+precondition in the original runbook. Do not send the user looking for Save/Restart on a
+read-only row or change unrelated settings just to reveal Restart.
+
+For migration, create the user-level entry with the supported CLI:
+
+```bash
+codex mcp add apple-calendar -- /usr/local/bin/apple-calendar-mcp --read-only
+```
+
+If the agent cannot write the user configuration, run this in the user's Terminal. Verify
+the resulting user-level entry, then remove the matching project override so Settings can
+manage it. The Add UI generates a suffixed key when that name already exists; do not create
+an accidental `apple-calendar-2` registration. CLI registration alone does not prove that an
+existing task has reloaded its tools or make the Restart control visible.
+
+For an editable user-level entry:
+
 1. When active work is idle, open **Settings → MCP servers** and inspect `apple-calendar`.
    If absent, add a STDIO server named `apple-calendar` with command
    `/usr/local/bin/apple-calendar-mcp` and argument `--read-only`, then save.
-2. Use the MCP settings **Restart** control after saving. In the inspected desktop build,
+2. After a successful settings-page change, use its **Restart** control. In the inspected desktop build,
    this restarts the selected host's **backend connection**, not the desktop application.
    Its scope is broader than Calendar alone; do not describe it as a per-server restart.
 3. Return to the task and use `/mcp` to inspect connected servers. Have the task call

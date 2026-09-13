@@ -72,6 +72,14 @@ plan §5 for timeout and cancellation behavior.
 
 ## Key Decisions
 
+**2026-09-13 — Project registration blocks desktop Settings edits.** The user's screenshot
+showed a faded Calendar gear/toggle and no Restart. Installed source sets both controls
+disabled for project-origin servers; Restart is shown only after a successful UI mutation.
+The user-level Calendar entry was verified absent. Migrate to one verified user-level entry,
+then remove the project override; avoid Add UI name suffixes and unrelated setting changes
+to force a reload. The backend Restart implementation exists but was not reachable through
+the current row. `docs/CLIENT-LIFECYCLE.md` corrects the earlier incomplete instructions.
+
 **2026-09-13 — Prefer host-managed connection refresh to whole-app restarts.** The human
 wants repeatable setup and updates without repeatedly quitting Codex. Official guidance and
 the installed desktop Restart event path support restarting the selected host's backend

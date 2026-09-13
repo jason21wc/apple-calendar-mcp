@@ -12,6 +12,11 @@
 
 ## Active Lessons
 
+**2026-09-13 — A button's handler did not prove the button was available.** I traced
+Codex's Restart action and prescribed it without checking visibility and enabled conditions
+for the current registration. **Rule:** distinguish handler behavior, UI reachability, and
+observed recovery; verify all prerequisites before giving exact steps.
+
 **2026-09-13 — Ordinary completion tests accidentally measured scheduler speed.** Two gate
 tests assumed work would beat 80–100 ms fixture deadlines under parallel load. **Rule:**
 observe completion and timer cancellation directly, bound the failure wait, and keep

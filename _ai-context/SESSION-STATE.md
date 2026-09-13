@@ -48,7 +48,8 @@
 - No event-data query, permission request, or journal cleanup was made. Tests use synthetic
   values and owned temporary storage. The later project-level client registration is below.
 - The lifecycle documentation and signing-guidance correction passed independent review,
-  shell syntax checks, and all 158 local tests outside the three sandbox-blocked lifecycle cases.
+  shell syntax checks, and the local test command with the documented lifecycle exclusion.
+  Published at `7096f67`; [full CI passed](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34783951108).
 
 ## Next actions, in order
 
@@ -57,8 +58,11 @@
    through the current host's native MCP connection once available. A declaration only
    establishes whether a form-elicitation test is worth trying; it never proves approval.
    A later turn still exposed no native Calendar tools. **Supersedes the quit/reopen advice:**
-   follow `docs/CLIENT-LIFECYCLE.md`: inspect MCP settings, save the appropriate registration,
-   use its Restart control while idle, then verify `/mcp` and a real status call. Installed
+   follow `docs/CLIENT-LIFECYCLE.md`. The subsequent screenshot and installed source confirm
+   that the current project-origin row has disabled controls; Restart only appears after
+   a successful settings-page mutation. User-level Calendar registration is still absent.
+   Create and verify it with `codex mcp add`, then remove the matching project override.
+   Do not promise that a CLI edit reveals Restart. Verify `/mcp` and a real status call. Installed
    source shows a backend-connection restart, not an Electron app relaunch. The human must
    operate that control because Computer Use blocks Codex; a live outcome is still unverified.
 2. **BACKLOG #24b:** design the approval request's timeout and abandoned-request cleanup,
@@ -125,3 +129,5 @@ Client-neutral correction/registration: `gov-a6bea5af4c24`, `gov-905a976a93b6` (
 Lifecycle research/correction: `gov-6797056cbe2e` (REVIEW), `gov-23f2ad693912` (PROCEED).
 `meta-core-systemic-thinking` and `meta-quality-verification-validation`: fix the host-loading
 workflow, retain the server lifecycle, and distinguish implementation evidence from live UI results.
+Settings editability correction: `gov-6500cc87631d` (PROCEED); verify control visibility and
+enabled preconditions as well as handler behavior (`meta-quality-verification-validation`).
