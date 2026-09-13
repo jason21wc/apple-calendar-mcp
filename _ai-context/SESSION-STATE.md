@@ -1,125 +1,82 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # Session State
 
-**Last Updated:** 2026-08-27
+**Last Updated:** 2026-09-13
 **Memory Type:** Working (transient)
-**Lifecycle:** Prune at session start per §7.0.4
-
-> CURRENT state only. Decisions → `PROJECT-MEMORY.md` · lessons → `LEARNING-LOG.md` ·
-> deferred work → `BACKLOG.md` · recurring commitments → `OPERATIONS.md`.
->
-> **Pruned 2026-08-27.** This file had grown to 275 lines, most of it a narrative of the
-> 2026-08-22→27 work — history it explicitly says belongs elsewhere. Every fact was checked as
-> present in `PROJECT-MEMORY` (gotchas 68–95), `LEARNING-LOG`, or the plan before removal.
-
----
+**Lifecycle:** Current position only; decisions and history live in the other memory files.
 
 ## Where things stand
 
-- **Phases 1–4 complete**, published, in daily use. **Five read-only tools; no write tool
-  exists.** Phase 5 substrate (`Journal.swift`) is built and has no caller.
-- **`main` is at `3a7fb8a`, pushed, tree clean, CI green** on a macOS runner.
-- **`0.2.0` is installed and verified** at `/usr/local/bin/apple-calendar-mcp`.
-- **Nothing is in flight.** The next action belongs to the human (below).
+- Phases 1–4 are implemented. **Five read-only tools; no write tool exists.** The Phase 5
+  journal has no production caller. Write policy remains C3–C7, as amended 2026-08-25.
+- Readiness hardening is committed at `aa21c13`: unsupported availability counts as busy;
+  content reads have bounded waits and fail fast after timeout; diagnostic controls are
+  escaped; journal failures throw and recovery reads cross month boundaries.
+- The plan/specification now agree that unrestorable future-events deletion is refused.
+  Snapshot completeness explicitly includes existing alarms and structured locations.
+- Full macOS CI passed the implementation commit, including lifecycle checks:
+  [verification run](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34766574299).
+  Consult `git status` for the current checkout; the hash above identifies the implementation,
+  not subsequent closeout-only commits.
+- Installed binary was **not replaced** during this work. Source improvements are not yet
+  an assertion about the executable a connected host is running.
 
-| | |
-|---|---|
-| Repo | https://github.com/jason21wc/apple-calendar-mcp (public, Apache-2.0) |
-| Installed | `/usr/local/bin/apple-calendar-mcp`, root:wheel, **0.2.0**, 2026-08-27 |
-| Install verified | signature verifies strictly · `disclaimed-child` · **`fullAccess`** · read-only tool surface. The grant survived the same-path replacement with no `--setup` — gotcha 26 confirmed a second time |
-| Tests | `./scripts/test.sh` — green. No count here on purpose; it drifted to four values across four files |
-| CI | `.github/workflows/ci.yml` — build, tests, shell checks. No signing, TCC or Calendar; none can work on a hosted runner |
-| Tool surface | **5, all read-only** |
-| Desktop config | `--read-only` only. **`toolPolicy` is NOT set, and never has been** |
-| Controls | C3, C4, C5, **C6 and C7 as amended 2026-08-25**. C1 withdrawn; C2/C2a/C4a superseded |
-| Plan | `docs/IMPLEMENTATION-PLAN.md` — repo-canonical. Permission model is §4a |
-| Latest governance | `gov-800ad831a848` (PROCEED) — the C6/C7 amendment |
+## Validation
 
-## The decision that governs the write surface
-
-**Decided 2026-08-25 by the human** (`gov-800ad831a848`), replacing C6's blanket refusal:
-
-| Tier | Covers |
-|---|---|
-| **Silent** | All reads. Shipped |
-| **Confirm** | **Every write** — create, update, delete, restore — including group events and shared/network calendars |
-| **Refuse** | Only what EventKit cannot express or the tool cannot bound: setting `attendees`, setting RSVP status, bulk deletion, `futureEvents` deletion while restoration is unsolved |
-
-Removing an event with attendees is permitted behind a confirmation that says plainly it
-removes through EventKit, may notify participants, and cannot restore invitation state. The
-operation is called **remove** and is never presented as Calendar.app's Decline. C7 carries a
-named exception: attendee state is unrestorable, recovery is social.
-
-**This authorizes the policy, not the shipping of writes.** The Confirm tier has no verified
-mechanism. Nothing mutating may ship until an approval round trip is demonstrated.
+- `./scripts/test.sh` now explicitly selects native SwiftPM and workspace compiler caches.
+  This resolves the local Swift 6.4 default engine's missing TestingMacros problem.
+- `./scripts/test.sh --disable-sandbox --skip ServerLifecycleTests` passes locally. The full
+  local run reaches the tests but its lifecycle cases cannot inspect child processes because
+  this desktop execution sandbox denies `pgrep`. They report that limitation explicitly;
+  the tests were not weakened or silently skipped. Failed startup now cleans up its process.
+- Shell checks and staged privacy/credential checks pass. Independent reviews covered the
+  gate, cancellation, journal locking/durability, diagnostics, and documentation.
+- Full macOS CI passed on the implementation commit before publication to `main`.
+  No tests were excluded in that run. The local sandbox limitation remains environment-specific.
+- No live Calendar query, permission request, journal cleanup, or host-config edit was made.
+  Tests use synthetic values and owned temporary storage.
 
 ## Next actions, in order
 
-1. **HUMAN — read `calendar_permission_status` from Cowork** and report
-   `client.elicitation_form_supported`. Restart/reconnect Cowork first so it picks up 0.2.0.
-   **`true`** → Desktop claims it can put a question to a human; the Confirm tier has a
-   candidate and #24b becomes worth designing. **`false`** → server elicitation is closed for
-   Cowork and `toolPolicy` (#23) is the only remaining candidate. Either answer is progress.
-   *A declaration establishes eligibility to try, never that a human is reachable.*
-2. **BACKLOG #19** — bound EventKit operations, fail fast once wedged. Architecture-bearing:
-   plan it, contrarian-review it, then build. A live defect in shipped read-only code, and the
-   design precedent for the elicitation wait.
-3. **#27** — escape control characters in `log()` before any mutating code logs.
-4. **#24b** — the live elicitation round trip, only after timeout and abandoned-request
-   cleanup are designed. Same policy problem as #19, different cleanup problem.
-5. **Build order when unblocked:** `calendar_create_event` → `calendar_delete_event` **with
-   restore in the same change** → `calendar_update_event`.
+1. **Verify the actual Cowork client.** Reconnect and read `calendar_permission_status`, then
+   report `client.elicitation_form_supported`. Requested from the human in this task; not yet
+   received. A declaration only establishes whether a form-elicitation test is worth trying.
+2. **BACKLOG #24b:** design the approval request's timeout and abandoned-request cleanup,
+   then demonstrate accept, decline, cancellation, absent support, error, and non-response.
+   The read gate is NOT an elicitation implementation and must not be reused for it.
+   `toolPolicy` (#23) remains the other unverified candidate; no configuration was changed.
+3. Before any mutating caller, connect acknowledged journal storage and define outcome-error
+   reconciliation. Do not retry a future write merely because recording its outcome failed.
+   Implement the typed snapshot/field matrix and disposable-calendar round trip before delete.
+4. When the approval gate is proved: create → delete **with restore in the same change** →
+   update. The attendee/invitation exception is unchanged; other unrestorable fields refuse.
+5. Build/sign/install a reviewed release at the existing final path when activating these
+   source changes. Verify the installed artifact and actual-host behavior; no new Calendar
+   grant is implied by a same-path replacement signed by the same certificate.
 
-## Blocked on the human
+## Operational observations and limits
 
-| # | Decision |
-|---|---|
-| **1** | **Demonstrate an enforced human-approval round trip.** Blocks every write tool. Two candidates: server elicitation (#24a measured, #24b unbuilt) and host `toolPolicy` (#23, never configured). Do not re-run the `apple-mail` experiment — three independent confounds made its null result attribute to nothing (gotcha 83) |
-| 2 | Whether to prune the live journal — 571 lines, all test output. A deliberate operation, not a code fix |
+- Last installed version observed was `0.2.0` at `/usr/local/bin/apple-calendar-mcp`.
+  On 2026-09-13 strict signature verification passed and ownership was root:wheel.
+  `--doctor` from this constrained execution reported `disclaimed-child` + `notDetermined`
+  and the old reinstall guidance. That does not establish the grant state in Cowork and is
+  not a reason to run `--setup`. The 2026-08-27 `fullAccess` result is historical evidence.
+- Host `toolPolicy` was absent in the August inspection. It was not inspected this session;
+  do not describe it as configured or claim a current host-wide approval guarantee.
+- The live journal contains historical test contamination. Pruning it remains a separate,
+  deliberate operation; the new reader reports corruption instead of hiding it.
+- Keep the historical deny on the `.build` Calendar grant. **Never grant Calendar access
+  to a development binary.** Install only at a root-owned final path; identity and path
+  are load-bearing. Do not infer grant ownership from authorization status alone.
+- Real populated-calendar concurrency and provider-specific removal/notification semantics
+  remain unmeasured. Header evidence is not a live provider measurement.
+- Approval policy is decided, approval enforcement is unproven. A capability flag, annotation,
+  propose token, or governance assessment is never itself a human approval.
 
-## Not measured — do not assume
+## Resuming
 
-- **Whether any client actually prompts for a write.** Both candidate mechanisms are unproven.
-- The §5 concurrency criterion (500-event fetch vs a concurrent `tools/list`) — needs a
-  populated real calendar.
-- What `removeEvent` does to an invited event over CalDAV. Optional characterisation since the
-  C6 amendment, not a release gate.
-- The CLOEXEC exemption; macOS 14.0–26.4 permission behaviour.
-
-## Resuming after a restart
-
-1. `AGENTS.md` → `PROJECT-MEMORY.md` (controls, gotchas 1–95) → `docs/IMPLEMENTATION-PLAN.md`.
-2. `./scripts/test.sh` for a known-good baseline. Never plain `swift test`.
-3. Start at **Next action 1** if the human is present, otherwise **#19**.
-
-## Security posture
-
-The stale `.build` Calendar grant is **revoked** (`auth_value 0`) and that deny row must stay —
-removing it would let a user-writable path be re-granted. `/usr/local/bin/apple-calendar-mcp`
-holds the only live grant. **Never grant Calendar access to a binary under `.build`.**
-
-System Settings shows the display name only, so two grants for one binary at different paths
-look identical; distinguish via `TCC.db` (`tccutil` cannot target either — gotcha 32).
-
-The journal and snapshots are **same-uid writable** — reductions, not boundaries. With
-`toolPolicy` unset there is currently **no host-level gate on writes for any MCP server on this
-machine**, which is why the write surface stays blocked rather than merely careful.
-
-**Unrelated to this project, still true:** a plaintext iCloud app-specific password sits in
-`claude_desktop_config.json` under `apple-mail` → `APPLE_MAIL_MCP_IMAP_PASSWORD_ICLOUD`.
-
-## Phase results (condensed)
-
-**Phase 1** — passed only after an architecture change: a signed binary got no TCC identity of
-its own, and an `.app` wrapper did not fix it. The **self-disclaiming re-exec** did.
-
-**Phase 2** — command dispatch, embedded plist, honest exit codes.
-
-**Phase 3** — five authorization states, `TCCInspector`, `Doctor`, `SetupFlow`. `--setup`
-refuses to run under inherited identity, structurally preventing the Phase 1 failure.
-
-**Phase 4** — shipped, failed in real use, was fixed, then audited. Twelve false contract
-claims found by reading each tool's promises against its implementation; all fixed with
-synthetic tests. The orphan exit criterion, open for three phases, is met. See plan §5.
-
-**Phase 5** — `Journal.swift` only. Write-ahead, concurrency-safe, test-isolated. No caller.
+Read `PROJECT-MEMORY.md`, `LEARNING-LOG.md`, `OPERATIONS.md`, then canonical
+`docs/IMPLEMENTATION-PLAN.md`. Completed #19/#26/#27 work is recorded in project memory;
+active work is in `BACKLOG.md`. Governance: `gov-4a43b04d5a39` (implementation) and
+`gov-2ade001e7ce0` (verification/publication); `meta-quality-verification-validation` governs
+separating local test limitations, CI evidence, and installed-host state.
