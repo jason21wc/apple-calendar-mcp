@@ -195,7 +195,8 @@ struct InitializeCompatibilityTests {
                 throw WaitError.timeout
             }
             defer { group.cancelAll() }
-            return try await #require(group.next())
+            let result = try await group.next()
+            return try #require(result)
         }
     }
 }
