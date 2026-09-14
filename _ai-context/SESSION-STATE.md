@@ -11,7 +11,14 @@
   object-valued experimental capabilities. Local tests and real-process initialization,
   tool discovery, and EOF shutdown pass; its signing requirement matches installed `0.2.0`.
   Actual Codex logs confirm a handshake/data-format failure, but the exact desktop payload
-  was not captured. Installation and native-host verification remain outstanding.
+  was not captured. Full CI passed on `f6c4262`:
+  [verification run](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34857485411).
+  Installation was attempted with escalation but the shell refused to execute `sudo`
+  (`operation not permitted`). Installed version remains `0.2.0`. The human must run
+  `sudo /usr/bin/install -S -o root -g wheel -m 755 .build/release/apple-calendar-mcp /usr/local/bin/apple-calendar-mcp`
+  from the project terminal, verify signature/version, then use Calendar off/on → Settings
+  Restart once. Native-host verification remains outstanding. The rollback copy is
+  `.build/apple-calendar-mcp-0.2.0.backup`.
 - Phases 1–4 are implemented. **Five read-only tools; no write tool exists.** The Phase 5
   journal has no production caller. Write policy remains C3–C7, as amended 2026-08-25.
 - Readiness hardening is committed at `aa21c13`: unsupported availability counts as busy;
@@ -66,7 +73,7 @@
    `/mcp` was absent from the user's composer despite online guidance. The human successfully
    toggled Calendar off/on and used Settings Restart; tools remained absent. Host startup
    logs then showed Calendar launching and rejecting initialization with JSON-RPC -32603.
-   Install the reviewed, signed candidate after CI, then use the now-demonstrated Settings
+   Install the reviewed, signed, CI-passing candidate in the human's terminal, then use the now-demonstrated Settings
    refresh once and verify native status. Do not repeat configuration changes or permission
    setup to repair this handshake failure. Computer Use blocks controlling Codex, so the
    human operates Settings. See `docs/CLIENT-LIFECYCLE.md` for evidence and limits.
