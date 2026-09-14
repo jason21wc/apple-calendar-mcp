@@ -1,7 +1,7 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # Session State
 
-**Last Updated:** 2026-09-13
+**Last Updated:** 2026-09-14
 **Memory Type:** Working (transient)
 **Lifecycle:** Current position only; decisions and history live in the other memory files.
 
@@ -21,8 +21,8 @@
 - Installed binary was **not replaced** during this work. Source improvements are not yet
   an assertion about the executable a connected host is running.
 - Client-neutral documentation and backlog now treat Claude Cowork and ChatGPT/Codex Work
-  as peer targets. Trusted-project Codex registration is included; native connection status
-  is distinct from the successful direct stdio check recorded below.
+  as peer targets. User-level Codex registration is verified and the duplicate project
+  override removed; native connection status is distinct from the direct stdio check below.
 - That follow-up is published at `1c52de4`; its full macOS CI passed, including lifecycle
   checks: [verification run](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34782316171).
 - The connection lifecycle is documented in `docs/CLIENT-LIFECYCLE.md`: prefer the host's
@@ -60,9 +60,11 @@
    A later turn still exposed no native Calendar tools. **Supersedes the quit/reopen advice:**
    follow `docs/CLIENT-LIFECYCLE.md`. The subsequent screenshot and installed source confirm
    that the current project-origin row has disabled controls; Restart only appears after
-   a successful settings-page mutation. User-level Calendar registration is still absent.
-   Create and verify it with `codex mcp add`, then remove the matching project override.
-   Do not promise that a CLI edit reveals Restart. Verify `/mcp` and a real status call. Installed
+   a successful settings-page mutation. On September 14 the human ran `codex mcp add` in
+   the app's interactive terminal. Direct TOML inspection verified the user-level entry;
+   the identical project override was removed. Native Calendar tools remain absent from
+   this task's tool catalog. Inspect `/mcp` for connection status or the startup error
+   before choosing another refresh action. Do not promise that a CLI edit reveals Restart. Installed
    source shows a backend-connection restart, not an Electron app relaunch. The human must
    operate that control because Computer Use blocks Codex; a live outcome is still unverified.
 2. **BACKLOG #24b:** design the approval request's timeout and abandoned-request cleanup,
@@ -97,15 +99,15 @@
   remain unmeasured. Header evidence is not a live provider measurement.
 - Approval policy is decided, approval enforcement is unproven. A capability flag, annotation,
   propose token, or governance assessment is never itself a human approval.
-- Current task exposed no native Apple Calendar tools, and the inspected Codex user config
+- On September 13 the task exposed no native Apple Calendar tools, and the Codex user config
   had no Calendar registration. A direct stdio call to the installed `0.2.0` binary succeeded
   on 2026-09-13: `calendar_permission_status` returned `disclaimed-child` / `notDetermined`.
   Its `client` flags were false because the test harness declared no capabilities; this is
   not a measurement of Codex's native elicitation support. No event data or setup was requested.
-- Adding the user-level Codex registration was attempted but the filesystem rejected config
-  persistence with `Operation not permitted`. The supported project-level alternative is now
-  saved in `.codex/config.toml`, pointing to the installed binary with `--read-only`.
-  `codex mcp get apple-calendar --json` resolves it as enabled with the expected command/args.
+- The agent's September 13 user-level registration attempt failed with `Operation not
+  permitted`; a project-level entry temporarily supplied registration. On September 14,
+  the human's interactive-terminal command succeeded. The global entry points to the
+  installed binary with `--read-only`; its matching project override is now removed.
   Native connection and capability measurement remain unverified until the host loads it.
 - Native verification attempts on 2026-09-13: installed CLI `0.153.4` still resolves the
   project registration. Its documented app-server API includes MCP reload/status/tool-call
@@ -131,3 +133,6 @@ Lifecycle research/correction: `gov-6797056cbe2e` (REVIEW), `gov-23f2ad693912` (
 workflow, retain the server lifecycle, and distinguish implementation evidence from live UI results.
 Settings editability correction: `gov-6500cc87631d` (PROCEED); verify control visibility and
 enabled preconditions as well as handler behavior (`meta-quality-verification-validation`).
+Global registration migration: `gov-1ea4fe07dd03` (REVIEW; retrieved accounting ledger rule
+does not apply to this configuration migration). Direct source/configuration verification
+and separate native-connection evidence follow `meta-quality-verification-validation`.

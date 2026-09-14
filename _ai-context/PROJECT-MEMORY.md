@@ -72,6 +72,13 @@ plan §5 for timeout and cancellation behavior.
 
 ## Key Decisions
 
+**2026-09-14 — Global Codex registration verified; project override removed.** The human
+ran `codex mcp add` in the app's interactive zsh terminal. Direct TOML inspection confirmed
+the same installed binary and `--read-only` arguments in the user-level entry, so the
+identical Calendar-only project config was removed. Interactive terminal access differs
+from the agent's constrained shell. Check the existing task's `/mcp` status before further
+refresh actions; a config migration does not demonstrate native tool availability or approval.
+
 **2026-09-13 — Project registration blocks desktop Settings edits.** The user's screenshot
 showed a faded Calendar gear/toggle and no Restart. Installed source sets both controls
 disabled for project-origin servers; Restart is shown only after a successful UI mutation.

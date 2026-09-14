@@ -167,15 +167,15 @@ claude mcp add --transport stdio apple-calendar -- /usr/local/bin/apple-calendar
 ```toml
 [mcp_servers.apple-calendar]
 command = "/usr/local/bin/apple-calendar-mcp"
-args = []
+args = ["--read-only"]
 ```
 
 The [OpenAI MCP configuration guide](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
 also documents trusted-project configuration in `.codex/config.toml` and shared desktop/CLI
 configuration. Select a local execution environment with access to this Mac's server.
-This repository includes a project configuration pointing to the installed binary with
-`--read-only`. It takes effect only when the host loads trusted-project configuration;
-configuration on disk is not proof that a running task has connected.
+Prefer the user-level entry for access across projects and editable desktop Settings.
+This repository does not supply a project override. Configuration on disk is not proof
+that a running task has connected; inspect `/mcp` and call `calendar_permission_status`.
 
 **Claude Desktop** — in `claude_desktop_config.json`:
 ```json

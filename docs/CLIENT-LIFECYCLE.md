@@ -21,8 +21,9 @@ do not keep restarting without new evidence. A full application restart is a fal
 ## Codex / ChatGPT desktop
 
 For everyday use across projects, prefer one user-level registration in `~/.codex/config.toml`.
-The repository's `.codex/config.toml` is a narrower trusted-project registration. Keep it until
-the user-level entry is verified; avoid divergent definitions for the same server name.
+A `.codex/config.toml` entry is a narrower trusted-project registration. During migration,
+keep it until the user-level entry is verified, then remove the duplicate. This repository
+no longer supplies that override; avoid divergent definitions for the same server name.
 The [OpenAI configuration guide](https://learn.chatgpt.com/docs/extend/mcp?surface=desktop)
 describes both scopes and desktop/CLI sharing. Hosted web chats do not read those local files.
 
@@ -43,7 +44,9 @@ If the agent cannot write the user configuration, run this in the user's Termina
 the resulting user-level entry, then remove the matching project override so Settings can
 manage it. The Add UI generates a suffixed key when that name already exists; do not create
 an accidental `apple-calendar-2` registration. CLI registration alone does not prove that an
-existing task has reloaded its tools or make the Restart control visible.
+existing task has reloaded its tools or make the Restart control visible. First inspect
+`/mcp` in the existing task for connection status or a startup error. Use that evidence to
+choose a refresh or resolve a launch failure, rather than assuming either from missing tools.
 
 For an editable user-level entry:
 
