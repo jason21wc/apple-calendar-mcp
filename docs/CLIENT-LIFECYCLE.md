@@ -9,6 +9,7 @@ connection. No server watchdog, automatic grant request, or new network transpor
 | Observation | Action | Success evidence |
 |---|---|---|
 | Server is configured but its tools are absent | Load the effective host configuration and refresh its MCP catalog/connection | The current task exposes `calendar_permission_status` and can call it |
+| Startup reports a handshake/data-format error | Read the host startup log and reproduce initialization; correct the server incompatibility before refreshing again | Initialization succeeds, then tools are listed |
 | A new executable was installed | Refresh the host's server connection so it launches the installed executable | Check the server version reported at initialization, then permission status |
 | A read reports `CALENDAR_STORE_WEDGED` | Refresh that server connection using the host's supported control | A fresh connection answers diagnostics; then a bounded read succeeds |
 | Permission status reports unavailable access | Inspect the reported identity, installed path, signature, and authorization | `disclaimed-child` plus usable access in the actual host context |
@@ -45,8 +46,10 @@ the resulting user-level entry, then remove the matching project override so Set
 manage it. The Add UI generates a suffixed key when that name already exists; do not create
 an accidental `apple-calendar-2` registration. CLI registration alone does not prove that an
 existing task has reloaded its tools or make the Restart control visible. First inspect
-`/mcp` in the existing task for connection status or a startup error. Use that evidence to
-choose a refresh or resolve a launch failure, rather than assuming either from missing tools.
+the host's connection status or startup log. `/mcp` is documented by OpenAI but was absent
+from this desktop's composer; do not prescribe it unless the command is actually offered.
+Use launch evidence to choose a refresh or resolve a failure, rather than assuming either
+from missing tools.
 
 For an editable user-level entry:
 
@@ -56,8 +59,9 @@ For an editable user-level entry:
 2. After a successful settings-page change, use its **Restart** control. In the inspected desktop build,
    this restarts the selected host's **backend connection**, not the desktop application.
    Its scope is broader than Calendar alone; do not describe it as a per-server restart.
-3. Return to the task and use `/mcp` to inspect connected servers. Have the task call
-   `calendar_permission_status`. Configuration visible on disk alone is insufficient.
+3. Return to the task and have it call `calendar_permission_status` if exposed. If tools
+   remain absent, inspect the host startup log before any further restart. Configuration
+   visible on disk alone is insufficient.
 4. Record authorization/identity separately from `client.elicitation_form_supported`.
    That flag describes the actual connection's declaration, not a human approval round trip.
    A shell harness reports the capabilities supplied by the harness, not the desktop UI.
@@ -68,6 +72,22 @@ Restart. Read-only inspection of desktop version `26.908.40834` (build `8881`, b
 connection's `restart(...)`, `stopProcess()`, and `ensureReady()`. This path does not invoke
 Electron quit/relaunch. The UI's descriptive string says “restart the app,” so the event path
 is the stronger evidence. This is implementation inspection, not a completed live UI test.
+
+**Observed refresh (2026-09-14).** After migration to user-level registration, the human
+successfully toggled Calendar off/on and used Settings Restart. The tool catalog still
+lacked Calendar. Host logs for the actual task then showed a launch followed by JSON-RPC
+`-32603` during initialization: “The data couldn’t be read because it isn’t in the correct
+format.” This is a handshake failure, not evidence that the refresh control was unavailable.
+
+The installed `0.2.0` reproduced that exact error when a synthetic initialize request
+contained an object-valued experimental capability; an otherwise identical empty-capability
+request succeeded. Swift SDK `0.12.1` incorrectly models those values as strings. The
+`0.2.1` source adapter ignores unsupported experimental objects only at initialization,
+preserving standard capabilities and normal SDK state. Tests cover tool discovery,
+elicitation declarations, malformed values, EOF, errors, and cancellation. Remove the
+adapter when a pinned upstream SDK accepts protocol-correct experimental objects. A
+synthetic fixture is not an exact capture of the desktop's handshake; verify the installed
+replacement through the native host before calling this integration complete.
 
 The [app-server API](https://learn.chatgpt.com/docs/app-server) also documents
 `config/mcpServer/reload`, which queues a configuration refresh for loaded tasks, plus

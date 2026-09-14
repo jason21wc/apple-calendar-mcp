@@ -7,6 +7,11 @@
 
 ## Where things stand
 
+- A signed `0.2.1` candidate fixes a reproduced SDK initialization incompatibility with
+  object-valued experimental capabilities. Local tests and real-process initialization,
+  tool discovery, and EOF shutdown pass; its signing requirement matches installed `0.2.0`.
+  Actual Codex logs confirm a handshake/data-format failure, but the exact desktop payload
+  was not captured. Installation and native-host verification remain outstanding.
 - Phases 1–4 are implemented. **Five read-only tools; no write tool exists.** The Phase 5
   journal has no production caller. Write policy remains C3–C7, as amended 2026-08-25.
 - Readiness hardening is committed at `aa21c13`: unsupported availability counts as busy;
@@ -57,16 +62,14 @@
    Claude Cowork and ChatGPT/Codex Work are peer targets. Call `calendar_permission_status`
    through the current host's native MCP connection once available. A declaration only
    establishes whether a form-elicitation test is worth trying; it never proves approval.
-   A later turn still exposed no native Calendar tools. **Supersedes the quit/reopen advice:**
-   follow `docs/CLIENT-LIFECYCLE.md`. The subsequent screenshot and installed source confirm
-   that the current project-origin row has disabled controls; Restart only appears after
-   a successful settings-page mutation. On September 14 the human ran `codex mcp add` in
-   the app's interactive terminal. Direct TOML inspection verified the user-level entry;
-   the identical project override was removed. Native Calendar tools remain absent from
-   this task's tool catalog. Inspect `/mcp` for connection status or the startup error
-   before choosing another refresh action. Do not promise that a CLI edit reveals Restart. Installed
-   source shows a backend-connection restart, not an Electron app relaunch. The human must
-   operate that control because Computer Use blocks Codex; a live outcome is still unverified.
+   On September 14 the global registration was verified and the project override removed.
+   `/mcp` was absent from the user's composer despite online guidance. The human successfully
+   toggled Calendar off/on and used Settings Restart; tools remained absent. Host startup
+   logs then showed Calendar launching and rejecting initialization with JSON-RPC -32603.
+   Install the reviewed, signed candidate after CI, then use the now-demonstrated Settings
+   refresh once and verify native status. Do not repeat configuration changes or permission
+   setup to repair this handshake failure. Computer Use blocks controlling Codex, so the
+   human operates Settings. See `docs/CLIENT-LIFECYCLE.md` for evidence and limits.
 2. **BACKLOG #24b:** design the approval request's timeout and abandoned-request cleanup,
    then demonstrate accept, decline, cancellation, absent support, error, and non-response.
    The read gate is NOT an elicitation implementation and must not be reused for it.
@@ -116,6 +119,10 @@
   No diagnostic task or native MCP call was created. Computer Use explicitly prohibits
   operating the Codex app, so app-side refresh must be performed by the human. These are
   execution-environment limits, not evidence against Calendar server compatibility or approval.
+- On September 14 a standalone Codex handshake fixture with temporary SQLite state also
+  failed before initialization with `Operation not permitted`, with and without escalation.
+  No client handshake was captured. Published Codex source uses an `extensions` field;
+  do not label the experimental-object fixture an exact capture of this desktop's request.
 - The journal checkpoint was analyzed and its accepted memory proposals applied. Its receipt
   command returned `accepted: false, reason: state_unavailable`, including with escalation;
   the governance cache has not acknowledged that checkpoint.
@@ -136,3 +143,5 @@ enabled preconditions as well as handler behavior (`meta-quality-verification-va
 Global registration migration: `gov-1ea4fe07dd03` (REVIEW; retrieved accounting ledger rule
 does not apply to this configuration migration). Direct source/configuration verification
 and separate native-connection evidence follow `meta-quality-verification-validation`.
+SDK compatibility: `gov-2fb6fed27aef` (REVIEW; `coding-quality-modular-service-architecture`:
+keep the workaround at the MCP boundary); installation: `gov-93636e49fe31` (PROCEED).

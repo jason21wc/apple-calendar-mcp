@@ -72,6 +72,15 @@ plan §5 for timeout and cancellation behavior.
 
 ## Key Decisions
 
+**2026-09-14 — Fix initialization decoding at the SDK boundary.** Actual Codex task startup
+logs show Calendar launching and failing its handshake with JSON-RPC -32603/data-format
+error. Installed 0.2.0 reproduces that error for object-valued experimental capabilities;
+empty capabilities succeed. Swift SDK 0.12.1 (and inspected upstream main) models these as
+strings, contrary to the protocol. The 0.2.1 source adapter drops unsupported experimental
+objects from initialize requests only; standard elicitation/sampling/roots and SDK session
+state remain unchanged. No server watchdog or new transport protocol is needed. Synthetic
+reproduction is not an exact desktop wire capture; actual-host verification follows install.
+
 **2026-09-14 — Global Codex registration verified; project override removed.** The human
 ran `codex mcp add` in the app's interactive zsh terminal. Direct TOML inspection confirmed
 the same installed binary and `--read-only` arguments in the user-level entry, so the

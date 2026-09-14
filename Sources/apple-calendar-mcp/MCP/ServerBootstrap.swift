@@ -63,7 +63,7 @@ enum ServerBootstrap {
             try await ToolHandlers.dispatch(params, store: store)
         }
 
-        let transport = StdioTransport()
+        let transport = await InitializeCompatibilityTransport(base: StdioTransport())
         // The initialize hook is the ONLY way to see what the client declared: the SDK keeps
         // `clientCapabilities` private. Records only -- it gates nothing today, and a
         // declaration is not an approval.

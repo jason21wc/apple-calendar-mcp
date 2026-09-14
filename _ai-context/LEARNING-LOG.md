@@ -12,6 +12,11 @@
 
 ## Active Lessons
 
+**2026-09-14 — Missing tools concealed a handshake failure.** I prescribed configuration
+and UI refresh steps before inspecting the host startup log, which named an initialization
+decode error. **Rule:** after one refresh, read the actual launch error before another UI
+step; test a realistic capability shape, not just an empty synthetic handshake.
+
 **2026-09-13 — A button's handler did not prove the button was available.** I traced
 Codex's Restart action and prescribed it without checking visibility and enabled conditions
 for the current registration. **Rule:** distinguish handler behavior, UI reachability, and

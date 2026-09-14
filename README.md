@@ -150,6 +150,10 @@ the exact binary contents and you would lose calendar access on every rebuild.
 
 Use the same absolute path you granted permission to.
 
+Version `0.2.1` handles object-valued experimental client capabilities that the pinned Swift
+SDK otherwise rejects during initialization. If tools remain absent after a refresh, inspect
+the host startup error before restarting again; see [client lifecycle](docs/CLIENT-LIFECYCLE.md).
+
 Start verification in the client you are using: call `calendar_permission_status` there.
 Its `client.elicitation_form_supported` field reports that connection's declared support,
 not a demonstrated approval. A shell-launched MCP test reports its own supplied capabilities,
@@ -175,7 +179,7 @@ also documents trusted-project configuration in `.codex/config.toml` and shared 
 configuration. Select a local execution environment with access to this Mac's server.
 Prefer the user-level entry for access across projects and editable desktop Settings.
 This repository does not supply a project override. Configuration on disk is not proof
-that a running task has connected; inspect `/mcp` and call `calendar_permission_status`.
+that a running task has connected; inspect host startup status and call `calendar_permission_status`.
 
 **Claude Desktop** — in `claude_desktop_config.json`:
 ```json
