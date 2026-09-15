@@ -19,7 +19,8 @@
 - **#24b — the live elicitation round trip. BLOCKED BY DESIGN, deliberately not built.**
   #24a is complete: `calendar_permission_status` reports declared/form/url booleans only;
   client identity is discarded. Measure the current host as an operational step in
-  `SESSION-STATE`; no Cowork report is a prerequisite. Repeat approval verification for each
+  `SESSION-STATE`; Codex declared form/URL support on 2026-09-14, with native read access
+  verified. This clears capability discovery only; no Cowork report is a prerequisite. Repeat approval verification for each
   client before enabling writes there.
   A capability declaration proves the client CLAIMS it can ask a human; only a completed round
   trip returning `.accept` shows one answered. **That probe must not be written until timeout

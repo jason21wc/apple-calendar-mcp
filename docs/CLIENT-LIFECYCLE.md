@@ -1,6 +1,9 @@
 # Connecting, refreshing, and updating clients
 
 The goal is a repeatable connection workflow without routinely quitting the AI app.
+Codex Settings Restart has caused a blank conversation twice on this machine; until that
+host issue is resolved, use a full quit/reopen when a connection refresh is actually needed.
+A healthy connection requires neither action.
 Keep the signed Calendar server at one stable path and let each host manage its stdio
 connection. No server watchdog, automatic grant request, or new network transport is needed.
 
@@ -51,9 +54,25 @@ from this desktop's composer; do not prescribe it unless the command is actually
 Use launch evidence to choose a refresh or resolve a failure, rather than assuming either
 from missing tools.
 
+**Current local exception (2026-09-14).** The human reports that Settings Restart twice
+left prompt history blank and new text invisible. A full quit/reopen restored the display.
+After installing `0.2.1` and completing that recovery, this task exposed Calendar tools;
+native permission status returned `fullAccess`, `disclaimed-child`, and form/URL elicitation
+declarations. A bounded busy-interval read also succeeded without truncation. This verifies
+read access, not a human-approval round trip or a reliable Settings-only refresh. Do not
+repeat the broken UI workflow or add a Calendar watchdog to repair it. The precise cause
+of the host display failure remains unconfirmed. Host logs show Calendar `ready` for the
+current task at 2026-09-15 02:01:16 UTC, after Settings Restart and before the full relaunch
+at 02:04:49 UTC. Task resume/read requests also returned no error. Thus MCP recovery
+succeeded independently of the failed display; a renderer ResizeObserver error nearby is
+only correlated evidence, not an established cause.
+
+The inspected Settings workflow below is retained for reference and other builds; it is
+**not the recommended refresh on this affected installation**:
+
 For an editable user-level entry:
 
-1. When active work is idle, open **Settings → MCP servers** and inspect `apple-calendar`.
+1. When active work is idle, open **Settings → Plugins → MCPs** and inspect `apple-calendar`.
    If absent, add a STDIO server named `apple-calendar` with command
    `/usr/local/bin/apple-calendar-mcp` and argument `--read-only`, then save.
 2. After a successful settings-page change, use its **Restart** control. In the inspected desktop build,
@@ -87,7 +106,9 @@ preserving standard capabilities and normal SDK state. Tests cover tool discover
 elicitation declarations, malformed values, EOF, errors, and cancellation. Remove the
 adapter when a pinned upstream SDK accepts protocol-correct experimental objects. A
 synthetic fixture is not an exact capture of the desktop's handshake; verify the installed
-replacement through the native host before calling this integration complete.
+replacement through the native host before calling this integration complete. That native
+read verification passed on September 14 as recorded above; the exact original desktop
+initialize payload remains uncaptured.
 
 The [app-server API](https://learn.chatgpt.com/docs/app-server) also documents
 `config/mcpServer/reload`, which queues a configuration refresh for loaded tasks, plus

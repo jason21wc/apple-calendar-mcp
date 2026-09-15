@@ -158,9 +158,11 @@ Start verification in the client you are using: call `calendar_permission_status
 Its `client.elicitation_form_supported` field reports that connection's declared support,
 not a demonstrated approval. A shell-launched MCP test reports its own supplied capabilities,
 not those of the app running the shell. A missing tool requires checking that client's
-registration; it does not require switching to Cowork. Use the host's connection refresh
-before considering a full app restart. See [client lifecycle](docs/CLIENT-LIFECYCLE.md) for
-the Codex MCP-settings Restart control and separate setup/update/recovery checks.
+registration; it does not require switching to Cowork. Prefer a verified host refresh.
+On the tested Codex installation, Settings Restart twice left the conversation blank;
+full quit/reopen restored it. Use that recovery when a refresh is needed on this affected
+build, and leave a healthy connection running. Native read access with `0.2.1` is verified.
+See [client lifecycle](docs/CLIENT-LIFECYCLE.md) for evidence and setup/update/recovery checks.
 
 **Claude Code**
 ```bash

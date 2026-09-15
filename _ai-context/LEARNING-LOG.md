@@ -437,6 +437,12 @@ still a claim about live state.**
 
 ---
 
+**2026-09-14 — Await mutating async calls before passing their result to Testing macros.**
+The local toolchain accepted `try await #require(group.next())`, but CI's macro expansion
+captured the task-group receiver immutably and failed compilation. Commit `f6c4262`
+separates `let result = try await group.next()` from `return try #require(result)`;
+full CI then passed. Keep mutation outside assertion macros when supporting both toolchains.
+
 ## Graduated Patterns
 
 | Pattern | Graduated To | Date |

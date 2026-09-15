@@ -72,6 +72,20 @@ plan §5 for timeout and cancellation behavior.
 
 ## Key Decisions
 
+**2026-09-14 — Native Codex read access verified; Settings Restart is unreliable here.**
+After installation of signed `0.2.1` and a full app quit/reopen, the current task called
+`calendar_permission_status`: `fullAccess`, `disclaimed-child`, form and URL declarations
+true. A bounded busy-interval read succeeded without truncation; no event details are
+recorded here. Approval remains unproven. The human reports that Settings Restart twice
+blanked prompt history and prevented new text from appearing; full quit/reopen recovered
+it. Supersedes the earlier preference for Settings Restart on this installation. Keep
+healthy connections running; use full quit/reopen only when a refresh/recovery is needed
+until the host UI issue is resolved. No Calendar watchdog can restore host conversation UI.
+The precise host failure cause and the original initialize payload remain unconfirmed.
+Host logs report Calendar ready after Settings Restart at 02:01:16 UTC September 15,
+before full relaunch at 02:04:49 UTC: MCP connection recovery succeeded while display
+recovery did not. Do not label this a failed Calendar refresh.
+
 **2026-09-14 — Fix initialization decoding at the SDK boundary.** Actual Codex task startup
 logs show Calendar launching and failing its handshake with JSON-RPC -32603/data-format
 error. Installed 0.2.0 reproduces that error for object-valued experimental capabilities;
@@ -79,14 +93,15 @@ empty capabilities succeed. Swift SDK 0.12.1 (and inspected upstream main) model
 strings, contrary to the protocol. The 0.2.1 source adapter drops unsupported experimental
 objects from initialize requests only; standard elicitation/sampling/roots and SDK session
 state remain unchanged. No server watchdog or new transport protocol is needed. Synthetic
-reproduction is not an exact desktop wire capture; actual-host verification follows install.
+reproduction is not an exact desktop wire capture; native read verification passed after
+installation, as recorded above.
 
 **2026-09-14 — Global Codex registration verified; project override removed.** The human
 ran `codex mcp add` in the app's interactive zsh terminal. Direct TOML inspection confirmed
 the same installed binary and `--read-only` arguments in the user-level entry, so the
 identical Calendar-only project config was removed. Interactive terminal access differs
-from the agent's constrained shell. Check the existing task's `/mcp` status before further
-refresh actions; a config migration does not demonstrate native tool availability or approval.
+from the agent's constrained shell. Check native tool availability or startup logs before further
+refresh actions (`/mcp` was absent from this desktop composer); a config migration does not demonstrate native tool availability or approval.
 
 **2026-09-13 — Project registration blocks desktop Settings edits.** The user's screenshot
 showed a faded Calendar gear/toggle and no Restart. Installed source sets both controls

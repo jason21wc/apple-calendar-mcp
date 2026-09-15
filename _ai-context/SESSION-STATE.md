@@ -9,15 +9,17 @@
 
 - A signed `0.2.1` candidate fixes a reproduced SDK initialization incompatibility with
   object-valued experimental capabilities. Local tests and real-process initialization,
-  tool discovery, and EOF shutdown pass; its signing requirement matches installed `0.2.0`.
+  tool discovery, and EOF shutdown pass; its signing requirement matches the prior `0.2.0`.
   Actual Codex logs confirm a handshake/data-format failure, but the exact desktop payload
   was not captured. Full CI passed on `f6c4262`:
   [verification run](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34857485411).
   Installation was attempted with escalation but the shell refused to execute `sudo`
-  (`operation not permitted`). Installed version remains `0.2.0`. The human must run
-  `sudo /usr/bin/install -S -o root -g wheel -m 755 .build/release/apple-calendar-mcp /usr/local/bin/apple-calendar-mcp`
-  from the project terminal, verify signature/version, then use Calendar off/on → Settings
-  Restart once. Native-host verification remains outstanding. The rollback copy is
+  (`operation not permitted`). The human then installed the candidate from the interactive
+  terminal. On September 14 the agent verified installed version `0.2.1` and a passing
+  strict signature check at the final path. Native Codex verification now PASSES after
+  full quit/reopen: permission status is `fullAccess` / `disclaimed-child`, form and URL
+  declarations are true, and a bounded busy-interval read succeeded without truncation.
+  Human approval remains unproven. The rollback copy is
   `.build/apple-calendar-mcp-0.2.0.backup`.
 - Phases 1–4 are implemented. **Five read-only tools; no write tool exists.** The Phase 5
   journal has no production caller. Write policy remains C3–C7, as amended 2026-08-25.
@@ -30,16 +32,19 @@
   [verification run](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34766574299).
   Consult `git status` for the current checkout; the hash above identifies the implementation,
   not subsequent closeout-only commits.
-- Installed binary was **not replaced** during this work. Source improvements are not yet
-  an assertion about the executable a connected host is running.
+- Installed binary is now `0.2.1`; the current native Codex connection answers diagnostics
+  and reads. This establishes read access, not approval for future writes.
 - Client-neutral documentation and backlog now treat Claude Cowork and ChatGPT/Codex Work
   as peer targets. User-level Codex registration is verified and the duplicate project
   override removed; native connection status is distinct from the direct stdio check below.
 - That follow-up is published at `1c52de4`; its full macOS CI passed, including lifecycle
   checks: [verification run](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34782316171).
-- The connection lifecycle is documented in `docs/CLIENT-LIFECYCLE.md`: prefer the host's
-  supported refresh over quitting the desktop app. Codex's MCP Restart event path was
-  inspected in the installed build; its live result in this task remains unverified.
+- Settings Restart twice blanked prompt history and new output according to the human;
+  full quit/reopen recovered the UI. Do not prescribe Settings Restart again on this
+  installation. Logs show Calendar ready after Settings Restart and before full quit,
+  so connection recovery succeeded despite the display failure. Leave the healthy connection
+  running; use full quit/reopen only when
+  refresh/recovery is needed. `docs/CLIENT-LIFECYCLE.md` records this host-specific limit.
 
 ## Validation
 
@@ -57,26 +62,20 @@
   after correction, with the same lifecycle sandbox exclusion noted above.
 - Full macOS CI passed on the implementation commit before publication to `main`.
   No tests were excluded in that run. The local sandbox limitation remains environment-specific.
-- No event-data query, permission request, or journal cleanup was made. Tests use synthetic
-  values and owned temporary storage. The later project-level client registration is below.
+- Automated tests use synthetic values and owned temporary storage. Native verification
+  on September 14 used a bounded busy-interval read without event details. No permission
+  request or journal cleanup was made.
 - The lifecycle documentation and signing-guidance correction passed independent review,
   shell syntax checks, and the local test command with the documented lifecycle exclusion.
   Published at `7096f67`; [full CI passed](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34783951108).
 
 ## Next actions, in order
 
-1. **Verify through the current client; do not wait for Cowork.** The human reaffirmed that
-   Claude Cowork and ChatGPT/Codex Work are peer targets. Call `calendar_permission_status`
-   through the current host's native MCP connection once available. A declaration only
-   establishes whether a form-elicitation test is worth trying; it never proves approval.
-   On September 14 the global registration was verified and the project override removed.
-   `/mcp` was absent from the user's composer despite online guidance. The human successfully
-   toggled Calendar off/on and used Settings Restart; tools remained absent. Host startup
-   logs then showed Calendar launching and rejecting initialization with JSON-RPC -32603.
-   Install the reviewed, signed, CI-passing candidate in the human's terminal, then use the now-demonstrated Settings
-   refresh once and verify native status. Do not repeat configuration changes or permission
-   setup to repair this handshake failure. Computer Use blocks controlling Codex, so the
-   human operates Settings. See `docs/CLIENT-LIFECYCLE.md` for evidence and limits.
+1. **Native read connection verified; no more setup/restart needed now.** The current Codex
+   task exposes the read tools, permission/identity checks pass, and a bounded read succeeds.
+   The human recovered the broken Settings Restart UI by fully quitting/reopening the app.
+   The exact host UI failure cause remains unconfirmed. Keep client neutrality and separate
+   read access from human-approval evidence; no Cowork check is a prerequisite.
 2. **BACKLOG #24b:** design the approval request's timeout and abandoned-request cleanup,
    then demonstrate accept, decline, cancellation, absent support, error, and non-response.
    The read gate is NOT an elicitation implementation and must not be reused for it.
@@ -87,14 +86,15 @@
    Implement the typed snapshot/field matrix and disposable-calendar round trip before delete.
 4. When the approval gate is proved: create → delete **with restore in the same change** →
    update. The attendee/invitation exception is unchanged; other unrestorable fields refuse.
-5. Build/sign/install a reviewed release at the existing final path when activating these
-   source changes. Verify the installed artifact and actual-host behavior; no new Calendar
-   grant is implied by a same-path replacement signed by the same certificate.
+5. For future releases, retain the reviewed build/sign/same-path install procedure and
+   verify actual-host behavior after loading the replacement. The `0.2.1` install and
+   native read verification are complete; no new Calendar grant was requested.
 
 ## Operational observations and limits
 
-- Last installed version observed was `0.2.0` at `/usr/local/bin/apple-calendar-mcp`.
-  On 2026-09-13 strict signature verification passed and ownership was root:wheel.
+- Last installed version observed is `0.2.1` at `/usr/local/bin/apple-calendar-mcp`;
+  strict signature verification passed on 2026-09-14. Before the update, on 2026-09-13,
+  version `0.2.0` passed strict signature verification and ownership was root:wheel.
   `--doctor` from this constrained execution reported `disclaimed-child` + `notDetermined`
   and the old reinstall guidance. That does not establish another host's grant state and is
   not a reason to run `--setup`. The 2026-08-27 `fullAccess` result is historical evidence.
@@ -118,7 +118,7 @@
   permitted`; a project-level entry temporarily supplied registration. On September 14,
   the human's interactive-terminal command succeeded. The global entry points to the
   installed binary with `--read-only`; its matching project override is now removed.
-  Native connection and capability measurement remain unverified until the host loads it.
+  Native connection and capability measurement subsequently passed with installed `0.2.1`.
 - Native verification attempts on 2026-09-13: installed CLI `0.153.4` still resolves the
   project registration. Its documented app-server API includes MCP reload/status/tool-call
   methods, but `app-server proxy` found no control socket. A temporary backend failed before
@@ -152,3 +152,10 @@ does not apply to this configuration migration). Direct source/configuration ver
 and separate native-connection evidence follow `meta-quality-verification-validation`.
 SDK compatibility: `gov-2fb6fed27aef` (REVIEW; `coding-quality-modular-service-architecture`:
 keep the workaround at the MCP boundary); installation: `gov-93636e49fe31` (PROCEED).
+
+Installation handoff verification: `gov-d857701c5474` (REVIEW); `meta-core-informational-readiness`
+and `coding-context-session-state-continuity`: record verified installation separately from pending native connection.
+
+Native read verification and restart correction: `gov-b2d0822f6254` (REVIEW);
+`coding-context-session-state-continuity` and `coding-context-context-engineering-discipline`:
+replace obsolete refresh advice with measured connection state and the human-reported UI failure.
