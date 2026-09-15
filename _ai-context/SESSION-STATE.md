@@ -48,6 +48,13 @@
 
 ## Validation
 
+- The native-verification documentation push exposed an existing cancellation-test race in
+  [CI](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34920121489): fixed sleep
+  returned before timer delivery, so admission was still busy. The test now waits for the
+  wedged state with a bounded observation loop while external work remains held. A temporary
+  mutation canceling the timer failed the intended assertion; production source was restored.
+  This is a test-only correction and needs no binary reinstall or host refresh.
+
 - `./scripts/test.sh` now explicitly selects native SwiftPM and workspace compiler caches.
   This resolves the local Swift 6.4 default engine's missing TestingMacros problem.
 - `./scripts/test.sh --disable-sandbox --skip ServerLifecycleTests` passes locally. The full
@@ -159,3 +166,6 @@ and `coding-context-session-state-continuity`: record verified installation sepa
 Native read verification and restart correction: `gov-b2d0822f6254` (REVIEW);
 `coding-context-session-state-continuity` and `coding-context-context-engineering-discipline`:
 replace obsolete refresh advice with measured connection state and the human-reported UI failure.
+
+Cancellation-test correction: `gov-1963a687c0c8` (PROCEED); the existing context pattern
+and bounded observation replace scheduler assumptions without changing production behavior.

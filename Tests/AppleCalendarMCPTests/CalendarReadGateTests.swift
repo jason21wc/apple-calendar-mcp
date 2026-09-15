@@ -175,9 +175,29 @@ struct CalendarReadGateTests {
         await held.waitUntilStarted()
         first.cancel()
         await #expect(throws: CancellationError.self) { try await first.value }
-        try await Task.sleep(for: .milliseconds(120))
-        await #expect(throws: CalendarReadError.wedged) { try await gate.run { 0 } }
+        // Observe deadline delivery, not a guess about when the timer actor runs.
+        // Keep the operation held: its late completion must not supply the wedge.
+        let observationDeadline = ContinuousClock.now.advanced(by: .seconds(5))
+        var observedWedge = false
+        while ContinuousClock.now < observationDeadline {
+            do {
+                _ = try await gate.run {
+                    Issue.record("canceled work incorrectly released admission")
+                    return 0
+                }
+                break
+            } catch CalendarReadError.busy {
+                try await Task.sleep(for: .milliseconds(5))
+            } catch CalendarReadError.wedged {
+                observedWedge = true
+                break
+            } catch {
+                Issue.record(error)
+                break
+            }
+        }
         await held.release()
+        #expect(observedWedge, "the operation deadline must survive caller cancellation")
     }
 
     @Test("already canceled requests never invoke the adapter")

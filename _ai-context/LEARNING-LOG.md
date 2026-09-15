@@ -22,10 +22,11 @@ Codex's Restart action and prescribed it without checking visibility and enabled
 for the current registration. **Rule:** distinguish handler behavior, UI reachability, and
 observed recovery; verify all prerequisites before giving exact steps.
 
-**2026-09-13 — Ordinary completion tests accidentally measured scheduler speed.** Two gate
-tests assumed work would beat 80–100 ms fixture deadlines under parallel load. **Rule:**
-observe completion and timer cancellation directly, bound the failure wait, and keep
-separate tests for real timeout behavior.
+**2026-09-13/14 — Timer tests accidentally measured scheduler speed.** Completion tests
+assumed work would beat short fixture deadlines; a cancellation test later assumed sleeping
+120 ms meant an 80 ms timer had been delivered. **Rule:** observe completion/cancellation or
+bounded state transitions. Hold external work until observing the timeout state so late
+completion cannot manufacture a pass; verify the test detects a deliberately canceled timer.
 
 **2026-09-13 — Session history became an unintended client dependency.** I made a Cowork
 status report the next gate although the server is client-neutral and work had moved to
