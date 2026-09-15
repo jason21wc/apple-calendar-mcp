@@ -367,7 +367,9 @@ constraints, all verified in SDK source rather than assumed:
   is insufficient, and strict mode only tests the top level anyway.
 - **There is no timeout.** `sendAndAwait` awaits `task.value` unbounded, so a client that never
   answers strands the tool call and leaves a `pendingRequests` entry. Racing a task around it
-  abandons the request rather than cancelling it. Same class of external wait as the read gate (§5), with different cleanup requirements.
+  abandons the request rather than cancelling it. The public `cancelRequest(id)` only sends a remote
+  cancellation notice; it does not remove/resume the local pending request. Same class of
+  external wait as the read gate (§5), with different cleanup requirements.
 
 **A capability declaration is not a human.** It says the client claims support. Only an
 observed round trip returning `.accept` demonstrates a person answered, and even that
@@ -548,15 +550,17 @@ than inferred from the product name. No particular client is a prerequisite for 
 
 Run `calendar_permission_status` through the current client first. Its capability flags
 describe that connection, not universal support; a direct stdio harness describes only its
-own supplied handshake. Approval acceptance and all refusal paths must be demonstrated in
-each client before enabling writes there. A client that cannot enforce approval keeps reads
+own supplied handshake. Current evidence: native Codex reads verified; Cowork read visibility
+confirmed by the human; Claude Code user-scope registration reported successful, native call
+not yet reported. None clears the approval gate. Approval acceptance and all refusal paths
+must be demonstrated in each client before enabling writes there. A client that cannot enforce approval keeps reads
 available and must refuse writes. Historical Cowork observations elsewhere are scoped evidence.
 
 Absolute path always — the TCC grant is keyed to it. **Serving is what happens with NO
 arguments**; there is no `serve` subcommand, and passing one exits `EX_USAGE` as an unknown
 flag.
 
-**Claude Code** — `claude mcp add --transport stdio apple-calendar -- /usr/local/bin/apple-calendar-mcp`
+**Claude Code** — `claude mcp add --transport stdio --scope user apple-calendar -- /usr/local/bin/apple-calendar-mcp --read-only`
 **Codex** — `[mcp_servers.apple-calendar]` in `~/.codex/config.toml`
 **Claude Desktop** — `mcpServers` in `claude_desktop_config.json`, currently with `--read-only`
 
@@ -675,6 +679,10 @@ bounded read gate in §5, escaped diagnostics, and acknowledged journal storage 
 cross-month history. These are prerequisites, not evidence that write approval or restore
 works. Next is the harmless human-approval round trip after the elicitation cleanup design;
 continue to enforce §6 Gate 1 before adding a mutating caller.
+
+**Current work:** [Approval probe design](APPROVAL-PROBE-DESIGN.md) defines the next
+deliverable and its fake-client acceptance checks. The cleanup implementation and live
+approval measurement remain outstanding; the design is not an approval result.
 
 **Then, and only after §6 Gate 1 is answered:** `calendar_create_event` →
 `calendar_delete_event` **with restore in the same change** → `calendar_update_event`.

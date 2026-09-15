@@ -164,9 +164,15 @@ full quit/reopen restored it. Use that recovery when a refresh is needed on this
 build, and leave a healthy connection running. Native read access with `0.2.1` is verified.
 See [client lifecycle](docs/CLIENT-LIFECYCLE.md) for evidence and setup/update/recovery checks.
 
+Current connection evidence: native Codex reads are verified, the user confirms Cowork can
+see the calendar, and Claude Code user-scope registration succeeded. A native Claude Code
+call has not yet been reported. These are separate observations, not proof of write approval.
+Cowork connection mechanisms can differ from the Claude Desktop configuration example below;
+retain the user's working connection rather than replacing it based on generic setup advice.
+
 **Claude Code**
 ```bash
-claude mcp add --transport stdio apple-calendar -- /usr/local/bin/apple-calendar-mcp
+claude mcp add --transport stdio --scope user apple-calendar -- /usr/local/bin/apple-calendar-mcp --read-only
 ```
 
 **Codex** — in `~/.codex/config.toml`:

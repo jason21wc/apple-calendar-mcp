@@ -16,7 +16,10 @@
   prior `apple-mail` experiment is not to be repeated as evidence: three independent confounds
   made its null result attribute to nothing (gotcha 83).
 
-- **#24b — the live elicitation round trip. BLOCKED BY DESIGN, deliberately not built.**
+- **#24b — bounded approval design, then the live elicitation round trip. IN PROGRESS.**
+  Design precursor: `docs/APPROVAL-PROBE-DESIGN.md`. Request-lifecycle cleanup must be
+  implemented and fake-client tested before the live probe; no write tool is authorized by a
+  capability declaration or by the design alone.
   #24a is complete: `calendar_permission_status` reports declared/form/url booleans only;
   client identity is discarded. Measure the current host as an operational step in
   `SESSION-STATE`; Codex declared form/URL support on 2026-09-14, with native read access
@@ -28,8 +31,8 @@
   nothing bounding it, and wrapping it in a timeout abandons the request rather than cancelling
   it, leaving an entry in the SDK's `pendingRequests` keyed by id. Building the probe first
   would ship the hang along with the measurement. Prerequisites: decide the bound, decide what
-  cleanup means when the SDK offers no cancellation, and make non-response, decline, cancel and
-  error all fail closed. Then measure.
+  cleanup means when the SDK offers no request-level local cancellation, and make
+  non-response, decline, cancel and error all fail closed. Then measure.
 
 - **#25 — Verify what this project's OWN governance hook actually enforces.** `CLAUDE.md`
   describes a PreToolUse hook that "BLOCKS Bash/Edit/Write until the required governance tools

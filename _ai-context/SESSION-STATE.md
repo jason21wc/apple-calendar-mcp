@@ -7,6 +7,18 @@
 
 ## Where things stand
 
+- Connection setup is no longer the next task. The human confirms Cowork can see the
+  calendar and supplied successful Claude Code user-scope registration output. Cowork is
+  user-confirmed visibility; CLI is registration only until a native call is reported.
+  Codex native read verification is recorded below. No approval round trip is proved.
+- Next-phase work has started with `docs/APPROVAL-PROBE-DESIGN.md`: repair request lifecycle
+  cleanup before implementing the harmless opt-in approval probe. SDK `cancelRequest` only
+  sends a remote notice; whole-server shutdown is not the selected cleanup strategy. The
+  recommended direction is an upstream or explicitly pinned minimal SDK lifecycle change,
+  with dependency selection and implementation still outstanding. Fresh design review
+  passed after adding outer-call cancellation, cross-attempt late-answer isolation, and
+  UI-dismissal evidence requirements. No probe/write tool exists.
+
 - A signed `0.2.1` candidate fixes a reproduced SDK initialization incompatibility with
   object-valued experimental capabilities. Local tests and real-process initialization,
   tool discovery, and EOF shutdown pass; its signing requirement matches the prior `0.2.0`.
@@ -48,6 +60,11 @@
 
 ## Validation
 
+- Latest completed implementation CI passed on `6a4d555`:
+  [verification run](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34920448879).
+  The following work updates client evidence and advances approval design, with no runtime
+  change or installed-binary replacement.
+
 - The native-verification documentation push exposed an existing cancellation-test race in
   [CI](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34920121489): fixed sleep
   returned before timer delivery, so admission was still busy. The test now waits for the
@@ -78,16 +95,14 @@
 
 ## Next actions, in order
 
-1. **Native read connection verified; no more setup/restart needed now.** The current Codex
-   task exposes the read tools, permission/identity checks pass, and a bounded read succeeds.
-   The human recovered the broken Settings Restart UI by fully quitting/reopening the app.
-   The exact host UI failure cause remains unconfirmed. Keep client neutrality and separate
-   read access from human-approval evidence; no Cowork check is a prerequisite.
-2. **BACKLOG #24b:** design the approval request's timeout and abandoned-request cleanup,
-   then demonstrate accept, decline, cancellation, absent support, error, and non-response.
-   The read gate is NOT an elicitation implementation and must not be reused for it.
-   Client-native tool approval remains another unverified candidate (plan §6); no approval
-   policy was changed by the new project registration.
+1. **Continue BACKLOG #24b from the design precursor.** Select a maintainable SDK request
+   lifecycle change and implement bounded, exactly-once completion/cancellation/disconnect
+   cleanup with fake-client race tests. Read `docs/APPROVAL-PROBE-DESIGN.md` first. This
+   design is not evidence that cleanup or human approval already works.
+2. After lifecycle checks pass, implement the opt-in harmless probe and demonstrate accept,
+   decline, cancellation, absent support, error, and non-response through the current host.
+   Keep reads available; do not repeat connection setup merely to advance design. Before
+   writes are enabled in another client, demonstrate its approval behavior independently.
 3. Before any mutating caller, connect acknowledged journal storage and define outcome-error
    reconciliation. Do not retry a future write merely because recording its outcome failed.
    Implement the typed snapshot/field matrix and disposable-calendar round trip before delete.
@@ -169,3 +184,7 @@ replace obsolete refresh advice with measured connection state and the human-rep
 
 Cancellation-test correction: `gov-1963a687c0c8` (PROCEED); the existing context pattern
 and bounded observation replace scheduler assumptions without changing production behavior.
+
+Cowork/CLI evidence and next-phase design: `gov-63a734e5a214` (REVIEW);
+`coding-context-session-state-continuity` and `coding-context-context-engineering-discipline`:
+record evidence at its actual strength, preserve working clients, and carry the write gate forward.

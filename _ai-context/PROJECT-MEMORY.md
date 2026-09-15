@@ -72,6 +72,15 @@ plan §5 for timeout and cancellation behavior.
 
 ## Key Decisions
 
+**2026-09-14 — Cowork visibility confirmed; advance to the approval gate.** The human
+reports Cowork can see the calendar and previously supplied successful Claude Code
+user-scope registration output for the installed executable with `--read-only`. Record
+Cowork as user-confirmed read visibility and CLI as registered, not a measured CLI call or
+proof of either client's approval behavior. Preserve the working Cowork route; it was not
+captured here. The human requested memory/project updates and continuation of the plan.
+Next deliverable is the bounded approval-probe design, then the harmless live round trip,
+per plan §6 Gate 1 / §15 and BACKLOG #24b. No write gate or C3–C7 control is waived.
+
 **2026-09-14 — Native Codex read access verified; Settings Restart is unreliable here.**
 After installation of signed `0.2.1` and a full app quit/reopen, the current task called
 `calendar_permission_status`: `fullAccess`, `disclaimed-child`, form and URL declarations

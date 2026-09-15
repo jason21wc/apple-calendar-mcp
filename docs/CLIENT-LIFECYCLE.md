@@ -116,6 +116,18 @@ The [app-server API](https://learn.chatgpt.com/docs/app-server) also documents
 available supported connection. A missing CLI control socket does not prove the desktop
 lacks reload support. Do not automate private IPC or restart loops to work around host limits.
 
+## Current client evidence
+
+| Client | Read connection evidence | Approval evidence |
+|---|---|---|
+| Codex desktop | Native permission/identity check and bounded busy read passed with installed `0.2.1` | Form and URL declared; no human-approval round trip demonstrated |
+| Claude Cowork | User confirms the calendar is visible; exact connection route and capability payload not supplied | Not measured |
+| Claude Code CLI | User reports successful user-scope registration of the installed path with `--read-only`; native call not yet reported | Not measured |
+
+Cowork visibility is accepted as the user's observation. Do not infer its mechanism from a
+Desktop JSON entry or overwrite the working setup. Capability and approval checks remain
+per-client; missing CLI evidence does not block design work in the currently connected client.
+
 ## Server ownership and updates
 
 Under the negotiated [MCP stdio transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports),

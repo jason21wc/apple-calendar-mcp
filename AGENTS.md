@@ -13,11 +13,13 @@ A subprocess test measures its supplied MCP capabilities, not the enclosing app'
 
 > **Start here.** Phases 1-4 are complete, published and in daily use. **Five read-only tools
 > are shipped and no write tool exists**; the Phase 5 journal substrate is built with no caller.
-> `main` is pushed and CI-green, and `0.2.0` is installed at `/usr/local/bin`.
+> `main` is pushed and CI-green, and `0.2.1` is installed at `/usr/local/bin`.
 >
 > **The write surface is blocked on one thing: no approval mechanism has been demonstrated.**
 > `toolPolicy` has never been configured on this machine, and server elicitation is measured
-> only as far as what the client *declares*. The permission model itself is decided — reads
+> only as far as what the client *declares*. Next is the bounded approval-probe design and
+> harmless round trip (plan §6 Gate 1; `docs/APPROVAL-PROBE-DESIGN.md`).
+> The permission model itself is decided — reads
 > silent, every write confirmed, refuse only what EventKit cannot express (plan §4a).
 >
 > Read `_ai-context/SESSION-STATE.md` for the current position and the next action, then
