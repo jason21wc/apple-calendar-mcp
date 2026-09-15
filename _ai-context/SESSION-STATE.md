@@ -20,12 +20,15 @@
   makes the settlement checks fail; exact production source was restored and rerun green.
   The signed release binary passed synthetic wire discovery, disabled dispatch, unsupported
   form, argument validation, accept/decline/cancel/invalid response and EOF shutdown.
+  Its real 30-second non-response deadline also passed; a late acceptance was ignored
+  and subsequent tool discovery succeeded on the same connection. This is synthetic
+  protocol evidence, not a measurement of host prompt dismissal or human approval.
 - Signed candidate: `.build/release/apple-calendar-mcp`, version `0.2.2`, SHA-256
   `2a3902acede874c5c547ef1fb921f2ee3bd91018b02b6ca049f49aebd9c219af`.
   Strict signature, hardened runtime and Calendar entitlement pass; designated requirement
   matches installed `0.2.1`. Backup: `.build/apple-calendar-mcp-0.2.1.backup`.
-  Final implementation CI is pending publication; previous checkpoint `809fad3` passed:
-  https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34921806961.
+  Implementation `ea4c5ea` is published and full macOS CI passed without exclusions:
+  https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34925395216.
 - **Installed remains `0.2.1`; no client configuration or Calendar data changed.**
   Codex native reads are verified. Cowork visibility is user-confirmed; Claude Code
   user-scope registration is confirmed by supplied output, with no native CLI call yet.
@@ -106,8 +109,8 @@
 
 ## Next actions, in order
 
-1. **Finish candidate publication/CI, then install once.** The source and signed release
-   candidate are ready for validation on the host. After CI passes, the human installs the
+1. **Install the reviewed candidate once.** Source publication and full CI are complete.
+   The signed release candidate is ready for validation on the host. The human installs the
    candidate at `/usr/local/bin/apple-calendar-mcp`, retains `--read-only`, adds
    `--enable-approval-probe` to Codex registration, and fully quits/reopens Codex once.
    Agent `sudo` execution was previously refused (`operation not permitted`); use the
@@ -125,6 +128,21 @@
 5. For future releases, retain the reviewed build/sign/same-path install procedure and
    verify actual-host behavior after loading the replacement. The `0.2.1` install and
    native read verification are complete; no new Calendar grant was requested.
+
+## Current install handoff
+
+Run in the human's interactive terminal, then fully quit/reopen Codex once. The first
+command needs the Mac's administrator authorization, which the agent shell cannot supply.
+The existing `0.2.1` backup is recorded above. Do not run `--setup` or reset Calendar access.
+
+```bash
+sudo /usr/bin/install -o root -g wheel -m 755 /Users/jasoncollier/Developer/apple-calendar/.build/release/apple-calendar-mcp /usr/local/bin/apple-calendar-mcp &&
+/usr/bin/codesign --verify --strict /usr/local/bin/apple-calendar-mcp &&
+codex mcp add apple-calendar -- /usr/local/bin/apple-calendar-mcp --read-only --enable-approval-probe
+```
+
+Return to this task for native verification and the harmless human prompt test. Cowork and
+Claude Code retain their existing read configuration; the probe flag is deliberate opt-in.
 
 ## Operational observations and limits
 

@@ -22,7 +22,7 @@
   disconnection, batch overlap, late replies and stdio backpressure. Final source review,
   local suite and signed-binary synthetic wire checks pass; installed remains `0.2.1`. See
   `docs/APPROVAL-PROBE-DESIGN.md` and `Vendor/swift-sdk/README.md`.
-  Remaining: full candidate CI, same-path signed install, then measure real human
+  Full CI passed on `ea4c5ea`. Remaining: same-path signed install, then measure real human
   accept/decline/cancel/non-response and post-timeout reads through the current host.
   Observe prompt dismissal and late-answer isolation; local cleanup does not prove UI cleanup.
   #24a capability discovery is complete in Codex. Cowork visibility is user-confirmed;
