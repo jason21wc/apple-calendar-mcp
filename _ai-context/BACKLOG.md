@@ -16,23 +16,19 @@
   prior `apple-mail` experiment is not to be repeated as evidence: three independent confounds
   made its null result attribute to nothing (gotcha 83).
 
-- **#24b — bounded approval design, then the live elicitation round trip. IN PROGRESS.**
-  Design precursor: `docs/APPROVAL-PROBE-DESIGN.md`. Request-lifecycle cleanup must be
-  implemented and fake-client tested before the live probe; no write tool is authorized by a
-  capability declaration or by the design alone.
-  #24a is complete: `calendar_permission_status` reports declared/form/url booleans only;
-  client identity is discarded. Measure the current host as an operational step in
-  `SESSION-STATE`; Codex declared form/URL support on 2026-09-14, with native read access
-  verified. This clears capability discovery only; no Cowork report is a prerequisite. Repeat approval verification for each
-  client before enabling writes there.
-  A capability declaration proves the client CLAIMS it can ask a human; only a completed round
-  trip returning `.accept` shows one answered. **That probe must not be written until timeout
-  and abandoned-request cleanup are designed** — `requestElicitation` awaits `task.value` with
-  nothing bounding it, and wrapping it in a timeout abandons the request rather than cancelling
-  it, leaving an entry in the SDK's `pendingRequests` keyed by id. Building the probe first
-  would ship the hang along with the measurement. Prerequisites: decide the bound, decide what
-  cleanup means when the SDK offers no request-level local cancellation, and make
-  non-response, decline, cancel and error all fail closed. Then measure.
+- **#24b — bounded approval probe and live human round trip. IN PROGRESS.**
+  `0.2.2` candidate implements the opt-in harmless diagnostic and a pinned local SDK
+  lifecycle patch. Synthetic tests cover acceptance/refusals, cancellation, deadlines,
+  disconnection, batch overlap, late replies and stdio backpressure. Final source review,
+  local suite and signed-binary synthetic wire checks pass; installed remains `0.2.1`. See
+  `docs/APPROVAL-PROBE-DESIGN.md` and `Vendor/swift-sdk/README.md`.
+  Remaining: full candidate CI, same-path signed install, then measure real human
+  accept/decline/cancel/non-response and post-timeout reads through the current host.
+  Observe prompt dismissal and late-answer isolation; local cleanup does not prove UI cleanup.
+  #24a capability discovery is complete in Codex. Cowork visibility is user-confirmed;
+  Claude Code registration is reported, native CLI behavior remains unmeasured.
+  Repeat approval verification before enabling writes in each client. No synthetic result,
+  capability declaration or diagnostic acceptance authorizes future calendar writes.
 
 - **#25 — Verify what this project's OWN governance hook actually enforces.** `CLAUDE.md`
   describes a PreToolUse hook that "BLOCKS Bash/Edit/Write until the required governance tools

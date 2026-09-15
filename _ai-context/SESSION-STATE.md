@@ -7,17 +7,29 @@
 
 ## Where things stand
 
-- Connection setup is no longer the next task. The human confirms Cowork can see the
-  calendar and supplied successful Claude Code user-scope registration output. Cowork is
-  user-confirmed visibility; CLI is registration only until a native call is reported.
-  Codex native read verification is recorded below. No approval round trip is proved.
-- Next-phase work has started with `docs/APPROVAL-PROBE-DESIGN.md`: repair request lifecycle
-  cleanup before implementing the harmless opt-in approval probe. SDK `cancelRequest` only
-  sends a remote notice; whole-server shutdown is not the selected cleanup strategy. The
-  recommended direction is an upstream or explicitly pinned minimal SDK lifecycle change,
-  with dependency selection and implementation still outstanding. Fresh design review
-  passed after adding outer-call cancellation, cross-attempt late-answer isolation, and
-  UI-dismissal evidence requirements. No probe/write tool exists.
+- **#24b candidate is implemented and locally validated.** `0.2.2` adds opt-in
+  `calendar_approval_probe` plus a pinned, attributed SDK lifecycle patch in `Vendor/swift-sdk`.
+  The probe has no EventKit/journal caller or write token. Default discovery remains five
+  tools. Human approval is still unproved; no write tool exists.
+- Final source review passed after fixing batch prompt queuing, cancellation of buffered
+  batch results, and unbounded outer response sends. The SDK now bounds incoming slots to
+  16 and response delivery to 5 seconds; overload or transport failure closes the connection.
+  Ordinary unanswered 30-second approval prompts keep a healthy connection available.
+- Local broad suite passes with the known `ServerLifecycleTests` sandbox exclusion;
+  focused fake-client/owned-pipe cases pass. Deliberately retaining completed SDK send tasks
+  makes the settlement checks fail; exact production source was restored and rerun green.
+  The signed release binary passed synthetic wire discovery, disabled dispatch, unsupported
+  form, argument validation, accept/decline/cancel/invalid response and EOF shutdown.
+- Signed candidate: `.build/release/apple-calendar-mcp`, version `0.2.2`, SHA-256
+  `2a3902acede874c5c547ef1fb921f2ee3bd91018b02b6ca049f49aebd9c219af`.
+  Strict signature, hardened runtime and Calendar entitlement pass; designated requirement
+  matches installed `0.2.1`. Backup: `.build/apple-calendar-mcp-0.2.1.backup`.
+  Final implementation CI is pending publication; previous checkpoint `809fad3` passed:
+  https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34921806961.
+- **Installed remains `0.2.1`; no client configuration or Calendar data changed.**
+  Codex native reads are verified. Cowork visibility is user-confirmed; Claude Code
+  user-scope registration is confirmed by supplied output, with no native CLI call yet.
+  Those observations establish connection/read access, never human write approval.
 
 - A signed `0.2.1` candidate fixes a reproduced SDK initialization incompatibility with
   object-valued experimental capabilities. Local tests and real-process initialization,
@@ -62,8 +74,7 @@
 
 - Latest completed implementation CI passed on `6a4d555`:
   [verification run](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34920448879).
-  The following work updates client evidence and advances approval design, with no runtime
-  change or installed-binary replacement.
+  That is historical read-surface validation; current candidate checks are recorded above.
 
 - The native-verification documentation push exposed an existing cancellation-test race in
   [CI](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34920121489): fixed sleep
@@ -95,14 +106,17 @@
 
 ## Next actions, in order
 
-1. **Continue BACKLOG #24b from the design precursor.** Select a maintainable SDK request
-   lifecycle change and implement bounded, exactly-once completion/cancellation/disconnect
-   cleanup with fake-client race tests. Read `docs/APPROVAL-PROBE-DESIGN.md` first. This
-   design is not evidence that cleanup or human approval already works.
-2. After lifecycle checks pass, implement the opt-in harmless probe and demonstrate accept,
-   decline, cancellation, absent support, error, and non-response through the current host.
-   Keep reads available; do not repeat connection setup merely to advance design. Before
-   writes are enabled in another client, demonstrate its approval behavior independently.
+1. **Finish candidate publication/CI, then install once.** The source and signed release
+   candidate are ready for validation on the host. After CI passes, the human installs the
+   candidate at `/usr/local/bin/apple-calendar-mcp`, retains `--read-only`, adds
+   `--enable-approval-probe` to Codex registration, and fully quits/reopens Codex once.
+   Agent `sudo` execution was previously refused (`operation not permitted`); use the
+   human's interactive terminal. Never request a new Calendar grant or Settings Restart.
+2. Use native `calendar_permission_status` to verify the new connection, then run the harmless
+   diagnostic with actual human interaction: accept, decline/cancel and non-response.
+   Verify later diagnostics/reads still work; record UI dismissal and late-answer isolation.
+   Repeat approval verification per client before enabling writes there. Do not reconfigure
+   the working Cowork/Claude Code routes merely for a Codex experiment.
 3. Before any mutating caller, connect acknowledged journal storage and define outcome-error
    reconciliation. Do not retry a future write merely because recording its outcome failed.
    Implement the typed snapshot/field matrix and disposable-calendar round trip before delete.
@@ -188,3 +202,11 @@ and bounded observation replace scheduler assumptions without changing productio
 Cowork/CLI evidence and next-phase design: `gov-63a734e5a214` (REVIEW);
 `coding-context-session-state-continuity` and `coding-context-context-engineering-discipline`:
 record evidence at its actual strength, preserve working clients, and carry the write gate forward.
+
+Approval-probe implementation: `gov-58493d06fa19` (PROCEED); closeout/sign/publication:
+`gov-a07832a0f789` (REVIEW, no required modifications). `meta-core-informational-readiness`
+and `coding-process-validation-gates`: distinguish local synthetic verification, full CI,
+installed executable and actual human interaction. User authorization covers implementation
+and source publication; no approval gate for future calendar writes has been waived.
+The phase-start journal audit found no new missing memory; its no-change receipt again
+returned `accepted: false, reason: state_unavailable`. Do not retry unchanged.

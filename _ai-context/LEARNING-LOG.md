@@ -444,6 +444,14 @@ captured the task-group receiver immutably and failed compilation. Commit `f6c42
 separates `let result = try await group.next()` from `return try #require(result)`;
 full CI then passed. Keep mutation outside assertion macros when supporting both toolchains.
 
+**2026-09-14 — Inner request cleanup is only one part of a protocol lifecycle.**
+Approval review found that a settled elicitation could still leave its outer response task
+blocked on unread stdout. Batch serialization also turned overlapping prompts into a queue,
+and dropping cancellation registration at handler completion admitted an already-buffered
+accepted result after cancellation. Track ownership through response commitment, bound both
+incoming admission and response delivery, and test real pipe backpressure alongside fake
+protocol responses. Local cleanup cannot prove that a client dismissed its prompt UI.
+
 ## Graduated Patterns
 
 | Pattern | Graduated To | Date |

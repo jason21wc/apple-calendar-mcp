@@ -55,18 +55,36 @@ enum ServerBootstrap {
                 """,
             capabilities: .init(tools: .init(listChanged: false)))
 
+        let approvalProbeEnabled = Runtime.isApprovalProbeEnabled
+        let approvalProbe = ApprovalProbe()
         await server.withMethodHandler(ListTools.self) { _ in
-            .init(tools: ToolRegistry.all())
+            .init(tools: ToolRegistry.all(approvalProbeEnabled: approvalProbeEnabled))
         }
 
         await server.withMethodHandler(CallTool.self) { params in
-            try await ToolHandlers.dispatch(params, store: store)
+            if approvalProbeEnabled, params.name == ApprovalProbe.tool.name {
+                guard params.arguments?.isEmpty != false else {
+                    throw MCPError.invalidParams("The approval diagnostic takes no arguments")
+                }
+                let snapshot = await ClientSession.shared.current()
+                let outcome = try await approvalProbe.run(
+                    formSupported: snapshot?.elicitationFormSupported == true
+                ) {
+                    try await server.requestElicitation(
+                        message: ApprovalProbe.message,
+                        requestedSchema: ApprovalProbe.schema,
+                        mode: .form,
+                        timeout: .seconds(30))
+                }
+                return ApprovalProbe.result(outcome)
+            }
+            return try await ToolHandlers.dispatch(params, store: store)
         }
 
         let transport = await InitializeCompatibilityTransport(base: StdioTransport())
         // The initialize hook is the ONLY way to see what the client declared: the SDK keeps
-        // `clientCapabilities` private. Records only -- it gates nothing today, and a
-        // declaration is not an approval.
+        // `clientCapabilities` private. Form support gates sending the opt-in diagnostic;
+        // the declaration itself is never an approval.
         try await server.start(transport: transport) { _, capabilities in
             await ClientSession.shared.record(capabilities: capabilities)
             // Capabilities only. The client's name and version arrive here too and are

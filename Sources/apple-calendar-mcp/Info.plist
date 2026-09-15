@@ -9,9 +9,9 @@
 	<key>CFBundleExecutable</key>
 	<string>apple-calendar-mcp</string>
 	<key>CFBundleVersion</key>
-	<string>0.2.1</string>
+	<string>0.2.2</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.2.1</string>
+	<string>0.2.2</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>apple-calendar-mcp reads your calendar so an AI assistant can answer questions about your schedule, and creates or changes events only when you confirm each one.</string>
 </dict>

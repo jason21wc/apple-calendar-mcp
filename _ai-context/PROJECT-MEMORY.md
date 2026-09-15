@@ -365,6 +365,23 @@ caching in v1.
 | 94 | **A declared capability is a claim, and the claim has sub-parts that a top-level check conflates.** `calendar_permission_status` now reports what the connected client declared at `initialize` — the only place it is visible, since the SDK keeps `clientCapabilities` private and exposes it solely through the `Server.start` hook. **`elicitation_form_supported` is reported separately from `elicitation_declared`** because `form` and `url` are independent sub-capabilities: measured 2026-08-26 against a synthetic url-only client, which reports `declared: true, form: false`. A top-level check would have called that client able to answer a confirmation. **None of this is an approval**: it says the client claims it can put a question to a human, not that a human is present, awake or willing, and a test asserts no handler consumes the field as permission. **Booleans only (2026-08-27):** the client's name and version arrive on the same hook and are deliberately neither stored nor logged — client-chosen strings that answer nothing the measurement asks have no business in a payload that enters the model's context or in a log line. Canary-verified: a client identifying itself with a unique marker leaves no trace in either. **The minimal-field rule this project applies to calendar content applies to non-calendar metadata too; being "not calendar data" is not an exemption.** | 2026-08-26 |
 | 95 | **Adding an observation can change a tool's trust class.** `calendar_permission_status` was closed-world because it returned only local machine state. #24a briefly added MCP-client name/version to both its payload and startup log; those client-supplied strings widened the trust boundary while the tool retained `openWorldHint: false`, and the logger wrote them without the required control-character escaping. Fixed in `df43307` by omitting the unnecessary strings and retaining only capability booleans. **Minimize data rather than reclassifying every sink for diagnostic decoration the feature does not need.** | 2026-08-27 |
 
+## Approval diagnostic implementation decision (2026-09-14)
+
+The `0.2.2` candidate uses a local source snapshot of Swift MCP SDK 0.12.1, revision
+`a0ae212ebf6eab5f754c3129608bc5557637e605`, with a minimal manifest, MIT attribution,
+original hashes and reversible patch in `Vendor/swift-sdk`. Upstream 0.12.1 was still the
+latest release when checked. The patch owns request registration, monotonic deadlines,
+exactly-once settlement, cancellation propagation, disconnect draining and cooperative
+stdio writes. A caller-side timeout or remote cancellation notice alone cannot provide that
+cleanup. Replace the snapshot when a pinned upstream release passes equivalent regressions.
+
+`--enable-approval-probe` adds a harmless diagnostic independently of `--read-only`.
+It asks a fixed boolean question, admits one pending elicitation, and never touches EventKit
+content, the journal or a write token. Default discovery remains five tools. A successful
+synthetic response establishes protocol behavior only; actual human accept and refusal/UI
+behavior remain unproved. No write tool exists. Installed version stays `0.2.1` until a
+reviewed, signed candidate is deliberately installed at the same root-owned path.
+
 ## The human's stated requirements (2026-08-20, after using the read-only server daily)
 
 | Requirement | Status |

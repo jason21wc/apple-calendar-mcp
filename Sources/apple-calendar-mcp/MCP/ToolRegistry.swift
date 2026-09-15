@@ -31,8 +31,9 @@ enum ToolRegistry {
     /// lists of tool names is one list that can disagree with the other.
     static var names: Set<String> { Set(all().map(\.name)) }
 
-    static func all() -> [Tool] {
-        [
+    static func all(approvalProbeEnabled: Bool = false) -> [Tool] {
+        if approvalProbeEnabled { return all() + [ApprovalProbe.tool] }
+        return [
             Tool(
                 name: "calendar_permission_status",
                 description: """

@@ -71,8 +71,12 @@ enum Runtime {
 
     static var isReadOnly: Bool { readOnlyRequested }
 
+    nonisolated(unsafe) private static var approvalProbeRequested = false
+    static var isApprovalProbeEnabled: Bool { approvalProbeRequested }
+
     static func applyStartupFlags(_ args: [String]) {
         readOnlyRequested = args.contains("--read-only")
+        approvalProbeRequested = args.contains("--enable-approval-probe")
     }
 
     /// Probe records, the setup fingerprint and (from Phase 5) the mutation journal.

@@ -20,7 +20,7 @@ enum Command {
     /// Flags that modify how a command runs rather than selecting one. Stripped before the
     /// command is read, so `--read-only --version` still reports the version instead of
     /// being swallowed as a command in its own right.
-    static let modifiers: Set<String> = ["--read-only"]
+    static let modifiers: Set<String> = ["--read-only", "--enable-approval-probe"]
 
     static func parse(_ rawArgs: [String]) -> Command {
         let args = rawArgs.filter { !modifiers.contains($0) }
@@ -65,6 +65,7 @@ func printHelp() {
           --setup            request Calendar access (run this in a terminal)
           --doctor           diagnose why access is or is not working
           --read-only        serve with every mutating tool withheld (see below)
+          --enable-approval-probe  expose a harmless human-confirmation diagnostic
           --probe <label>    write a diagnostic record to ~/.local/state/apple-calendar-mcp
           --version          print version and identity
           --help             this text
@@ -84,5 +85,6 @@ func printVersion() {
     log("  path:       \(Meta.executablePath)")
     log("  mode:       \(Runtime.disclaimMode)")
     log("  tools:      read-only -- no write tool exists in this build")
+    if Runtime.isApprovalProbeEnabled { log("  approval probe: enabled (no calendar changes)") }
     if Runtime.isReadOnly { log("  --read-only: yes (mutating tools would be withheld)") }
 }

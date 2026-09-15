@@ -1,0 +1,5 @@
+# Unified-diff context lines contain a required leading space, including blank lines.
+Vendor/swift-sdk/LOCAL.patch whitespace=-blank-at-eol,-blank-at-eof
+# Preserve these upstream originals byte-for-byte for UPSTREAM.sha256 verification.
+Vendor/swift-sdk/Sources/MCP/Base/Authorization/OAuthDiscovery.swift whitespace=-blank-at-eof
+Vendor/swift-sdk/Sources/MCP/Base/Authorization/OAuthWWWAuthenticateParser.swift whitespace=-blank-at-eof

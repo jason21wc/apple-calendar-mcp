@@ -13,9 +13,9 @@ let package = Package(
     name: "apple-calendar-mcp",
     platforms: [.macOS(.v14)],
     dependencies: [
-        // EXACT pin, not a range. The SDK is pre-1.0, so minor versions may break; an
-        // upgrade should be a deliberate act with the contract tests re-run.
-        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", exact: "0.12.1")
+        // Reviewed 0.12.1 snapshot with request-lifecycle fixes; upstream revision,
+        // attribution and removal conditions live in Vendor/swift-sdk/README.md.
+        .package(path: "Vendor/swift-sdk")
     ],
     targets: [
         .executableTarget(
@@ -68,7 +68,7 @@ let package = Package(
         // XCTest is not an alternative: Command Line Tools ships no XCTest.swiftmodule.
         .testTarget(
             name: "AppleCalendarMCPTests",
-            dependencies: ["apple-calendar-mcp"],
+            dependencies: ["apple-calendar-mcp", .product(name: "MCP", package: "swift-sdk")],
             path: "Tests/AppleCalendarMCPTests"
         ),
     ]

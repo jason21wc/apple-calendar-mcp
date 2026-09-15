@@ -206,7 +206,8 @@ Shipped, published, and in daily use.
 | `calendar_busy_intervals` | Availability without titles |
 
 `calendar_recent_mutations` moves to Phase 6 — it reads the journal, which Phase 5 builds.
-**These five are the entire shipped surface.** The propose/commit tools described in §6 do not
+**These five are the default surface and the entire installed 0.2.1 surface.** The 0.2.2
+candidate adds an opt-in harmless approval diagnostic (§6). The propose/commit tools described in §6 do not
 exist; anything describing a fourteen-tool surface is describing the plan, not the server.
 
 ### Data model
@@ -354,10 +355,10 @@ server, from `config.json`, and from both August backups. The 2026-08-20 "measur
 the no-policy default and proves nothing about `readOnlyHint` exemption or write prompting.
 BACKLOG #23 exists to establish whether the key does anything at all.
 
-**The second candidate: server-initiated elicitation.** The pinned SDK exposes
+**The second candidate: server-initiated elicitation.** The SDK exposes
 `Server.requestElicitation`. Its appeal is that it lives in the binary we sign rather than in a
 config key that must be remembered — the failure that produced this entire correction. Three
-constraints, all verified in SDK source rather than assumed:
+constraints, verified in the original upstream 0.12.1 SDK rather than assumed:
 
 - **It does not fail closed as shipped.** `validateClientCapability` is wrapped in
   `if configuration.strict`, and `Configuration.default` is `strict: false`. We pass no
@@ -370,6 +371,14 @@ constraints, all verified in SDK source rather than assumed:
   abandons the request rather than cancelling it. The public `cancelRequest(id)` only sends a remote
   cancellation notice; it does not remove/resume the local pending request. Same class of
   external wait as the read gate (§5), with different cleanup requirements.
+
+The `0.2.2` candidate now repairs that request lifecycle in an attributed, pinned local
+SDK source snapshot and wires `calendar_approval_probe` behind `--enable-approval-probe`.
+The probe requires explicit form support, admits one pending question, and uses a 30-second
+monotonic deadline. It cannot access Calendar content, append to the journal or grant future
+write permission. See [the implementation design](APPROVAL-PROBE-DESIGN.md) and
+[SDK provenance](../Vendor/swift-sdk/README.md). Final validation and live measurement remain
+separate gates; installed `0.2.1` still has only the five read tools.
 
 **A capability declaration is not a human.** It says the client claims support. Only an
 observed round trip returning `.accept` demonstrates a person answered, and even that
@@ -680,9 +689,10 @@ cross-month history. These are prerequisites, not evidence that write approval o
 works. Next is the harmless human-approval round trip after the elicitation cleanup design;
 continue to enforce §6 Gate 1 before adding a mutating caller.
 
-**Current work:** [Approval probe design](APPROVAL-PROBE-DESIGN.md) defines the next
-deliverable and its fake-client acceptance checks. The cleanup implementation and live
-approval measurement remain outstanding; the design is not an approval result.
+**Current work:** the `0.2.2` source candidate implements the opt-in harmless probe and
+SDK lifecycle cleanup described in [the design](APPROVAL-PROBE-DESIGN.md). Complete final
+review/verification, install the signed candidate at the existing path, then measure actual
+human interaction. Fake-client tests do not clear the approval gate.
 
 **Then, and only after §6 Gate 1 is answered:** `calendar_create_event` →
 `calendar_delete_event` **with restore in the same change** → `calendar_update_event`.

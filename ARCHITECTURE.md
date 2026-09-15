@@ -46,7 +46,7 @@ hardened-runtime binary missing the calendars entitlement — potentially unreco
 
 | Decision | Why |
 |---|---|
-| MCP Swift SDK pinned `.exact("0.12.1")` | Pre-1.0; minors break. One spec revision behind (SDK tops out at `2025-11-25`, spec is at `2026-07-28`); clients negotiate down |
+| MCP Swift SDK 0.12.1 source pinned in `Vendor/swift-sdk` | Local request-lifecycle and cooperative stdio patch; upstream revision, MIT license, reverse patch and source hashes are retained. See `Vendor/swift-sdk/README.md` for removal criteria. Protocol negotiation is unchanged |
 | Info.plist embedded via `-sectcreate __TEXT __info_plist` | An SPM executable has no bundle and so cannot otherwise carry `NSCalendarsFullAccessUsageDescription` |
 | Stable self-signed cert + hardened runtime + entitlement | The TCC grant is checked against the **designated requirement**, which for a certificate-signed binary is `identifier "..." and certificate root = H"..."` — identity-based, so rebuilds keep the grant. Ad-hoc signing yields a **cdhash-based** requirement instead, which breaks on every build. Measured 2026-08-19 |
 | **Self-disclaiming re-exec at startup** | A plain executable never gets its own TCC identity — the grant is attributed to whoever spawned it, and an `.app` wrapper does not change that. Re-spawning once with `responsibility_spawnattrs_setdisclaim` makes the child its own responsible process. Verified 2026-08-19; the private symbol is resolved via `dlsym`, so its removal degrades to inherited mode rather than failing to launch |
@@ -101,6 +101,12 @@ titles, all of which arrive from other people — carry `openWorldHint: true`.
 The two closed-world tools are `calendar_busy_intervals`, which returns times and counts, and
 `calendar_permission_status`, which returns local state plus three client-declared capability
 booleans. Client name/version are explicitly discarded and never reach the payload or log.
+
+The `0.2.2` candidate adds an optional sixth diagnostic, `calendar_approval_probe`, only
+when launched with `--enable-approval-probe`. Its actor owns one pending question; the SDK
+owns request cancellation, deadlines and transport cleanup. It has no EventKit or journal
+call path and produces no reusable write authorization. Form support gates sending the
+question, never permission to mutate. See `docs/APPROVAL-PROBE-DESIGN.md`.
 
 The fourteen-tool surface with propose/commit pairs is the **plan**, not the server.
 

@@ -1,0 +1,946 @@
+--- a/Package.swift
++++ b/Package.swift
+@@ -17,20 +17,12 @@
+         // Products define the executables and libraries a package produces, making them visible to other packages.
+         .library(
+             name: "MCP",
+-            targets: ["MCP"]),
+-        .executable(
+-            name: "mcp-everything-server",
+-            targets: ["MCPConformanceServer"]),
+-        .executable(
+-            name: "mcp-everything-client",
+-            targets: ["MCPConformanceClient"])
++            targets: ["MCP"])
+     ],
+     dependencies: [
+-        .package(url: "https://github.com/swiftlang/swift-docc-plugin", branch: "main"),
+         .package(url: "https://github.com/apple/swift-system.git", from: "1.0.0"),
+         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
+         .package(url: "https://github.com/mattt/eventsource.git", from: "1.1.0"),
+-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
+     ],
+     targets: [
+         .target(
+@@ -45,36 +37,6 @@
+             swiftSettings: [
+                 .enableUpcomingFeature("StrictConcurrency")
+             ]
+-        ),
+-        .testTarget(
+-            name: "MCPTests",
+-            dependencies: [
+-                "MCP",
+-                .product(name: "SystemPackage", package: "swift-system"),
+-                .product(name: "Logging", package: "swift-log"),
+-                .product(
+-                    name: "EventSource", package: "eventsource",
+-                    condition: .when(platforms: [.macOS, .iOS, .tvOS, .visionOS, .watchOS, .macCatalyst])),
+-            ]
+-        ),
+-        .executableTarget(
+-            name: "MCPConformanceServer",
+-            dependencies: [
+-                "MCP",
+-                .product(name: "Logging", package: "swift-log"),
+-                .product(name: "NIOCore", package: "swift-nio"),
+-                .product(name: "NIOPosix", package: "swift-nio"),
+-                .product(name: "NIOHTTP1", package: "swift-nio"),
+-            ],
+-            path: "Sources/MCPConformance/Server"
+-        ),
+-        .executableTarget(
+-            name: "MCPConformanceClient",
+-            dependencies: [
+-                "MCP",
+-                .product(name: "Logging", package: "swift-log"),
+-            ],
+-            path: "Sources/MCPConformance/Client"
+         )
+     ]
+ )
+--- a/Sources/MCP/Base/Transport.swift
++++ b/Sources/MCP/Base/Transport.swift
+@@ -12,7 +12,12 @@
+     /// Disconnects from the transport
+     func disconnect() async
+ 
+-    /// Sends data
++    /// Sends data.
++    /// Bounded server request lifecycles require this operation to promptly observe
++    /// task cancellation, including while waiting on I/O. Implementations must not
++    /// leave a partial protocol frame that a subsequent send could corrupt.
++    /// Disconnect must terminate outstanding I/O. Arbitrary uncooperative transports
++    /// cannot be forcibly canceled by Swift tasks.
+     func send(_ data: Data) async throws
+ 
+     /// Receives data in an async sequence
+--- a/Sources/MCP/Base/Transports/StdioTransport.swift
++++ b/Sources/MCP/Base/Transports/StdioTransport.swift
+@@ -54,6 +54,10 @@
+         public nonisolated let logger: Logger
+ 
+         private var isConnected = false
++        private var isSending = false
++        // Internal observation for synthetic full-pipe cancellation tests.
++        var _isSendingForTesting: Bool { isSending }
++        private var readTask: Task<Void, Never>?
+         private let messageStream: AsyncThrowingStream<Data, Swift.Error>
+         private let messageContinuation: AsyncThrowingStream<Data, Swift.Error>.Continuation
+ 
+@@ -99,9 +103,7 @@
+             logger.debug("Transport connected successfully")
+ 
+             // Start reading loop in background
+-            Task {
+-                await readLoop()
+-            }
++            readTask = Task { await readLoop() }
+         }
+ 
+         /// Configures a file descriptor for non-blocking I/O
+@@ -180,9 +182,14 @@
+         ///
+         /// This stops the message reading loop and releases associated resources.
+         public func disconnect() async {
+-            guard isConnected else { return }
++            // Also drain the reader after a partial-write failure already marked
++            // the connection closed.
+             isConnected = false
+             messageContinuation.finish()
++            let reader = readTask
++            readTask = nil
++            reader?.cancel()
++            await reader?.value
+             logger.debug("Transport disconnected")
+         }
+ 
+@@ -195,29 +202,50 @@
+         /// - Parameter message: The message data to send (without a trailing newline)
+         /// - Throws: Error if the message cannot be sent
+         public func send(_ message: Data) async throws {
++            // Actor reentrancy while waiting for writable output must not interleave
++            // two JSON frames. Waiting callers remain cancellation-cooperative.
++            while isSending {
++                try Task.checkCancellation()
++                guard isConnected else {
++                    throw MCPError.transportError(Errno(rawValue: ENOTCONN))
++                }
++                try await Task.sleep(for: .milliseconds(10))
++            }
++            try Task.checkCancellation()
+             guard isConnected else {
+                 throw MCPError.transportError(Errno(rawValue: ENOTCONN))
+             }
+-
+-            // Add newline as delimiter
+-            var messageWithNewline = message
+-            messageWithNewline.append(UInt8(ascii: "\n"))
+-
+-            var remaining = messageWithNewline
+-            while !remaining.isEmpty {
+-                do {
+-                    let written = try remaining.withUnsafeBytes { buffer in
+-                        try output.write(UnsafeRawBufferPointer(buffer))
+-                    }
+-                    if written > 0 {
+-                        remaining = remaining.dropFirst(written)
+-                    }
+-                } catch let error where MCPError.isResourceTemporarilyUnavailable(error) {
+-                    try await Task.sleep(for: .milliseconds(10))
+-                    continue
+-                } catch {
+-                    throw MCPError.transportError(error)
+-                }
++            isSending = true
++            defer { isSending = false }
++            var frame = message
++            frame.append(UInt8(ascii: "\n"))
++            var remaining = frame
++            do {
++                while !remaining.isEmpty {
++                    try Task.checkCancellation()
++                    guard isConnected else {
++                        throw MCPError.transportError(Errno(rawValue: ENOTCONN))
++                    }
++                    do {
++                        let written = try remaining.withUnsafeBytes {
++                            try output.write(UnsafeRawBufferPointer($0))
++                        }
++                        if written > 0 { remaining = remaining.dropFirst(written) }
++                        else { try await Task.sleep(for: .milliseconds(10)) }
++                    } catch let error where MCPError.isResourceTemporarilyUnavailable(error) {
++                        try await Task.sleep(for: .milliseconds(10))
++                    }
++                }
++            } catch {
++                // A partial line cannot be abandoned and followed by another JSON
++                // message. Close this stream instead of corrupting its framing.
++                // Cancellation before any byte was written leaves it healthy.
++                if remaining.count != frame.count {
++                    isConnected = false
++                    messageContinuation.finish(throwing: error)
++                    readTask?.cancel()
++                }
++                throw error
+             }
+         }
+ 
+--- a/Sources/MCP/Server/Server.swift
++++ b/Sources/MCP/Server/Server.swift
+@@ -1,4 +1,5 @@
+ import Logging
++import class Foundation.NSLock
+ 
+ import struct Foundation.Data
+ import struct Foundation.Date
+@@ -166,10 +167,78 @@
+     /// Notification handlers
+     private var notificationHandlers: [String: [NotificationHandlerBox]] = [:]
+     /// Pending request tasks (for cancellation support)
+-    private var pendingRequestTasks: [ID: Task<Response<AnyMethod>, Error>] = [:]
++    private var pendingRequestTasks: [ID: Task<Response<AnyMethod>?, Error>] = [:]
++    // Batch handlers can finish before their response is committed. Retain a
++    // cancellation flag as well as their task until the aggregate is handed off.
++    private var incomingCancellationFlags: [ID: CancellationFlag] = [:]
++    private var batchTasks: [ID: Task<Void, Never>] = [:]
++    private var batchReservations: Set<ID> = []
++    private var responseSendTasks = 0
++    private var responseSendTimeout: Duration = .seconds(5)
++    private var maximumIncomingRequests = 16
++
++    // Local stdio defaults are conservative; tests use short, observable budgets.
++    func _setResponseLifecycleLimitsForTesting(timeout: Duration, maximumIncomingRequests: Int) {
++        precondition(timeout > .zero && maximumIncomingRequests > 1)
++        responseSendTimeout = timeout
++        self.maximumIncomingRequests = maximumIncomingRequests
++    }
++    private var completedBatchResponseIDs: Set<ID> = []
++    // Observes fully computed results buffered behind another batch item.
++    var _completedBatchResponseCountForTesting: Int { completedBatchResponseIDs.count }
++    private var generation: UInt64 = 0
++    private var isOpen = false
++    private var hasStarted = false
++    private var lifecycleNow: @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
++
++    // Internal deterministic response-expiry seam, visible only to @testable clients.
++    func _setRequestLifecycleNow(_ now: @escaping @Sendable () -> ContinuousClock.Instant) {
++        lifecycleNow = now
++    }
++    private var outgoingSendTasks: [ID: Task<Void, Never>] = [:]
++    private var deadlineTasks: [ID: Task<Void, Never>] = [:]
++    private var cancellationNotificationTask: Task<Void, Never>?
++
++    public enum RequestLifecycleError: Swift.Error, Sendable, Equatable {
++        case timedOut
++        case disconnected
++    }
++
++    public struct RequestLifecycleDiagnostics: Sendable {
++        public let pendingOutgoingRequests: Int
++        public let outgoingSendTasks: Int
++        public let deadlineTasks: Int
++        public let incomingRequestTasks: Int
++        public let responseSendTasks: Int
++        public let cancellationNotificationTasks: Int
++    }
++
++    public func requestLifecycleDiagnostics() -> RequestLifecycleDiagnostics {
++        .init(pendingOutgoingRequests: pendingRequests.count,
++              outgoingSendTasks: outgoingSendTasks.count, deadlineTasks: deadlineTasks.count,
++              incomingRequestTasks: pendingRequestTasks.count + batchReservations.count,
++              responseSendTasks: responseSendTasks,
++              cancellationNotificationTasks: cancellationNotificationTask == nil ? 0 : 1)
++    }
++
++    /// Shared with the synchronous cancellation handler: an actor hop cannot delay
++    /// cancellation visibility until after a racing successful response.
++    private final class CancellationFlag: @unchecked Sendable {
++        private let lock = NSLock()
++        private var value = false
++        func cancel() { lock.lock(); value = true; lock.unlock() }
++        var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return value }
++    }
++
++    private struct OutgoingRequest {
++        let continuation: AnyPendingRequest
++        let deadline: ContinuousClock.Instant?
++        let cancellation: CancellationFlag
++        let generation: UInt64
++    }
+ 
+     /// Pending requests sent to the client, awaiting responses
+-    private var pendingRequests: [ID: AnyPendingRequest] = [:]
++    private var pendingRequests: [ID: OutgoingRequest] = [:]
+ 
+     /// Whether the server is initialized
+     private var isInitialized = false
+@@ -206,15 +275,27 @@
+         transport: any Transport,
+         initializeHook: (@Sendable (Client.Info, Client.Capabilities) async throws -> Void)? = nil
+     ) async throws {
++        guard !hasStarted else { throw MCPError.internalError("Server cannot be restarted") }
++        hasStarted = true
++        generation &+= 1
++        let currentGeneration = generation
+         self.connection = transport
+         registerDefaultHandlers(initializeHook: initializeHook)
+         registerCancellationHandler()
+         try await transport.connect()
++        guard connection != nil, generation == currentGeneration else {
++            await transport.disconnect()
++            throw RequestLifecycleError.disconnected
++        }
++        isOpen = true
+ 
+         await logger?.debug(
+             "Server started", metadata: ["name": "\(name)", "version": "\(version)"]
+         )
+ 
++        guard isOpen, generation == currentGeneration else {
++            throw RequestLifecycleError.disconnected
++        }
+         // Start message handling loop
+         task = Task {
+             do {
+@@ -232,9 +313,7 @@
+                             await handleResponse(response)
+                         } else if let request = try? decoder.decode(AnyRequest.self, from: data) {
+                             // Handle request in a separate task to avoid blocking the receive loop
+-                            Task {
+-                                _ = try? await self.handleRequest(request, sendResponse: true)
+-                            }
++                            _ = startIncomingRequest(request, sendResponse: true)
+                         } else if let message = try? decoder.decode(AnyMessage.self, from: data) {
+                             try await handleMessage(message)
+                         } else {
+@@ -270,26 +349,45 @@
+                 await logger?.error(
+                     "Fatal error in message handling loop", metadata: ["error": "\(error)"])
+             }
++            await closeGeneration()
+             await logger?.debug("Server finished", metadata: [:])
+         }
+     }
+ 
+     /// Stop the server
+     public func stop() async {
+-        task?.cancel()
++        let receiveTask = task
++        receiveTask?.cancel()
++        await closeGeneration()
++        await receiveTask?.value
+         task = nil
+-
+-        // Clear pending requests with errors
+-        let pendingRequestsToCancel = self.pendingRequests
+-        self.pendingRequests = [:]
+-        for (_, request) in pendingRequestsToCancel {
+-            request.resume(throwing: MCPError.internalError("Server disconnected"))
+-        }
+-
+-        if let connection = connection {
+-            await connection.disconnect()
+-        }
++    }
++
++    /// Close before the first suspension, so no handler can register late work.
++    private func closeGeneration() async {
++        isOpen = false
++        generation &+= 1
++        let transport = connection
+         connection = nil
++        for id in Array(pendingRequests.keys) {
++            finishOutgoing(id, error: RequestLifecycleError.disconnected)
++        }
++        let sends = Array(outgoingSendTasks.values)
++        let timers = Array(deadlineTasks.values)
++        let incoming = Array(pendingRequestTasks.values)
++        let batches = Array(batchTasks.values)
++        let notification = cancellationNotificationTask
++        sends.forEach { $0.cancel() }
++        timers.forEach { $0.cancel() }
++        incoming.forEach { $0.cancel() }
++        batches.forEach { $0.cancel() }
++        notification?.cancel()
++        await transport?.disconnect()
++        for work in sends { await work.value }
++        for work in timers { await work.value }
++        for work in incoming { _ = try? await work.value }
++        for work in batches { await work.value }
++        await notification?.value
+     }
+ 
+     public func waitUntilCompleted() async {
+@@ -364,7 +462,7 @@
+ 
+     /// Send a response to a request
+     public func send<M: Method>(_ response: Response<M>) async throws {
+-        guard let connection = connection else {
++        guard connection != nil else {
+             throw MCPError.internalError("Server connection not initialized")
+         }
+ 
+@@ -372,7 +470,54 @@
+         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+ 
+         let responseData = try encoder.encode(response)
+-        try await connection.send(responseData)
++        try await sendResponseData(responseData)
++    }
++
++    /// A response belongs to its incoming task until delivery finishes. A full
++    /// output pipe must not retain one new handler forever for every new request.
++    private func sendResponseData(_ data: Data) async throws {
++        try Task.checkCancellation()
++        guard isOpen, let connection else { throw RequestLifecycleError.disconnected }
++        guard responseSendTasks < maximumIncomingRequests else {
++            invalidateForTransportFailure()
++            throw RequestLifecycleError.disconnected
++        }
++        responseSendTasks += 1
++        defer { responseSendTasks -= 1 }
++        let timeout = responseSendTimeout
++        do {
++            try await withThrowingTaskGroup(of: Void.self) { group in
++                group.addTask { try await connection.send(data) }
++                group.addTask {
++                    try await Task.sleep(for: timeout)
++                    // Close admission before canceling/draining the stalled send.
++                    await self.invalidateForTransportFailure()
++                    throw RequestLifecycleError.disconnected
++                }
++                do {
++                    _ = try await group.next()
++                    group.cancelAll()
++                } catch {
++                    group.cancelAll()
++                    throw error
++                }
++            }
++        } catch {
++            // Task cancellation before any response bytes is an ordinary canceled
++            // request. An actual transport failure or send deadline closes the stream.
++            if !(error is CancellationError) { invalidateForTransportFailure() }
++            throw error
++        }
++    }
++
++    /// Do not await closeGeneration here: the caller can itself be an incoming task
++    /// that shutdown must drain. Canceling the receive loop runs that shutdown from
++    /// its owner, without a task awaiting its own completion.
++    private func invalidateForTransportFailure() {
++        guard isOpen else { return }
++        isOpen = false
++        generation &+= 1
++        task?.cancel()
+     }
+ 
+     /// Send a notification to connected clients
+@@ -388,60 +533,122 @@
+         try await connection.send(notificationData)
+     }
+ 
+-    /// Send a request to the client and return a Task for the response
+-    private func send<M: Method>(_ request: Request<M>) throws -> Task<M.Result, Error> {
+-        guard let connection = connection else {
+-            throw MCPError.internalError("Server connection not initialized")
+-        }
+-
++    /// Registration is actor-atomic and precedes the send task becoming runnable.
++    /// Transport sends must cooperate with task cancellation; see the local patch README.
++    private func sendAndAwait<M: Method>(
++        _ request: Request<M>, timeout: Duration? = nil
++    ) async throws -> M.Result {
++        try Task.checkCancellation()
++        guard isOpen, let connection else { throw RequestLifecycleError.disconnected }
++        let currentGeneration = generation
++        let cancellation = CancellationFlag()
++        let deadline = timeout.map { lifecycleNow().advanced(by: $0) }
+         let encoder = JSONEncoder()
+         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+         let requestData = try encoder.encode(request)
+-
+-        let requestTask = Task<M.Result, Error> {
+-            try await withCheckedThrowingContinuation { continuation in
+-                Task {
+-                    // Add pending response before sending
+-                    self.addPendingResponse(
+-                        id: request.id,
+-                        continuation: continuation,
+-                        type: M.Result.self
+-                    )
+-
+-                    // Send the request
+-                    do {
+-                        try await connection.send(requestData)
+-                    } catch {
+-                        // If send fails, remove pending response and resume with error
+-                        if self.removePendingResponse(id: request.id) != nil {
+-                            continuation.resume(throwing: error)
++        do {
++            let result: M.Result = try await withTaskCancellationHandler {
++                try await withCheckedThrowingContinuation { continuation in
++                    guard !Task.isCancelled, !cancellation.isCancelled else {
++                        continuation.resume(throwing: CancellationError()); return
++                    }
++                    guard isOpen, generation == currentGeneration else {
++                        continuation.resume(throwing: RequestLifecycleError.disconnected); return
++                    }
++                    guard deadline.map({ lifecycleNow() < $0 }) ?? true else {
++                        continuation.resume(throwing: RequestLifecycleError.timedOut); return
++                    }
++                    pendingRequests[request.id] = OutgoingRequest(
++                        continuation: AnyPendingRequest(PendingRequest(continuation: continuation)),
++                        deadline: deadline, cancellation: cancellation, generation: currentGeneration)
++                    outgoingSendTasks[request.id] = Task {
++                        defer { outgoingSendTasks.removeValue(forKey: request.id) }
++                        do {
++                            try Task.checkCancellation()
++                            guard !cancellation.isCancelled else { throw CancellationError() }
++                            guard isOpen, generation == currentGeneration,
++                                  pendingRequests[request.id] != nil else {
++                                throw RequestLifecycleError.disconnected
++                            }
++                            try await connection.send(requestData)
++                        } catch {
++                            finishOutgoing(request.id, error: error)
++                        }
++                    }
++                    if let deadline {
++                        deadlineTasks[request.id] = Task {
++                            defer { deadlineTasks.removeValue(forKey: request.id) }
++                            do { try await ContinuousClock().sleep(until: deadline) }
++                            catch { return }
++                            finishOutgoing(request.id, error: RequestLifecycleError.timedOut,
++                                           notifyCancellation: true)
+                         }
+                     }
+                 }
+-            }
+-        }
+-
+-        return requestTask
+-    }
+-
+-    /// Send a request and await its response
+-    private func sendAndAwait<M: Method>(_ request: Request<M>) async throws -> M.Result {
+-        let task = try send(request)
+-        return try await task.value
+-    }
+-
+-    private func addPendingResponse<T: Sendable & Decodable>(
+-        id: ID,
+-        continuation: CheckedContinuation<T, Swift.Error>,
+-        type: T.Type
++            } onCancel: {
++                cancellation.cancel()
++                Task { await self.cancelOutgoing(request.id) }
++            }
++            await drainOutgoingWork(request.id)
++            try Task.checkCancellation()
++            return result
++        } catch {
++            await drainOutgoingWork(request.id)
++            throw error
++        }
++    }
++
++    private func drainOutgoingWork(_ id: ID) async {
++        let send = outgoingSendTasks[id]
++        let timer = deadlineTasks[id]
++        await send?.value
++        await timer?.value
++    }
++
++    private func cancelOutgoing(_ id: ID) {
++        finishOutgoing(id, error: CancellationError(), notifyCancellation: true)
++    }
++
++    /// The sole outgoing terminal transition. Late/duplicate messages see no entry.
++    private func finishOutgoing(
++        _ id: ID, value: Value? = nil, error: Swift.Error? = nil,
++        notifyCancellation: Bool = false
+     ) {
+-        pendingRequests[id] = AnyPendingRequest(
+-            PendingRequest(continuation: continuation)
+-        )
+-    }
+-
+-    private func removePendingResponse(id: ID) -> AnyPendingRequest? {
+-        return pendingRequests.removeValue(forKey: id)
++        guard let pending = pendingRequests.removeValue(forKey: id) else { return }
++        outgoingSendTasks[id]?.cancel()
++        deadlineTasks[id]?.cancel()
++        var terminalError = error
++        if !isOpen || pending.generation != generation {
++            terminalError = RequestLifecycleError.disconnected
++        } else if pending.cancellation.isCancelled {
++            terminalError = CancellationError()
++        } else if let deadline = pending.deadline, lifecycleNow() >= deadline {
++            terminalError = RequestLifecycleError.timedOut
++        }
++        if let terminalError { pending.continuation.resume(throwing: terminalError) }
++        else if let value { pending.continuation.resume(returning: value) }
++        else { pending.continuation.resume(throwing: MCPError.internalError("Missing response")) }
++        if notifyCancellation || terminalError is CancellationError ||
++            (terminalError as? RequestLifecycleError) == .timedOut {
++            sendCancellationBestEffort(id)
++        }
++    }
++
++    /// At most one bounded notification operation per connection. Drop additional
++    /// notices while this slot is occupied; local cancellation never waits on it.
++    private func sendCancellationBestEffort(_ id: ID, reason: String? = nil) {
++        guard isOpen, cancellationNotificationTask == nil, let connection else { return }
++        let notification = CancelledNotification.message(.init(requestId: id, reason: reason))
++        guard let data = try? JSONEncoder().encode(notification) else { return }
++        cancellationNotificationTask = Task {
++            defer { cancellationNotificationTask = nil }
++            await withTaskGroup(of: Void.self) { group in
++                group.addTask { try? await connection.send(data) }
++                group.addTask { try? await Task.sleep(for: .milliseconds(100)) }
++                _ = await group.next()
++                group.cancelAll()
++            }
++        }
+     }
+ 
+     // MARK: - Sampling
+@@ -529,10 +736,11 @@
+         message: String,
+         requestedSchema: Elicitation.RequestSchema,
+         mode: Elicitation.Mode? = nil,
+-        _meta: Metadata? = nil
++        _meta: Metadata? = nil,
++        timeout: Duration? = nil
+     ) async throws -> CreateElicitation.Result {
+         guard connection != nil else {
+-            throw MCPError.internalError("Server connection not initialized")
++            throw RequestLifecycleError.disconnected
+         }
+ 
+         try validateClientCapability(\.elicitation, "Elicitation")
+@@ -548,7 +756,7 @@
+             )
+         )
+ 
+-        let result = try await sendAndAwait(request)
++        let result = try await sendAndAwait(request, timeout: timeout)
+         return result
+     }
+ 
+@@ -569,10 +777,11 @@
+         message: String,
+         url: String,
+         elicitationId: String,
+-        _meta: Metadata? = nil
++        _meta: Metadata? = nil,
++        timeout: Duration? = nil
+     ) async throws -> CreateElicitation.Result {
+         guard connection != nil else {
+-            throw MCPError.internalError("Server connection not initialized")
++            throw RequestLifecycleError.disconnected
+         }
+ 
+         try validateClientCapability(\.elicitation, "Elicitation")
+@@ -588,7 +797,7 @@
+             )
+         )
+ 
+-        let result = try await sendAndAwait(request)
++        let result = try await sendAndAwait(request, timeout: timeout)
+         return result
+     }
+ 
+@@ -675,56 +884,104 @@
+         }
+     }
+ 
+-    /// Process a batch of requests and/or notifications
++    /// Dispatch concurrently, so an overlap guard in an application handler observes
++    /// overlapping batch calls too. Response collection leaves the receive loop free.
+     private func handleBatch(_ batch: Batch) async throws {
+-        await logger?.trace("Processing batch request", metadata: ["size": "\(batch.items.count)"])
+-
+         if batch.items.isEmpty {
+-            // Empty batch is invalid according to JSON-RPC spec
+-            let error = MCPError.invalidRequest("Batch array must not be empty")
+-            let response = AnyMethod.response(id: .random, error: error)
+-            try await send(response)
++            try await send(AnyMethod.response(id: .random,
++                error: MCPError.invalidRequest("Batch array must not be empty")))
+             return
+         }
+-
+-        // Process each item in the batch and collect responses
+-        var responses: [Response<AnyMethod>] = []
+-
++        guard isOpen else { return }
++        guard pendingRequestTasks.count + batchReservations.count < maximumIncomingRequests else {
++            invalidateForTransportFailure()
++            return
++        }
++        let id = ID.random
++        batchReservations.insert(id)
++        var requests: [(id: ID, task: Task<Response<AnyMethod>?, Error>)] = []
+         for item in batch.items {
+-            do {
+-                switch item {
+-                case .request(let request):
+-                    // For batched requests, collect responses instead of sending immediately
+-                    if let response = try await handleRequest(request, sendResponse: false) {
++            switch item {
++            case .request(let request):
++                if let work = startIncomingRequest(request, sendResponse: false) {
++                    requests.append((request.id, work))
++                }
++            case .notification(let message): try? await handleMessage(message)
++            }
++        }
++        guard isOpen else {
++            // A notification handler may have suspended during disconnect.
++            for request in requests {
++                request.task.cancel()
++                _ = try? await request.task.value
++                releaseIncomingRequest(request.id)
++            }
++            batchReservations.remove(id)
++            return
++        }
++        guard !requests.isEmpty else { batchReservations.remove(id); return }
++        batchTasks[id] = Task {
++            defer {
++                for request in requests {
++                    completedBatchResponseIDs.remove(request.id)
++                    releaseIncomingRequest(request.id)
++                }
++                batchTasks.removeValue(forKey: id)
++                batchReservations.remove(id)
++            }
++            var responses: [Response<AnyMethod>] = []
++            for request in requests {
++                do {
++                    if let response = try await request.task.value {
+                         responses.append(response)
++                        completedBatchResponseIDs.insert(request.id)
+                     }
+-
+-                case .notification(let notification):
+-                    // Handle notification (no response needed)
+-                    try await handleMessage(notification)
++                } catch is CancellationError {
++                    // Canceled batch items have no response, including cancellations
++                    // observed before the handler was dispatched.
++                } catch {
++                    responses.append(AnyMethod.response(id: request.id,
++                        error: error as? MCPError ?? MCPError.internalError(error.localizedDescription)))
+                 }
+-            } catch {
+-                // Only add errors to response for requests (notifications don't have responses)
+-                if case .request(let request) = item {
+-                    let mcpError =
+-                        error as? MCPError ?? MCPError.internalError(error.localizedDescription)
+-                    responses.append(AnyMethod.response(id: request.id, error: mcpError))
+-                }
+-            }
+-        }
+-
+-        // Send collected responses if any
+-        if !responses.isEmpty {
++            }
++            guard !Task.isCancelled, isOpen else { return }
++            // This is the response commitment point. No actor suspension occurs
++            // between filtering canceled IDs and handing the encoded aggregate to
++            // the transport. Already-written bytes cannot subsequently be retracted.
++            responses.removeAll { incomingCancellationFlags[$0.id]?.isCancelled != false }
++            guard !responses.isEmpty else { return }
+             let encoder = JSONEncoder()
+             encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+-            let responseData = try encoder.encode(responses)
+-
+-            guard let connection = connection else {
+-                throw MCPError.internalError("Server connection not initialized")
+-            }
+-
+-            try await connection.send(responseData)
+-        }
++            if let data = try? encoder.encode(responses) { try? await sendResponseData(data) }
++        }
++    }
++
++    private func releaseIncomingRequest(_ id: ID) {
++        pendingRequestTasks.removeValue(forKey: id)
++        incomingCancellationFlags.removeValue(forKey: id)
++    }
++
++    private func startIncomingRequest(
++        _ request: Request<AnyMethod>, sendResponse: Bool
++    ) -> Task<Response<AnyMethod>?, Error>? {
++        guard isOpen, pendingRequestTasks[request.id] == nil else { return nil }
++        guard pendingRequestTasks.count + batchReservations.count < maximumIncomingRequests else {
++            invalidateForTransportFailure()
++            return nil
++        }
++        let currentGeneration = generation
++        incomingCancellationFlags[request.id] = CancellationFlag()
++        let work = Task<Response<AnyMethod>?, Error> {
++            defer {
++                // Batch slots belong to the aggregate response task until it commits.
++                if sendResponse { releaseIncomingRequest(request.id) }
++            }
++            try Task.checkCancellation()
++            guard isOpen, generation == currentGeneration else { throw CancellationError() }
++            return try await handleRequest(request, sendResponse: sendResponse)
++        }
++        pendingRequestTasks[request.id] = work
++        return work
+     }
+ 
+     // MARK: - Request and Message Handling
+@@ -754,6 +1011,8 @@
+                 "id": "\(request.id)",
+             ])
+ 
++        try Task.checkCancellation()
++        guard isOpen else { throw CancellationError() }
+         if configuration.strict {
+             // The client SHOULD NOT send requests other than pings
+             // before the server has responded to the initialize request.
+@@ -785,68 +1044,38 @@
+             .httpRequestContext(for: request.id)
+         let handlerContext = HandlerContext(id: request.id, httpContext: httpContext)
+ 
+-        // Create a task to handle the request with cancellation support.
+-        // Set currentHandlerContext as a task local so handlers see it.
+-        var handlerTask: Task<Response<AnyMethod>, Error>!
+-        Server.$currentHandlerContext.withValue(handlerContext) {
+-            handlerTask = Task<Response<AnyMethod>, Error> {
+-                do {
+-                    // Check if task was cancelled before starting
+-                    try Task.checkCancellation()
+-
+-                    // Handle request and get response
+-                    let response = try await handler(request)
+-                    return response
+-                } catch is CancellationError {
+-                    // Request was cancelled, don't send a response per MCP spec
+-                    await logger?.debug(
+-                        "Request cancelled",
+-                        metadata: ["id": "\(request.id)", "method": "\(request.method)"]
+-                    )
+-                    throw CancellationError()
+-                } catch {
+-                    let mcpError =
+-                        error as? MCPError ?? MCPError.internalError(error.localizedDescription)
+-                    return AnyMethod.response(id: request.id, error: mcpError)
+-                }
+-            }
+-        }
+-
+-        // Store the handler task for potential cancellation
+-        pendingRequestTasks[request.id] = handlerTask
+-
+-        // Ensure cleanup happens regardless of success or failure
+-        defer {
+-            pendingRequestTasks.removeValue(forKey: request.id)
+-        }
+-
+         do {
+-            let response = try await handlerTask.value
+-
+-            if sendResponse {
+-                try await send(response)
+-                return nil
+-            }
+-
++            try Task.checkCancellation()
++            guard isOpen else { throw CancellationError() }
++            let response = try await Server.$currentHandlerContext.withValue(handlerContext) {
++                try await handler(request)
++            }
++            // A handler may catch cancellation itself. Never emit its result afterwards.
++            try Task.checkCancellation()
++            guard isOpen else { throw CancellationError() }
++            if sendResponse { try await send(response); return nil }
+             return response
+         } catch is CancellationError {
+-            // Request was cancelled, don't send a response per MCP spec
+             return nil
+         } catch {
+-            // This should not happen as errors are caught in the task
++            guard !Task.isCancelled, isOpen else { return nil }
+             let mcpError = error as? MCPError ?? MCPError.internalError(error.localizedDescription)
+             let response = AnyMethod.response(id: request.id, error: mcpError)
+-
+-            if sendResponse {
+-                try await send(response)
+-                return nil
+-            }
+-
++            if sendResponse { try await send(response); return nil }
+             return response
+         }
+     }
+ 
+     private func handleMessage(_ message: Message<AnyNotification>) async throws {
++        // Observe wire cancellation before logging or any other suspension. The
++        // request slot already exists even if its handler has not started yet.
++        if message.method == CancelledNotification.name,
++           let data = try? JSONEncoder().encode(message),
++           let cancellation = try? JSONDecoder().decode(Message<CancelledNotification>.self, from: data),
++           let id = cancellation.params.requestId {
++            incomingCancellationFlags[id]?.cancel()
++            pendingRequestTasks[id]?.cancel()
++        }
+         await logger?.trace(
+             "Processing notification",
+             metadata: ["method": "\(message.method)"])
+@@ -877,18 +1106,9 @@
+     }
+ 
+     private func handleResponse(_ response: Response<AnyMethod>) async {
+-        if let pendingRequest = self.removePendingResponse(id: response.id) {
+-            switch response.result {
+-            case .success(let value):
+-                pendingRequest.resume(returning: value)
+-            case .failure(let error):
+-                pendingRequest.resume(throwing: error)
+-            }
+-        } else {
+-            await logger?.warning(
+-                "Received response for unknown request",
+-                metadata: ["id": "\(response.id)"]
+-            )
++        switch response.result {
++        case .success(let value): finishOutgoing(response.id, value: value)
++        case .failure(let error): finishOutgoing(response.id, error: error)
+         }
+     }
+ 
+@@ -970,8 +1190,9 @@
+     }
+ 
+     /// Cancel and remove a pending request task
+-    private func removePendingRequest(id: ID) -> Task<Response<AnyMethod>, Error>? {
+-        pendingRequestTasks.removeValue(forKey: id)
++    private func removePendingRequest(id: ID) -> Task<Response<AnyMethod>?, Error>? {
++        // Retain until task completion so disconnect can drain canceled handlers.
++        pendingRequestTasks[id]
+     }
+ 
+     private func registerCancellationHandler() {
+@@ -1032,11 +1253,8 @@
+     /// - Throws: MCPError if the notification cannot be sent
+     /// - SeeAlso: https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/cancellation
+     public func cancelRequest(_ requestID: ID, reason: String? = nil) async throws {
+-        // Send cancellation notification to client
+-        let notification = CancelledNotification.message(
+-            .init(requestId: requestID, reason: reason)
+-        )
+-        try await notify(notification)
++        finishOutgoing(requestID, error: CancellationError())
++        sendCancellationBestEffort(requestID, reason: reason)
+     }
+ }
+ 

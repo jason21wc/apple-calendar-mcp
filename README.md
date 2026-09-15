@@ -73,6 +73,23 @@ Run `./scripts/test.sh` to see the test suite pass. (A count is not quoted here:
 quoted in four documents, drifted to four different numbers, and running the suite is the
 only way to know it anyway.)
 
+## Optional approval diagnostic (0.2.2 candidate)
+
+Add `--enable-approval-probe` to the server launch arguments to expose
+`calendar_approval_probe`. It also works with `--read-only`. This diagnostic asks one fixed
+confirmation question, changes no calendar data, and grants no permission for future writes.
+The default catalog remains the five read tools.
+
+The client must explicitly declare form support. Only an affirmative checkbox plus Accept
+within 30 seconds yields `accepted`; decline, cancellation, silence, malformed answers and
+errors do not. Overlapping prompts return `busy`. Ordinary refusal or an unanswered prompt
+keeps the read connection available; a broken transport may require reconnecting.
+Actual human interaction still needs to be verified per client before write work begins.
+
+This candidate uses a pinned, attributed [local Swift SDK patch](Vendor/swift-sdk/README.md)
+for request cleanup and safe stdio delivery. See the
+[probe design and validation requirements](docs/APPROVAL-PROBE-DESIGN.md).
+
 ## How it protects you
 
 These apply to the write tools, which are **not built yet**. They are listed so the design is

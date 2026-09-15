@@ -47,6 +47,22 @@ The code is contractual; the prose after it is not.
 every timestamp in that response was rendered in. `limits_applied` reports what the call
 actually applied, with `null` where a limit does not apply to it.
 
+## Optional approval diagnostic (0.2.2 candidate)
+
+`calendar_approval_probe` is absent unless launched with `--enable-approval-probe`, including
+when combined with `--read-only`. It accepts an empty argument object only and requires
+explicit form support. A fixed form requests required boolean `confirm`, initially false.
+Only a timely `accept` with exactly `{"confirm": true}` yields diagnostic acceptance.
+
+The result has exactly `outcome`, `calendar_changed: false`, and `authorizes_writes: false`.
+Outcomes: `accepted`, `declined`, `canceled`, `unsupported`, `busy`, `error`, `timed_out`,
+`disconnected`, `invalid_response`. Outer-call cancellation suppresses its response before
+transport commitment. No response can retract bytes already handed to the transport.
+A 30-second monotonic deadline includes elicitation sending and answer waiting. An overlap
+returns `busy` without queuing another prompt. No Calendar content is accessed or changed;
+no mutation journal entry or authorization token is created. A synthetic accepted response
+is not proof that a human interacted with the client.
+
 ## Not built
 
 **No write tool exists.** The propose/commit design below is specification. `Journal.swift`

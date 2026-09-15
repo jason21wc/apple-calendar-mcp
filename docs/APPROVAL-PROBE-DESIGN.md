@@ -1,7 +1,9 @@
 # Approval probe: bounded request lifecycle before live measurement
 
-Status: design precursor for implementation; no probe, cleanup fix, or write approval is
-implemented by this document. Canonical gate: [implementation plan §6](IMPLEMENTATION-PLAN.md#6-the-write-surface--redesigned-2026-08-20), BACKLOG #24b.
+Status: `0.2.2` source candidate implements the harmless probe and local SDK cleanup patch;
+source review, local synthetic tests and signed-binary wire checks pass. Full candidate CI
+and installation remain. Installed binary remains `0.2.1`; no human approval
+round trip has been demonstrated. Canonical gate: [implementation plan §6](IMPLEMENTATION-PLAN.md#6-the-write-surface--redesigned-2026-08-20), BACKLOG #24b.
 
 ## Intent and scope
 
@@ -18,7 +20,7 @@ require quitting the AI app or disconnect the healthy read connection.
 
 ## SDK facts and selected direction
 
-Pinned Swift SDK `0.12.1`, `Sources/MCP/Server/Server.swift`:
+Unmodified upstream Swift SDK `0.12.1`, `Sources/MCP/Server/Server.swift`, had these defects:
 
 - `requestElicitation` creates a request internally, so callers cannot retain its ID.
 - `send` schedules response registration asynchronously; `sendAndAwait` waits on an
@@ -32,12 +34,15 @@ These are source findings, not live proof of a host's prompt UI. The
 [MCP cancellation specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/cancellation)
 describes cooperative cancellation; sending a notice cannot guarantee local resource cleanup.
 
-**Recommended implementation direction: repair lifecycle ownership in the SDK request
-layer**, where request registration, result delivery, cancellation, and disconnection can
-be coordinated together. Prefer a maintained upstream change; if unavailable, evaluate a
-minimal, explicitly pinned patch/fork with attribution and a removal condition. Never edit
-`.build/checkouts` as the deliverable or silently float the dependency to upstream main.
-The exact dependency source/revision must be selected and tested before adopting it.
+**Selected implementation: repair lifecycle ownership in the SDK request layer.**
+`Vendor/swift-sdk` contains MCP sources from upstream 0.12.1 revision
+`a0ae212ebf6eab5f754c3129608bc5557637e605`, with the MIT license, original hashes and
+reversible local patch. The root package uses that local dependency and pins transitive
+versions. Upstream's latest release was still 0.12.1 when checked on September 14.
+This keeps the correction reviewable and reproducible without publishing an external fork
+or editing `.build/checkouts`. Replace it with a pinned upstream release once equivalent
+lifecycle behavior passes our regression suite. See the vendor README for exact changes
+and transport cooperation requirements.
 
 Alternatives considered:
 
@@ -87,9 +92,20 @@ Alternatives considered:
    path itself cannot be bounded, resolve that in the lifecycle layer before enabling the
    probe; do not claim a timeout wrapper solves it.
 
+### Response delivery limits
+
+The local SDK patch retains incoming ownership through response delivery. It admits at most
+16 slots (batch collectors also consume a slot), and response sending has a separate
+5-second deadline. Overload or stalled/failed delivery closes the connection and drains
+owned work. Partial-frame cancellation also closes stdio to prevent a corrupt next frame.
+These are transport failures requiring reconnection, distinct from an ordinary unanswered
+30-second approval prompt on a responsive connection. No background restart is introduced.
+Batch requests run concurrently; canceled results are filtered at aggregate commitment.
+The approval deadline measures the answer, not time waiting behind an unrelated batch result.
+
 ## Harmless probe contract
 
-The future probe is opt-in diagnostic functionality, absent from the default tool catalog.
+The candidate probe is opt-in diagnostic functionality, absent from the default tool catalog.
 Keep the default read-only surface unchanged. Enabling a probe is not enabling writes.
 
 - Require known form support before sending. Use the current explicit form-capability check;
@@ -127,6 +143,9 @@ review and CI. Finally measure human accept and refusal through the current host
 approval verification before enabling writes in each other client. Do not use a sibling
 server's write tool as a substitute experiment.
 
-This document advances design work; §6 Gate 1 remains open until the implementation and
-actual human round trip are demonstrated. Afterwards the planned write sequence is create,
+The implementation lives in `MCP/ApprovalProbe.swift`, wired by `ServerBootstrap.swift`
+only with `--enable-approval-probe`. Synthetic checks live in `ApprovalProbeTests`,
+`MCPRequestLifecycleTests` and `StdioWriteLifecycleTests`. They use fake clients and owned
+pipes, never Calendar content. §6 Gate 1 remains open until final implementation validation
+and the actual human round trip are demonstrated. Afterwards the planned write sequence is create,
 then delete **with restore in the same change**, then update, subject to the other §6 gates.
