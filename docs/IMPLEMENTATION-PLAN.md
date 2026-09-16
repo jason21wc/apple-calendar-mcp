@@ -206,8 +206,8 @@ Shipped, published, and in daily use.
 | `calendar_busy_intervals` | Availability without titles |
 
 `calendar_recent_mutations` moves to Phase 6 — it reads the journal, which Phase 5 builds.
-**These five are the default surface and the entire installed 0.2.1 surface.** The 0.2.2
-candidate adds an opt-in harmless approval diagnostic (§6). The propose/commit tools described in §6 do not
+**These five are the default surface.** Installed 0.2.2 also provides an opt-in harmless
+approval diagnostic (§6). The propose/commit tools described in §6 do not
 exist; anything describing a fourteen-tool surface is describing the plan, not the server.
 
 ### Data model
@@ -378,7 +378,8 @@ The probe requires explicit form support, admits one pending question, and uses 
 monotonic deadline. It cannot access Calendar content, append to the journal or grant future
 write permission. See [the implementation design](APPROVAL-PROBE-DESIGN.md) and
 [SDK provenance](../Vendor/swift-sdk/README.md). Final validation and live measurement remain
-separate gates; installed `0.2.1` still has only the five read tools.
+separate gates. Installed `0.2.2` exposes the opt-in probe in Codex; its first result was
+`canceled`, with human UI observation still pending. Subsequent diagnostics succeeded.
 
 **A capability declaration is not a human.** It says the client claims support. Only an
 observed round trip returning `.accept` demonstrates a person answered, and even that

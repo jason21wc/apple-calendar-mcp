@@ -120,7 +120,7 @@ lacks reload support. Do not automate private IPC or restart loops to work aroun
 
 | Client | Read connection evidence | Approval evidence |
 |---|---|---|
-| Codex desktop | Native permission/identity check and bounded busy read passed with installed `0.2.1` | Form and URL declared; no human-approval round trip demonstrated |
+| Codex desktop | Native permission/identity checks pass on installed `0.2.2`; bounded busy read previously passed on `0.2.1` | Form/URL declared; native probe returned `canceled`, subsequent diagnostics passed. Human UI observation pending; no human approval proved |
 | Claude Cowork | User confirms the calendar is visible; exact connection route and capability payload not supplied | Not measured |
 | Claude Code CLI | User reports successful user-scope registration of the installed path with `--read-only`; native call not yet reported | Not measured |
 

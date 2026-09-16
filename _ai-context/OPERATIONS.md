@@ -16,7 +16,7 @@
 | Every EventKit claim | Verify against the local SDK headers and cite `file:line`. Never against Apple's web docs — they are JavaScript-rendered and unreadable to tooling | 2026-08-18 |
 | Every containment-control change | Run `evaluate_governance`, then write the amendment back to `PROJECT-MEMORY.md` **in the same turn**. Three controls once drifted because this was left for "later" | 2026-08-18 |
 | Before any plan/spec approval | Run a fresh-context review pass. Author review does not catch author contradictions, and this document reversed direction three times | 2026-08-18 |
-| On SDK bump | The MCP Swift SDK is pre-1.0 — read the changelog before moving the exact pin, and re-run contract tests | — |
+| On SDK bump | Read the changelog and verify provenance before moving the pin. Replacing the local patch requires equivalent request-lifecycle, cancellation, batch, disconnect and real-pipe backpressure regressions, plus ordinary contract tests | — |
 
 ## Tripwires
 

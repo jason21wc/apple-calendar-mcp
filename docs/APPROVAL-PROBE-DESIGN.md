@@ -2,7 +2,8 @@
 
 Status: `0.2.2` source candidate implements the harmless probe and local SDK cleanup patch;
 source review, local synthetic tests, signed-binary wire checks and full CI on `ea4c5ea`
-pass. Installation remains. Installed binary remains `0.2.1`; no human approval
+pass. Installed `0.2.2` verified September 15; the native probe returned `canceled` and
+follow-up diagnostics succeeded. Human UI observation remains pending; no human approval
 round trip has been demonstrated. Canonical gate: [implementation plan §6](IMPLEMENTATION-PLAN.md#6-the-write-surface--redesigned-2026-08-20), BACKLOG #24b.
 
 ## Intent and scope

@@ -20,9 +20,10 @@
   `0.2.2` candidate implements the opt-in harmless diagnostic and a pinned local SDK
   lifecycle patch. Synthetic tests cover acceptance/refusals, cancellation, deadlines,
   disconnection, batch overlap, late replies and stdio backpressure. Final source review,
-  local suite and signed-binary synthetic wire checks pass; installed remains `0.2.1`. See
+  local suite and signed-binary synthetic wire checks pass; installed `0.2.2` verified. See
   `docs/APPROVAL-PROBE-DESIGN.md` and `Vendor/swift-sdk/README.md`.
-  Full CI passed on `ea4c5ea`. Remaining: same-path signed install, then measure real human
+  Full CI passed on `ea4c5ea`. First native probe returned `canceled`; human UI observation
+  is pending. Installation is complete. Remaining: measure real human
   accept/decline/cancel/non-response and post-timeout reads through the current host.
   Observe prompt dismissal and late-answer isolation; local cleanup does not prove UI cleanup.
   #24a capability discovery is complete in Codex. Cowork visibility is user-confirmed;
@@ -139,3 +140,11 @@ Removed after verifying each against the repository rather than against memory:
 ---
 
 *Convention: items move Active ↔ Deferred as priorities shift. Shipped or migrated items are removed from this file — no redirect stubs (commit history is the record).*
+
+## Reference Library intake pending approval
+
+- Proposed reusable pattern: retain asynchronous request ownership through response commitment.
+  The local lesson is already recorded; central capture requires explicit user approval and
+  deduplication. Evidence: `ea4c5ea`, `MCPRequestLifecycleTests`, `StdioWriteLifecycleTests`.
+  Scope: outer-response ownership, buffered batch cancellation, independent admission/delivery
+  bounds, and actual pipe backpressure. No capture has been made.

@@ -1,11 +1,23 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # Session State
 
-**Last Updated:** 2026-09-14
+**Last Updated:** 2026-09-15
 **Memory Type:** Working (transient)
 **Lifecycle:** Current position only; decisions and history live in the other memory files.
 
 ## Where things stand
+
+- **Installed `0.2.2` and native Codex connection verified on September 15.** The user
+  reports full quit/reopen. Installed version, strict signature and SHA-256 match the signed
+  candidate below. Native diagnostics report `fullAccess` / `disclaimed-child` and explicit
+  form/URL declarations. `calendar_approval_probe` is exposed by this connection.
+- The first native probe returned `canceled` immediately, with `calendar_changed: false`
+  and `authorizes_writes: false`. A following native diagnostic succeeded on the same
+  connection. **Whether the human saw or canceled a form is not yet confirmed.** Do not
+  infer human interaction or unsupported UI from this result. Await that observation before
+  another deliberate probe; no automatic retry, install, restart or write work is needed.
+- Documentation closeout `ea5d505` also passed full CI:
+  https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34925673192.
 
 - **#24b candidate is implemented and locally validated.** `0.2.2` adds opt-in
   `calendar_approval_probe` plus a pinned, attributed SDK lifecycle patch in `Vendor/swift-sdk`.
@@ -29,7 +41,8 @@
   matches installed `0.2.1`. Backup: `.build/apple-calendar-mcp-0.2.1.backup`.
   Implementation `ea4c5ea` is published and full macOS CI passed without exclusions:
   https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34925395216.
-- **Installed remains `0.2.1`; no client configuration or Calendar data changed.**
+- The preceding implementation session left `0.2.1` installed; the September 15
+  verification above supersedes that installed-state checkpoint. No Calendar data changed.
   Codex native reads are verified. Cowork visibility is user-confirmed; Claude Code
   user-scope registration is confirmed by supplied output, with no native CLI call yet.
   Those observations establish connection/read access, never human write approval.
@@ -59,7 +72,7 @@
   [verification run](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34766574299).
   Consult `git status` for the current checkout; the hash above identifies the implementation,
   not subsequent closeout-only commits.
-- Installed binary is now `0.2.1`; the current native Codex connection answers diagnostics
+- Installed binary is now `0.2.2`; the current native Codex connection answers diagnostics
   and reads. This establishes read access, not approval for future writes.
 - Client-neutral documentation and backlog now treat Claude Cowork and ChatGPT/Codex Work
   as peer targets. User-level Codex registration is verified and the duplicate project
@@ -109,17 +122,14 @@
 
 ## Next actions, in order
 
-1. **Install the reviewed candidate once.** Source publication and full CI are complete.
-   The signed release candidate is ready for validation on the host. The human installs the
-   candidate at `/usr/local/bin/apple-calendar-mcp`, retains `--read-only`, adds
-   `--enable-approval-probe` to Codex registration, and fully quits/reopens Codex once.
-   Agent `sudo` execution was previously refused (`operation not permitted`); use the
-   human's interactive terminal. Never request a new Calendar grant or Settings Restart.
-2. Use native `calendar_permission_status` to verify the new connection, then run the harmless
-   diagnostic with actual human interaction: accept, decline/cancel and non-response.
+1. **Resolve the first native probe's UI observation.** Installation and reconnection are
+   verified; the first result is `canceled`. Ask whether a form appeared and whether the
+   human canceled it. If no form appeared, investigate the host elicitation path before
+   recommending another restart or server change.
+2. Then deliberately measure accept, decline/cancel and non-response in this client.
    Verify later diagnostics/reads still work; record UI dismissal and late-answer isolation.
-   Repeat approval verification per client before enabling writes there. Do not reconfigure
-   the working Cowork/Claude Code routes merely for a Codex experiment.
+   Repeat approval verification per client before enabling writes there. Preserve the
+   working Cowork/Claude Code routes. Native human approval remains unproved.
 3. Before any mutating caller, connect acknowledged journal storage and define outcome-error
    reconciliation. Do not retry a future write merely because recording its outcome failed.
    Implement the typed snapshot/field matrix and disposable-calendar round trip before delete.
@@ -129,25 +139,16 @@
    verify actual-host behavior after loading the replacement. The `0.2.1` install and
    native read verification are complete; no new Calendar grant was requested.
 
-## Current install handoff
+## Installation handoff completed
 
-Run in the human's interactive terminal, then fully quit/reopen Codex once. The first
-command needs the Mac's administrator authorization, which the agent shell cannot supply.
-The existing `0.2.1` backup is recorded above. Do not run `--setup` or reset Calendar access.
-
-```bash
-sudo /usr/bin/install -o root -g wheel -m 755 /Users/jasoncollier/Developer/apple-calendar/.build/release/apple-calendar-mcp /usr/local/bin/apple-calendar-mcp &&
-/usr/bin/codesign --verify --strict /usr/local/bin/apple-calendar-mcp &&
-codex mcp add apple-calendar -- /usr/local/bin/apple-calendar-mcp --read-only --enable-approval-probe
-```
-
-Return to this task for native verification and the harmless human prompt test. Cowork and
-Claude Code retain their existing read configuration; the probe flag is deliberate opt-in.
+Installed `0.2.2` matches the signed candidate; the native connection exposes the opt-in
+probe after the user's full quit/reopen. Keep the existing Calendar grant and healthy
+connection. Backup remains `.build/apple-calendar-mcp-0.2.1.backup`.
 
 ## Operational observations and limits
 
-- Last installed version observed is `0.2.1` at `/usr/local/bin/apple-calendar-mcp`;
-  strict signature verification passed on 2026-09-14. Before the update, on 2026-09-13,
+- Last installed version observed is `0.2.2` at `/usr/local/bin/apple-calendar-mcp`;
+  strict signature and candidate-hash verification passed on 2026-09-15. Before the update, on 2026-09-13,
   version `0.2.0` passed strict signature verification and ownership was root:wheel.
   `--doctor` from this constrained execution reported `disclaimed-child` + `notDetermined`
   and the old reinstall guidance. That does not establish another host's grant state and is
@@ -228,3 +229,12 @@ installed executable and actual human interaction. User authorization covers imp
 and source publication; no approval gate for future calendar writes has been waived.
 The phase-start journal audit found no new missing memory; its no-change receipt again
 returned `accepted: false, reason: state_unavailable`. Do not retry unchanged.
+
+Post-reopen verification: `gov-9a182972528d` (PROCEED).
+`meta-quality-verification-validation`: installation, native protocol outcome, and actual
+human UI interaction are separate evidence; the cancellation result does not clear Gate 1.
+
+Journal checkpoint `8a1f43ad7286465d8b4701322220a4eb`: read-only analysis completed;
+accepted proposals applied (closeout CI evidence, historical approval-claim corrections,
+SDK replacement checklist). Central Reference Library proposal is deferred for user approval.
+The main-agent `applied` receipt returned `accepted: false, reason: state_unavailable`.
