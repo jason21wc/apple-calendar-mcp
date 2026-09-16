@@ -7,15 +7,26 @@
 
 ## Where things stand
 
+- **`0.2.3` signed correction ready; installed version remains `0.2.2`.** The probe's root
+  schema title is rejected by Codex's typed parser, whose failure path cancels before UI.
+  The original installed wire payload fails the schema exported by bundled backend
+  `0.154.0-alpha.6.2`; corrected debug and signed release payloads pass. The regression fails
+  before the fix and passes afterward. Local broad suite and independent review pass.
+  No host config, approval policy or Calendar grant changed. Native human approval remains
+  unproved. Candidate SHA-256 and exact install command are in
+  `docs/APPROVAL-PROBE-DESIGN.md#installation-handoff`.
+
 - **Installed `0.2.2` and native Codex connection verified on September 15.** The user
   reports full quit/reopen. Installed version, strict signature and SHA-256 match the signed
   candidate below. Native diagnostics report `fullAccess` / `disclaimed-child` and explicit
   form/URL declarations. `calendar_approval_probe` is exposed by this connection.
 - The first native probe returned `canceled` immediately, with `calendar_changed: false`
   and `authorizes_writes: false`. A following native diagnostic succeeded on the same
-  connection. **Whether the human saw or canceled a form is not yet confirmed.** Do not
-  infer human interaction or unsupported UI from this result. Await that observation before
-  another deliberate probe; no automatic retry, install, restart or write work is needed.
+  connection. **The human subsequently confirmed no form appeared and they did not cancel one.**
+  The native cancellation therefore does not demonstrate a human refusal. The user-requested
+  bounded event listing then succeeded without truncation; no event details are persisted.
+  The investigation found the schema defect above; install the corrected candidate before
+  another probe. A restart of the unchanged `0.2.2` binary would not fix the payload.
 - Documentation closeout `ea5d505` also passed full CI:
   https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34925673192.
 
@@ -122,10 +133,11 @@
 
 ## Next actions, in order
 
-1. **Resolve the first native probe's UI observation.** Installation and reconnection are
-   verified; the first result is `canceled`. Ask whether a form appeared and whether the
-   human canceled it. If no form appeared, investigate the host elicitation path before
-   recommending another restart or server change.
+1. **Install the signed `0.2.3` correction at the existing path and refresh the host once.**
+   Full quit/reopen is the measured recovery route here; Settings Restart previously broke
+   display. Keep the Calendar grant and existing registration. See the concrete handoff in
+   `docs/APPROVAL-PROBE-DESIGN.md`. Privileged installation previously required the human's
+   interactive terminal; this session leaves installed `0.2.2` running.
 2. Then deliberately measure accept, decline/cancel and non-response in this client.
    Verify later diagnostics/reads still work; record UI dismissal and late-answer isolation.
    Repeat approval verification per client before enabling writes there. Preserve the
@@ -139,7 +151,7 @@
    verify actual-host behavior after loading the replacement. The `0.2.1` install and
    native read verification are complete; no new Calendar grant was requested.
 
-## Installation handoff completed
+## Prior installation handoff completed
 
 Installed `0.2.2` matches the signed candidate; the native connection exposes the opt-in
 probe after the user's full quit/reopen. Keep the existing Calendar grant and healthy
@@ -238,3 +250,12 @@ Journal checkpoint `8a1f43ad7286465d8b4701322220a4eb`: read-only analysis comple
 accepted proposals applied (closeout CI evidence, historical approval-claim corrections,
 SDK replacement checklist). Central Reference Library proposal is deferred for user approval.
 The main-agent `applied` receipt returned `accepted: false, reason: state_unavailable`.
+
+User UI observation/read check: `gov-6b9a3d0c367f` (PROCEED);
+`coding-context-session-state-continuity`: preserve the negative UI observation without
+persisting personal calendar content. Observation incorporated in the schema-fix closeout.
+
+Approval schema investigation/correction: `gov-69e34b02900a`, `gov-642d240f6910`,
+`gov-0c2e4c2dce52` (PROCEED). `meta-core-informational-readiness` and
+`coding-context-session-state-continuity`: preserve the actual consumer rejection and
+separate source/schema proof from the pending native human round trip.

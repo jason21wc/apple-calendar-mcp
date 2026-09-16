@@ -28,6 +28,27 @@ struct ApprovalProbeTests {
         }
     }
 
+    @Test("encoded form uses the portable elicitation schema subset")
+    func requestSchemaCompatibility() throws {
+        let parameters = CreateElicitation.Parameters.form(.init(
+            message: ApprovalProbe.message, mode: .form, requestedSchema: ApprovalProbe.schema))
+        let object = try #require(JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(parameters)) as? [String: Any])
+        #expect(object["mode"] as? String == "form")
+        let schema = try #require(object["requestedSchema"] as? [String: Any])
+        // Codex's typed form boundary rejects unknown root keys, including title and
+        // description, even though the Swift SDK permits them. Field titles are supported.
+        #expect(Set(schema.keys).isSubset(of: ["$schema", "type", "properties", "required"]))
+        #expect(schema["type"] as? String == "object")
+        #expect(schema["required"] as? [String] == ["confirm"])
+        let properties = try #require(schema["properties"] as? [String: Any])
+        #expect(Set(properties.keys) == ["confirm"])
+        let confirm = try #require(properties["confirm"] as? [String: Any])
+        #expect(confirm["type"] as? String == "boolean")
+        #expect(confirm["default"] as? Bool == false)
+        #expect(confirm["title"] as? String == "I confirm this harmless test")
+    }
+
     @Test("absent form support refuses before invoking the SDK")
     func unsupported() async throws {
         let result = try await ApprovalProbe().run(formSupported: false) {

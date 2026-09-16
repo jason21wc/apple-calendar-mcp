@@ -16,8 +16,9 @@ actor ApprovalProbe {
         for future writes. To test acceptance, check the confirmation box and accept. You can \
         decline or cancel instead. This test expires after 30 seconds.
         """
+    // Keep root metadata out of the wire schema: strict clients reject root title and
+    // description. The request message and field title carry the human-facing wording.
     static let schema = Elicitation.RequestSchema(
-        title: "Harmless Calendar approval test",
         properties: ["confirm": .object([
             "type": .string("boolean"),
             "title": .string("I confirm this harmless test"),

@@ -3,8 +3,65 @@
 Status: `0.2.2` source candidate implements the harmless probe and local SDK cleanup patch;
 source review, local synthetic tests, signed-binary wire checks and full CI on `ea4c5ea`
 pass. Installed `0.2.2` verified September 15; the native probe returned `canceled` and
-follow-up diagnostics succeeded. Human UI observation remains pending; no human approval
-round trip has been demonstrated. Canonical gate: [implementation plan §6](IMPLEMENTATION-PLAN.md#6-the-write-surface--redesigned-2026-08-20), BACKLOG #24b.
+follow-up diagnostics succeeded. The human confirmed no form appeared. Signed `0.2.3`
+corrects the root-schema incompatibility identified below; installation and native human
+verification remain. No human approval round trip has been demonstrated. Canonical gate: [implementation plan §6](IMPLEMENTATION-PLAN.md#6-the-write-surface--redesigned-2026-08-20), BACKLOG #24b.
+
+## Native cancellation investigation (2026-09-15)
+
+The human observed no form and did not cancel anything. Reads and subsequent diagnostics
+continued to work. The installed Calendar binary was `0.2.2`; the inspected desktop bundle
+reported `26.908.70816` and its bundled Codex backend reported `0.154.0-alpha.6.2`.
+
+The incompatibility is in the encoded request, not a missing Calendar grant:
+
+1. `ApprovalProbe.schema` supplied a top-level `title`. The Swift SDK encodes it; RMCP
+   `3.2.0` preserves it through its schema decode/re-encode boundary.
+2. The exact installed backend's exported `McpElicitationSchema` allows only `$schema`,
+   `type`, `properties` and `required` at the root (`additionalProperties: false`). Its
+   [tagged typed schema](https://github.com/openai/codex/blob/rust-v0.154.0-alpha.6.2/codex-rs/app-server-protocol/src/protocol/v2/mcp.rs#L404)
+   uses `deny_unknown_fields`; conversion deserializes into that type at line 824.
+3. The [tagged backend dispatch](https://github.com/openai/codex/blob/rust-v0.154.0-alpha.6.2/codex-rs/app-server/src/bespoke_event_handling.rs#L889)
+   resolves that parse failure as `Cancel` and returns before sending the UI request.
+   This supplies a concrete cause matching immediate cancellation without a form.
+
+`0.2.3` removes only the root title. The fixed message and boolean field title retain the
+human-facing wording. Required `confirm`, default false, exact `confirm: true` acceptance,
+30-second lifetime and no-write behavior remain unchanged. This is a portable schema subset,
+not a Codex-only alternate tool contract. The general
+[app-server documentation](https://learn.chatgpt.com/docs/app-server) describes the form
+request/response path; its existence alone did not prove this payload would reach UI.
+
+Validation: the encoded-request regression fails on the original source and passes after
+the correction. The actual installed `0.2.2` wire payload fails the schema exported by the
+installed backend, specifically for unexpected `title`; debug and signed release `0.2.3`
+wire payloads pass. Local suite passes with the documented lifecycle sandbox exclusion.
+Independent review confirms the parse-failure path and unchanged confirmation safeguards.
+These are synthetic/source checks; actual native rendering and human response remain unproved.
+No personal Calendar data was queried by these checks.
+
+The upstream September 9 elicitation-cancellation fix was also examined. Its existence
+alone does not explain this failure or justify requiring an app update. Do not change host
+approval settings, remove the required checkbox, or add a server restart loop for this defect.
+
+### Installation handoff
+
+The signed candidate is `.build/release/apple-calendar-mcp`, version `0.2.3`, SHA-256
+`8e52a1ef7537c10d2a336ad3d628a4f0dc7d29837538e24912318d73e5509ff9`.
+Its strict signature passes and its designated requirement matches installed `0.2.2`.
+Backup: `.build/apple-calendar-mcp-0.2.2.backup`.
+
+From the project terminal, install at the existing path:
+
+```sh
+sudo install -o root -g wheel -m 755 .build/release/apple-calendar-mcp /usr/local/bin/apple-calendar-mcp
+```
+
+Refresh the current host once to load the replacement. On this installation use full
+quit/reopen, because Settings Restart previously broke conversation display. Do not run
+`--setup` or re-register the server. Then verify native version/connection and run the
+harmless probe with the human ready. Deliberate acceptance, decline/cancel, non-response,
+UI dismissal and healthy follow-up reads remain Gate 1 measurements.
 
 ## Intent and scope
 

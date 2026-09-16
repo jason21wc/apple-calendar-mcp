@@ -73,7 +73,7 @@ Run `./scripts/test.sh` to see the test suite pass. (A count is not quoted here:
 quoted in four documents, drifted to four different numbers, and running the suite is the
 only way to know it anyway.)
 
-## Optional approval diagnostic (0.2.2 candidate)
+## Optional approval diagnostic (0.2.3 candidate)
 
 Add `--enable-approval-probe` to the server launch arguments to expose
 `calendar_approval_probe`. It also works with `--read-only`. This diagnostic asks one fixed

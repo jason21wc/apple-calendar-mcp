@@ -12,6 +12,12 @@
 
 ## Active Lessons
 
+**2026-09-15 — SDK acceptance did not imply client-schema acceptance.** The Swift SDK
+encoded a root form title that Codex's typed boundary rejects, producing cancellation before
+UI. **Rule:** validate encoded elicitation requests against the actual consumer schema;
+keep display text in supported message/field metadata, and distinguish client cancellation
+from a human refusal.
+
 **2026-09-14 — Missing tools concealed a handshake failure.** I prescribed configuration
 and UI refresh steps before inspecting the host startup log, which named an initialization
 decode error. **Rule:** after one refresh, read the actual launch error before another UI

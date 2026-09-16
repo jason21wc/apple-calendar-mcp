@@ -22,9 +22,11 @@
   disconnection, batch overlap, late replies and stdio backpressure. Final source review,
   local suite and signed-binary synthetic wire checks pass; installed `0.2.2` verified. See
   `docs/APPROVAL-PROBE-DESIGN.md` and `Vendor/swift-sdk/README.md`.
-  Full CI passed on `ea4c5ea`. First native probe returned `canceled`; human UI observation
-  is pending. Installation is complete. Remaining: measure real human
-  accept/decline/cancel/non-response and post-timeout reads through the current host.
+  Full CI passed on `ea4c5ea`. The human confirmed the native `0.2.2` cancellation
+  displayed no form. Codex rejects its root schema title before UI dispatch; signed `0.2.3`
+  removes that field and passes the installed-client schema check. Remaining: install the
+  corrected candidate, then measure real human accept/decline/cancel/non-response and
+  post-timeout reads through the current host.
   Observe prompt dismissal and late-answer isolation; local cleanup does not prove UI cleanup.
   #24a capability discovery is complete in Codex. Cowork visibility is user-confirmed;
   Claude Code registration is reported, native CLI behavior remains unmeasured.

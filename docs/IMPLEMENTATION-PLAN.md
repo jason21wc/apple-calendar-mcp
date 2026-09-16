@@ -379,7 +379,9 @@ monotonic deadline. It cannot access Calendar content, append to the journal or 
 write permission. See [the implementation design](APPROVAL-PROBE-DESIGN.md) and
 [SDK provenance](../Vendor/swift-sdk/README.md). Final validation and live measurement remain
 separate gates. Installed `0.2.2` exposes the opt-in probe in Codex; its first result was
-`canceled`, with human UI observation still pending. Subsequent diagnostics succeeded.
+`canceled`; the human confirmed no form appeared. Subsequent diagnostics and a bounded
+read succeeded. The `0.2.3` candidate removes the root schema title that Codex rejects
+before UI dispatch; installation and the native human round trip remain.
 
 **A capability declaration is not a human.** It says the client claims support. Only an
 observed round trip returning `.accept` demonstrates a person answered, and even that
@@ -690,10 +692,12 @@ cross-month history. These are prerequisites, not evidence that write approval o
 works. Next is the harmless human-approval round trip after the elicitation cleanup design;
 continue to enforce §6 Gate 1 before adding a mutating caller.
 
-**Current work:** the `0.2.2` source candidate implements the opt-in harmless probe and
-SDK lifecycle cleanup described in [the design](APPROVAL-PROBE-DESIGN.md). Complete final
-review/verification, install the signed candidate at the existing path, then measure actual
-human interaction. Fake-client tests do not clear the approval gate.
+**Current work:** installed `0.2.2` implements the opt-in harmless probe and SDK cleanup,
+but its native test returned cancellation without UI. The signed `0.2.3` candidate removes
+a root schema title rejected by Codex before UI dispatch; regression and client-schema
+checks pass. Install the corrected candidate at the existing path, then measure actual
+human interaction. See [the evidence and handoff](APPROVAL-PROBE-DESIGN.md#native-cancellation-investigation-2026-09-15).
+Synthetic tests do not clear the approval gate.
 
 **Then, and only after §6 Gate 1 is answered:** `calendar_create_event` →
 `calendar_delete_event` **with restore in the same change** → `calendar_update_event`.

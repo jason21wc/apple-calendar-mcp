@@ -17,9 +17,10 @@ A subprocess test measures its supplied MCP capabilities, not the enclosing app'
 >
 > **The write surface is blocked on one thing: no approval mechanism has been demonstrated.**
 > `toolPolicy` has never been configured on this machine, and server elicitation is measured
-> only as far as what the client *declares*. The `0.2.2` candidate implements an opt-in
-> harmless probe with SDK lifecycle cleanup; source review, local checks and full CI pass.
-> Native probe returned `canceled`; actual human UI interaction remains unconfirmed
+> by declaration and a native cancellation without UI. Installed `0.2.2` sends a root
+> schema title that Codex rejects before UI dispatch. Signed `0.2.3` removes that field;
+> encoded-request regression, local suite and installed-client schema validation pass.
+> Installation and actual human interaction remain
 > (plan §6 Gate 1; `docs/APPROVAL-PROBE-DESIGN.md`).
 > The permission model itself is decided — reads
 > silent, every write confirmed, refuse only what EventKit cannot express (plan §4a).

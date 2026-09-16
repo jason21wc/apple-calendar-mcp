@@ -72,13 +72,23 @@ plan §5 for timeout and cancellation behavior.
 
 ## Key Decisions
 
+**2026-09-15 — Fix the encoded form contract before repeating the native test.** Installed
+`0.2.2` sends `requestedSchema.title`, allowed by the Swift SDK but rejected by the installed
+Codex app-server schema. The tagged backend source turns that parse failure into `cancel`
+before dispatching UI. Actual installed-binary wire output fails the client-exported schema;
+`0.2.3` passes after removing only the root title. Preserve the field title, unchecked default,
+required boolean and exact affirmative response. No host-policy or lifecycle change is needed
+for this mismatch. See `docs/APPROVAL-PROBE-DESIGN.md` for versions, source pointers and limits.
+Synthetic interoperability proves the payload correction, not human approval; install and
+measure the current host before clearing Gate 1. Do not replace this with another blind restart.
+
 **2026-09-15 — Installed approval diagnostic is reachable; human interaction still unproved.**
 After the user reported full quit/reopen, installed `0.2.2` matched the signed candidate's
 hash and strict signature passed. Native Codex diagnostics retained `fullAccess` and
 `disclaimed-child`. The opt-in probe returned `canceled`; a following diagnostic succeeded.
-Whether a confirmation form appeared or was canceled by the human is not yet known.
-Treat this as protocol refusal and healthy follow-up diagnostics only; do not clear Gate 1
-or prescribe another restart from the cancellation result alone.
+The human subsequently confirmed that no form appeared and they did not cancel one.
+The requested bounded event read succeeded; no personal event details are persisted.
+The investigation above supersedes the initial unknown UI observation; Gate 1 remains open.
 
 **2026-09-14 — Cowork visibility confirmed; advance to the approval gate.** The human
 reports Cowork can see the calendar and previously supplied successful Claude Code
