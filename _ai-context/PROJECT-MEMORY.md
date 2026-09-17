@@ -77,8 +77,16 @@ The human confirmed full quit/reopen with installed `0.2.3`. Codex's desktop res
 records `accept` with `confirm: false`; the server correctly returned `invalid_response`.
 A subsequent probe timed out after 30 seconds and native diagnostics remained healthy.
 This supersedes the pending-install and loaded-process uncertainty of September 15.
-Valid affirmative approval, deliberate decline/cancel, UI dismissal and late-answer isolation
-remain unproved. Keep the unchecked default and exact affirmative predicate; client acceptance
+Later that session, an attended affirmative response passed and the human confirmed seeing
+the form. Skip with the request unchecked was explicitly chosen and logged as `decline`,
+but the probe returned `timed_out`. Installed host source excludes ordinary forms from
+cancellation handling and waits for pending forms before delivering code-mode results;
+upstream has a matching fix, whose desktop availability remains unverified. Deliberate
+refusal delivery, unattended UI cleanup and late-answer isolation remain unproved. The
+reported 30-second tool duration does not establish end-to-end delivery: transcript timing
+shows the explicit Skip attempt remained pending over 15 minutes. See the canonical
+`docs/APPROVAL-PROBE-DESIGN.md` investigation before repeating any probe. Keep the unchecked
+default and exact affirmative predicate; client acceptance
 without affirmative content is insufficient. No further reinstall or grant is indicated.
 
 **2026-09-15 — Fix the encoded form contract before repeating the native test.** Installed

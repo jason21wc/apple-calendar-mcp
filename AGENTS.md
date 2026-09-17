@@ -15,12 +15,12 @@ A subprocess test measures its supplied MCP capabilities, not the enclosing app'
 > are shipped and no write tool exists**; the Phase 5 journal substrate is built with no caller.
 > The published read baseline is CI-green; `0.2.3` is installed at `/usr/local/bin`.
 >
-> **The write surface is blocked on one thing: no approval mechanism has been demonstrated.**
-> `toolPolicy` has never been configured on this machine, and server elicitation is measured
-> through the native client. Installed `0.2.3` corrects the rejected root schema title.
-> After full reopen, Codex returned acceptance with `confirm: false`, correctly refused;
-> non-response timed out and following diagnostics succeeded. A valid affirmative answer
-> and remaining UI cleanup observations are still required
+> **The write surface remains blocked on approval lifecycle verification.** Installed
+> `0.2.3` demonstrated valid affirmative approval in Codex with human-confirmed form visibility.
+> Unchecked Skip was correctly chosen and logged as decline, but returned a timeout.
+> The installed host has an ordinary-form cancellation defect; an upstream fix exists,
+> but its desktop availability is unverified. Resolve refusal delivery and timeout/UI cleanup
+> before write implementation; do not repeat server installation or blind restarts
 > (plan §6 Gate 1; `docs/APPROVAL-PROBE-DESIGN.md`).
 > The permission model itself is decided — reads
 > silent, every write confirmed, refuse only what EventKit cannot express (plan §4a).

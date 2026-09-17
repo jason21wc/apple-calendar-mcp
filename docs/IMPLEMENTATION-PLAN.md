@@ -382,8 +382,10 @@ separate gates. Installed `0.2.2` exposes the opt-in probe in Codex; its first r
 `canceled`; the human confirmed no form appeared. Subsequent diagnostics and a bounded
 read succeeded. The `0.2.3` candidate removes the root schema title that Codex rejects
 before UI dispatch and is now installed. After full reopen, acceptance with `confirm: false`
-was refused and non-response timed out with healthy follow-up diagnostics. Valid affirmative
-approval and remaining UI cleanup observations are still required.
+was refused; an attended valid affirmative response and human-observed form subsequently
+passed. Human-selected unchecked Skip logged decline but returned timeout. Installed host
+source has an ordinary-form cancellation defect; update availability is unverified. Refusal
+delivery, unattended UI cleanup and late-answer isolation remain required.
 
 **A capability declaration is not a human.** It says the client claims support. Require
 confirmed human interaction and valid affirmative content, not `.accept` alone. Even a
@@ -698,8 +700,10 @@ continue to enforce §6 Gate 1 before adding a mutating caller.
 The earlier `0.2.2` native test returned cancellation without UI. The correction removes
 a root schema title rejected by Codex before UI dispatch; regression and client-schema
 checks pass. Installation and full reopen are complete; native unchecked acceptance was
-refused and non-response timed out with healthy diagnostics. Next measure valid affirmative
-approval and the remaining refusal/UI cleanup cases. See [the evidence and handoff](APPROVAL-PROBE-DESIGN.md#native-cancellation-investigation-2026-09-15).
+refused, and attended valid affirmative approval with visible form subsequently passed.
+Unchecked Skip was correctly chosen, logged decline, and returned timeout. Verify whether
+an available desktop update includes the identified host cancellation fix before another
+refusal/UI cleanup test. See [the current evidence](APPROVAL-PROBE-DESIGN.md#native-skip-and-timeout-investigation-2026-09-16).
 Synthetic tests do not clear the approval gate.
 
 **Then, and only after §6 Gate 1 is answered:** `calendar_create_event` →

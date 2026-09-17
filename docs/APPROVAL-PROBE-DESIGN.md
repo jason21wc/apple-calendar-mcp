@@ -1,13 +1,48 @@
 # Approval probe: bounded request lifecycle before live measurement
 
-Status: `0.2.2` source candidate implements the harmless probe and local SDK cleanup patch;
-source review, local synthetic tests, signed-binary wire checks and full CI on `ea4c5ea`
-pass. Installed `0.2.2` verified September 15; the native probe returned `canceled` and
-follow-up diagnostics succeeded. The human confirmed no form appeared. Signed `0.2.3`
-corrects the root-schema incompatibility identified below and is now installed. After the
-human confirmed full reopen on September 16, native acceptance with `confirm: false` was
-correctly refused; non-response timed out and following diagnostics succeeded. A valid
-affirmative round trip and remaining UI cleanup observations are still required. Canonical gate: [implementation plan §6](IMPLEMENTATION-PLAN.md#6-the-write-surface--redesigned-2026-08-20), BACKLOG #24b.
+Status: installed `0.2.3` has demonstrated a valid native affirmative response in Codex,
+and the human confirmed seeing the form. Unchecked acceptance is refused. The human then
+chose **Skip without checking the request**; Codex logged `decline`, but the probe returned
+`timed_out`. Gate 1 remains open for refusal delivery, timeout cleanup and late-answer
+isolation. No Calendar content changed and no write tool exists. See the current evidence
+below and [implementation plan §6](IMPLEMENTATION-PLAN.md#6-the-write-surface--redesigned-2026-08-20).
+
+## Native Skip and timeout investigation (2026-09-16)
+
+Observed on desktop `26.908.70816`, bundled Codex backend `0.154.0-alpha.6.2`:
+
+- An attended probe returned `accepted`; the human confirmed seeing the form in this chat.
+  The response carried `confirm: true`; the probe still reported no Calendar change and no
+  authorization for future writes. Native diagnostics afterward remained healthy.
+- The human saw a clickable checkbox statement, **Continue**, and **Skip**, with no visible
+  Cancel button. They explicitly chose Skip with the checkbox unchecked. That is valid:
+  installed UI source dispatches `decline` immediately, without checkbox validation.
+  Only Continue validates the form. Do not instruct the human to check a refusal request.
+- The explicit Skip attempt began at `2026-09-17T04:43:15.531Z`; the desktop logged
+  `decline` at `04:58:49.858Z`, and the tool result appeared at `04:58:49.859Z`.
+  The tool reported 30 seconds, while transcript timestamps span over 15 minutes.
+  A prior refusal attempt likewise returned `timed_out`. These are not successful native
+  decline/cancel results. No wire capture establishes the precise physical-click timing.
+- Following diagnostics succeeded with `fullAccess` / `disclaimed-child`. This proves
+  connection health after dismissal, not unattended prompt cleanup or timely result delivery.
+
+The [backend matching the installed version](https://github.com/openai/codex/blob/rust-v0.154.0-alpha.6.2/codex-rs/rmcp-client/src/elicitation_client_service.rs#L144)
+registers and awaits cancellation only for user-verification requests, excluding ordinary
+forms. Its notification handler also gates cancellation on user-verification support.
+Separately, [code-mode result delivery](https://github.com/openai/codex/blob/rust-v0.154.0-alpha.6.2/codex-rs/core/src/tools/code_mode/execute_handler.rs#L136)
+waits until pending elicitations clear. The Calendar SDK expires its request and sends a
+best-effort cancellation notification. **Inference:** the host can retain the form after
+that deadline and hold an already-completed timeout result until Skip clears the pending
+request. This fits the logs and source; exact on-wire ordering remains unmeasured.
+
+OpenAI's [upstream cancellation fix](https://github.com/openai/codex/commit/3436cad5abbe9199c061880421b16d96a9ba702b)
+removes these guards and adds ordinary-form cancellation regression coverage. Its presence
+in an available desktop release is **not verified**; do not infer inclusion from a version
+number alone. Next check the supported desktop updater (**Menu → Check for Updates**),
+then verify the offered/installed backend before another targeted test. The
+[official update instructions](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex)
+establish the update control, not fix availability. No Calendar-server reinstall, deadline
+extension, checkbox weakening, or server restart loop is indicated by these findings.
 
 ## Native cancellation investigation (2026-09-15)
 
@@ -39,18 +74,20 @@ the correction. The actual installed `0.2.2` wire payload fails the schema expor
 installed backend, specifically for unexpected `title`; debug and signed release `0.2.3`
 wire payloads pass. Local suite passes with the documented lifecycle sandbox exclusion.
 Independent review confirms the parse-failure path and unchanged confirmation safeguards.
-These are synthetic/source checks; actual native rendering and human response remain unproved.
+These synthetic/source checks established the payload correction. The September 16 native
+acceptance above subsequently established rendering and a valid human response.
 No personal Calendar data was queried by these checks.
 
-The upstream September 9 elicitation-cancellation fix was also examined. Its existence
-alone does not explain this failure or justify requiring an app update. Do not change host
+The upstream cancellation fix does not explain this earlier schema rejection. It is relevant
+to the separate September 16 timeout/Skip investigation above. Do not change host
 approval settings, remove the required checkbox, or add a server restart loop for this defect.
 
 ### Installation handoff
 
 **Completed September 16:** installed version/hash verified and the human confirmed full
 quit/reopen. The commands below describe the completed handoff, not another required step.
-The native client now returns form content; no further install or refresh is indicated.
+The native client now returns form content; no further Calendar-server install is indicated.
+The separate host cancellation investigation above supersedes the earlier refresh guidance.
 
 The signed candidate is `.build/release/apple-calendar-mcp`, version `0.2.3`, SHA-256
 `8e52a1ef7537c10d2a336ad3d628a4f0dc7d29837538e24912318d73e5509ff9`.
@@ -76,7 +113,8 @@ valid answer does not arrive. The experiment must never read or mutate EventKit 
 append to the mutation journal, mint a reusable approval token, or enable a write tool.
 Read connection evidence is sufficient to start this work: Codex was measured natively,
 Cowork visibility is user-confirmed, and Claude Code registration was reported successful.
-Valid human approval remains unproved in all three clients.
+A valid affirmative form response is now measured in Codex. Its remaining lifecycle cases
+and approval behavior in Cowork and Claude Code remain unproved.
 
 Implement and test request cleanup first. A promptly returned timeout is not enough if it
 leaves a suspended task or pending continuation behind. No normal refusal or timeout may

@@ -27,8 +27,10 @@
   removes that field and passes the installed-client schema check. Its `fd1292b` full CI
   passed, including lifecycle tests. Installed `0.2.3` and human-reported full reopen are
   verified. Native acceptance with `confirm: false` returned `invalid_response`; another
-  probe timed out and following diagnostics succeeded. Remaining: valid affirmative response,
-  deliberate decline/cancel and UI cleanup observations through the current host.
+  probe timed out and following diagnostics succeeded. Attended affirmative approval and form
+  visibility subsequently passed. Human-selected unchecked Skip logged decline but returned
+  timeout; installed Codex source has a matching cancellation defect. Check desktop update
+  availability and verify the bundled fix before repeating refusal/UI cleanup tests.
   Observe prompt dismissal and late-answer isolation; local cleanup does not prove UI cleanup.
   #24a capability discovery is complete in Codex. Cowork visibility is user-confirmed;
   Claude Code registration is reported, native CLI behavior remains unmeasured.

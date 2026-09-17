@@ -7,20 +7,28 @@
 
 ## Where things stand
 
-- **Installed `0.2.3`; full quit/reopen confirmed by the human on September 16.**
-  Installed hash matches the signed candidate. Native diagnostics report `fullAccess` /
-  `disclaimed-child`. The refreshed probe reached the client response path: the desktop log
-  records `action: accept`, `content: {confirm: false}`; the server returned `invalid_response`
-  as required. Actual checkbox/UI interaction is awaiting the user's description.
-- A second native probe returned `timed_out` after 30 seconds. Native diagnostics succeeded
-  afterward on the same connection. This proves the no-response refusal and connection
-  health, not prompt dismissal or late-answer isolation. No Calendar content was queried
-  or changed. No further install, grant or refresh is indicated.
-- **Gate 1 remains open:** a valid checked-and-accepted response has not been measured.
-  Next is one deliberate affirmative round trip with the human ready, followed by remaining
-  decline/cancel and UI cleanup observations. Do not repeatedly prompt an absent user.
+- **Affirmative form verified; unchecked Skip correctly chosen but returned timeout.**
+  The human saw the successful form, then explicitly chose Skip without checking the request.
+  Installed UI source maps Skip directly to decline, independent of checkbox state; desktop
+  logs confirm decline. The native probe instead returned `timed_out`. No Calendar changed.
+- **Installed `0.2.3` and healthy Codex diagnostics are verified.** No server reinstall,
+  Calendar grant, or blind restart is needed. Acceptance with `confirm: false` was correctly
+  refused; attended `confirm: true` passed and visibility was human-confirmed.
+- **Host cancellation defect identified; runtime explanation remains an inference.**
+  Desktop `26.908.70816` / backend `0.154.0-alpha.6.2` excludes ordinary forms from
+  cancellation handling and waits for pending forms before delivering code-mode results.
+  Explicit Skip's transcript spans over 15 minutes despite a reported 30-second duration;
+  decline and timeout-result delivery are 1 ms apart. This fits a held timeout result,
+  but exact wire/physical-click timing was not captured. Post-dismissal diagnostics prove
+  connection health, not unattended cleanup. See `docs/APPROVAL-PROBE-DESIGN.md`.
+- **Gate 1 stays open.** OpenAI has an upstream cancellation fix; availability in a desktop
+  update is unverified. Check the supported updater, then inspect its bundled backend before
+  another targeted test. No new probe was run during this investigation.
+
 - Implementation `fd1292b` passed full macOS CI, including lifecycle tests:
   https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35058103638.
+
+## Historical checkpoints (superseded by current position above)
 
 - **Pre-install checkpoint: `0.2.3` signed correction prepared.** The probe's root
   schema title is rejected by Codex's typed parser, whose failure path cancels before UI.
@@ -114,6 +122,10 @@
 
 ## Validation
 
+- September 16 Skip investigation changes documentation only. Local suite passes with the
+  established `ServerLifecycleTests` sandbox exclusion; shell syntax, diff whitespace and
+  public-repository privacy review pass. No executable, host setting or Calendar data changed.
+
 - Latest completed implementation CI passed on `6a4d555`:
   [verification run](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34920448879).
   That is historical read-surface validation; current candidate checks are recorded above.
@@ -148,12 +160,12 @@
 
 ## Next actions, in order
 
-1. **Measure a valid affirmative answer when the human is ready.** The native client
-   returned `confirm: false` on acceptance; selecting the required confirmation field must
-   produce `confirm: true`. Do not weaken the predicate or preselect the checkbox.
-2. Measure deliberate decline/cancel, prompt dismissal and late-answer isolation; native
-   non-response refusal and following diagnostics already passed. Repeat approval verification
-   per client before enabling writes there. No reinstall or restart is needed for this test.
+1. **Check desktop update availability (Menu → Check for Updates).** Verify the offered or
+   installed backend includes the identified cancellation fix; version numbering alone is
+   insufficient. The current user action is fully understood; do not ask them to repeat it.
+2. Once a relevant host change is verified, measure refusal delivery, unattended prompt
+   dismissal and late-answer isolation. Acceptance and human visibility already passed.
+   Repeat approval verification per client before enabling writes there.
 3. Before any mutating caller, connect acknowledged journal storage and define outcome-error
    reconciliation. Do not retry a future write merely because recording its outcome failed.
    Implement the typed snapshot/field matrix and disposable-calendar round trip before delete.
@@ -283,3 +295,12 @@ Post-restart measurement: `gov-8062290ad29d` (PROCEED). Preserve the distinction
 client form data, human UI observation and valid affirmative approval. Journal checkpoint
 `7598496fca1c44948338d1a49f48ed6c` found no additional gaps; the main-agent `no_change`
 receipt returned `accepted: false, reason: state_unavailable`. No central capture was made.
+
+Skip investigation/documentation: `gov-d1a7840d03d6` (REVIEW).
+`meta-core-informational-readiness` and `coding-context-context-engineering-discipline`:
+record the user's actual controls, distinguish source evidence from runtime inference,
+and correct earlier claims of complete timeout cleanup. No server or app configuration changed.
+
+Documentation publication: `gov-4039591994b3` (REVIEW, no required modifications).
+`meta-core-single-source-of-truth`: canonical probe evidence owns the investigation;
+plan and memory summaries point to it without claiming the host update is available.
