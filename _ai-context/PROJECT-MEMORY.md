@@ -72,6 +72,15 @@ plan §5 for timeout and cancellation behavior.
 
 ## Key Decisions
 
+**2026-09-16 — Native form response and non-response refusal measured after refresh.**
+The human confirmed full quit/reopen with installed `0.2.3`. Codex's desktop response log
+records `accept` with `confirm: false`; the server correctly returned `invalid_response`.
+A subsequent probe timed out after 30 seconds and native diagnostics remained healthy.
+This supersedes the pending-install and loaded-process uncertainty of September 15.
+Valid affirmative approval, deliberate decline/cancel, UI dismissal and late-answer isolation
+remain unproved. Keep the unchecked default and exact affirmative predicate; client acceptance
+without affirmative content is insufficient. No further reinstall or grant is indicated.
+
 **2026-09-15 — Fix the encoded form contract before repeating the native test.** Installed
 `0.2.2` sends `requestedSchema.title`, allowed by the Swift SDK but rejected by the installed
 Codex app-server schema. The tagged backend source turns that parse failure into `cancel`

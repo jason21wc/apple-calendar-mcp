@@ -120,7 +120,7 @@ lacks reload support. Do not automate private IPC or restart loops to work aroun
 
 | Client | Read connection evidence | Approval evidence |
 |---|---|---|
-| Codex desktop | Native permission/identity checks and bounded reads pass on installed `0.2.2` | Human confirmed no form on immediate cancellation. Root schema title is rejected before UI dispatch; `0.2.3` candidate passes the exported client schema. Installation and human round trip remain |
+| Codex desktop | Installed `0.2.3`, full reopen user-confirmed; native diagnostics healthy, prior bounded reads passed | Schema fix reaches form-response path. `accept` with `confirm: false` correctly refused; non-response timed out, following diagnostics passed. Valid affirmative response and UI cleanup remain |
 | Claude Cowork | User confirms the calendar is visible; exact connection route and capability payload not supplied | Not measured |
 | Claude Code CLI | User reports successful user-scope registration of the installed path with `--read-only`; native call not yet reported | Not measured |
 

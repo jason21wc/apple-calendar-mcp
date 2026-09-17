@@ -381,11 +381,13 @@ write permission. See [the implementation design](APPROVAL-PROBE-DESIGN.md) and
 separate gates. Installed `0.2.2` exposes the opt-in probe in Codex; its first result was
 `canceled`; the human confirmed no form appeared. Subsequent diagnostics and a bounded
 read succeeded. The `0.2.3` candidate removes the root schema title that Codex rejects
-before UI dispatch; installation and the native human round trip remain.
+before UI dispatch and is now installed. After full reopen, acceptance with `confirm: false`
+was refused and non-response timed out with healthy follow-up diagnostics. Valid affirmative
+approval and remaining UI cleanup observations are still required.
 
-**A capability declaration is not a human.** It says the client claims support. Only an
-observed round trip returning `.accept` demonstrates a person answered, and even that
-demonstrates it for one client at one version.
+**A capability declaration is not a human.** It says the client claims support. Require
+confirmed human interaction and valid affirmative content, not `.accept` alone. Even a
+verified round trip establishes that behavior only for the tested client and version.
 
 **Host approval is also client-specific.** Claude Desktop's `toolPolicy` is one candidate,
 not the portable interface. The [OpenAI MCP guide](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
@@ -692,11 +694,12 @@ cross-month history. These are prerequisites, not evidence that write approval o
 works. Next is the harmless human-approval round trip after the elicitation cleanup design;
 continue to enforce §6 Gate 1 before adding a mutating caller.
 
-**Current work:** installed `0.2.2` implements the opt-in harmless probe and SDK cleanup,
-but its native test returned cancellation without UI. The signed `0.2.3` candidate removes
+**Current work:** installed `0.2.3` includes the opt-in harmless probe and SDK cleanup.
+The earlier `0.2.2` native test returned cancellation without UI. The correction removes
 a root schema title rejected by Codex before UI dispatch; regression and client-schema
-checks pass. Install the corrected candidate at the existing path, then measure actual
-human interaction. See [the evidence and handoff](APPROVAL-PROBE-DESIGN.md#native-cancellation-investigation-2026-09-15).
+checks pass. Installation and full reopen are complete; native unchecked acceptance was
+refused and non-response timed out with healthy diagnostics. Next measure valid affirmative
+approval and the remaining refusal/UI cleanup cases. See [the evidence and handoff](APPROVAL-PROBE-DESIGN.md#native-cancellation-investigation-2026-09-15).
 Synthetic tests do not clear the approval gate.
 
 **Then, and only after §6 Gate 1 is answered:** `calendar_create_event` →

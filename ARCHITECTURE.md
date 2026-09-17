@@ -102,7 +102,7 @@ The two closed-world tools are `calendar_busy_intervals`, which returns times an
 `calendar_permission_status`, which returns local state plus three client-declared capability
 booleans. Client name/version are explicitly discarded and never reach the payload or log.
 
-The `0.2.2` candidate adds an optional sixth diagnostic, `calendar_approval_probe`, only
+The server offers an optional diagnostic, `calendar_approval_probe`, only
 when launched with `--enable-approval-probe`. Its actor owns one pending question; the SDK
 owns request cancellation, deadlines and transport cleanup. It has no EventKit or journal
 call path and produces no reusable write authorization. Form support gates sending the

@@ -13,14 +13,14 @@ A subprocess test measures its supplied MCP capabilities, not the enclosing app'
 
 > **Start here.** Phases 1-4 are complete, published and in daily use. **Five read-only tools
 > are shipped and no write tool exists**; the Phase 5 journal substrate is built with no caller.
-> The published read baseline is CI-green; `0.2.2` is installed at `/usr/local/bin`.
+> The published read baseline is CI-green; `0.2.3` is installed at `/usr/local/bin`.
 >
 > **The write surface is blocked on one thing: no approval mechanism has been demonstrated.**
 > `toolPolicy` has never been configured on this machine, and server elicitation is measured
-> by declaration and a native cancellation without UI. Installed `0.2.2` sends a root
-> schema title that Codex rejects before UI dispatch. Signed `0.2.3` removes that field;
-> encoded-request regression, local suite and installed-client schema validation pass.
-> Installation and actual human interaction remain
+> through the native client. Installed `0.2.3` corrects the rejected root schema title.
+> After full reopen, Codex returned acceptance with `confirm: false`, correctly refused;
+> non-response timed out and following diagnostics succeeded. A valid affirmative answer
+> and remaining UI cleanup observations are still required
 > (plan §6 Gate 1; `docs/APPROVAL-PROBE-DESIGN.md`).
 > The permission model itself is decided — reads
 > silent, every write confirmed, refuse only what EventKit cannot express (plan §4a).

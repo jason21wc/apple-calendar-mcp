@@ -47,7 +47,7 @@ The code is contractual; the prose after it is not.
 every timestamp in that response was rendered in. `limits_applied` reports what the call
 actually applied, with `null` where a limit does not apply to it.
 
-## Optional approval diagnostic (0.2.2 candidate)
+## Optional approval diagnostic
 
 `calendar_approval_probe` is absent unless launched with `--enable-approval-probe`, including
 when combined with `--read-only`. It accepts an empty argument object only and requires

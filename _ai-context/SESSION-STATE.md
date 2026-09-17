@@ -1,13 +1,28 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # Session State
 
-**Last Updated:** 2026-09-15
+**Last Updated:** 2026-09-16
 **Memory Type:** Working (transient)
 **Lifecycle:** Current position only; decisions and history live in the other memory files.
 
 ## Where things stand
 
-- **`0.2.3` signed correction ready; installed version remains `0.2.2`.** The probe's root
+- **Installed `0.2.3`; full quit/reopen confirmed by the human on September 16.**
+  Installed hash matches the signed candidate. Native diagnostics report `fullAccess` /
+  `disclaimed-child`. The refreshed probe reached the client response path: the desktop log
+  records `action: accept`, `content: {confirm: false}`; the server returned `invalid_response`
+  as required. Actual checkbox/UI interaction is awaiting the user's description.
+- A second native probe returned `timed_out` after 30 seconds. Native diagnostics succeeded
+  afterward on the same connection. This proves the no-response refusal and connection
+  health, not prompt dismissal or late-answer isolation. No Calendar content was queried
+  or changed. No further install, grant or refresh is indicated.
+- **Gate 1 remains open:** a valid checked-and-accepted response has not been measured.
+  Next is one deliberate affirmative round trip with the human ready, followed by remaining
+  decline/cancel and UI cleanup observations. Do not repeatedly prompt an absent user.
+- Implementation `fd1292b` passed full macOS CI, including lifecycle tests:
+  https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35058103638.
+
+- **Pre-install checkpoint: `0.2.3` signed correction prepared.** The probe's root
   schema title is rejected by Codex's typed parser, whose failure path cancels before UI.
   The original installed wire payload fails the schema exported by bundled backend
   `0.154.0-alpha.6.2`; corrected debug and signed release payloads pass. The regression fails
@@ -83,8 +98,8 @@
   [verification run](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/34766574299).
   Consult `git status` for the current checkout; the hash above identifies the implementation,
   not subsequent closeout-only commits.
-- Installed binary is now `0.2.2`; the current native Codex connection answers diagnostics
-  and reads. This establishes read access, not approval for future writes.
+- Installed binary is now `0.2.3`; the refreshed native Codex connection answers diagnostics.
+  Bounded content reads passed before this refresh. Neither establishes write approval.
 - Client-neutral documentation and backlog now treat Claude Cowork and ChatGPT/Codex Work
   as peer targets. User-level Codex registration is verified and the duplicate project
   override removed; native connection status is distinct from the direct stdio check below.
@@ -133,15 +148,12 @@
 
 ## Next actions, in order
 
-1. **Install the signed `0.2.3` correction at the existing path and refresh the host once.**
-   Full quit/reopen is the measured recovery route here; Settings Restart previously broke
-   display. Keep the Calendar grant and existing registration. See the concrete handoff in
-   `docs/APPROVAL-PROBE-DESIGN.md`. Privileged installation previously required the human's
-   interactive terminal; this session leaves installed `0.2.2` running.
-2. Then deliberately measure accept, decline/cancel and non-response in this client.
-   Verify later diagnostics/reads still work; record UI dismissal and late-answer isolation.
-   Repeat approval verification per client before enabling writes there. Preserve the
-   working Cowork/Claude Code routes. Native human approval remains unproved.
+1. **Measure a valid affirmative answer when the human is ready.** The native client
+   returned `confirm: false` on acceptance; selecting the required confirmation field must
+   produce `confirm: true`. Do not weaken the predicate or preselect the checkbox.
+2. Measure deliberate decline/cancel, prompt dismissal and late-answer isolation; native
+   non-response refusal and following diagnostics already passed. Repeat approval verification
+   per client before enabling writes there. No reinstall or restart is needed for this test.
 3. Before any mutating caller, connect acknowledged journal storage and define outcome-error
    reconciliation. Do not retry a future write merely because recording its outcome failed.
    Implement the typed snapshot/field matrix and disposable-calendar round trip before delete.
@@ -159,8 +171,8 @@ connection. Backup remains `.build/apple-calendar-mcp-0.2.1.backup`.
 
 ## Operational observations and limits
 
-- Last installed version observed is `0.2.2` at `/usr/local/bin/apple-calendar-mcp`;
-  strict signature and candidate-hash verification passed on 2026-09-15. Before the update, on 2026-09-13,
+- Last installed version observed is `0.2.3` at `/usr/local/bin/apple-calendar-mcp`;
+  strict signature passed on September 15 and the candidate hash was rechecked September 16. Before the update, on 2026-09-13,
   version `0.2.0` passed strict signature verification and ownership was root:wheel.
   `--doctor` from this constrained execution reported `disclaimed-child` + `notDetermined`
   and the old reinstall guidance. That does not establish another host's grant state and is
@@ -259,3 +271,15 @@ Approval schema investigation/correction: `gov-69e34b02900a`, `gov-642d240f6910`
 `gov-0c2e4c2dce52` (PROCEED). `meta-core-informational-readiness` and
 `coding-context-session-state-continuity`: preserve the actual consumer rejection and
 separate source/schema proof from the pending native human round trip.
+
+Installed-file/native-connection follow-up: `gov-bda9e8c07878` (PROCEED).
+Journal checkpoint `c65387a9ea6d4d64965511ad8b2bfc0a` analysis completed; accepted proposals
+recorded full-CI evidence and removed stale diagnostic candidate labels. The main-agent
+`applied` receipt returned `accepted: false, reason: state_unavailable`; acknowledgement
+remains unavailable. The proposed reusable consumer-schema lesson remains local only;
+central Reference Library capture requires user approval. That documentation checkpoint is incorporated into the post-restart closeout.
+
+Post-restart measurement: `gov-8062290ad29d` (PROCEED). Preserve the distinction between
+client form data, human UI observation and valid affirmative approval. Journal checkpoint
+`7598496fca1c44948338d1a49f48ed6c` found no additional gaps; the main-agent `no_change`
+receipt returned `accepted: false, reason: state_unavailable`. No central capture was made.

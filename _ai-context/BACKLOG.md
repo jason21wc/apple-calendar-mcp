@@ -24,9 +24,11 @@
   `docs/APPROVAL-PROBE-DESIGN.md` and `Vendor/swift-sdk/README.md`.
   Full CI passed on `ea4c5ea`. The human confirmed the native `0.2.2` cancellation
   displayed no form. Codex rejects its root schema title before UI dispatch; signed `0.2.3`
-  removes that field and passes the installed-client schema check. Remaining: install the
-  corrected candidate, then measure real human accept/decline/cancel/non-response and
-  post-timeout reads through the current host.
+  removes that field and passes the installed-client schema check. Its `fd1292b` full CI
+  passed, including lifecycle tests. Installed `0.2.3` and human-reported full reopen are
+  verified. Native acceptance with `confirm: false` returned `invalid_response`; another
+  probe timed out and following diagnostics succeeded. Remaining: valid affirmative response,
+  deliberate decline/cancel and UI cleanup observations through the current host.
   Observe prompt dismissal and late-answer isolation; local cleanup does not prove UI cleanup.
   #24a capability discovery is complete in Codex. Cowork visibility is user-confirmed;
   Claude Code registration is reported, native CLI behavior remains unmeasured.

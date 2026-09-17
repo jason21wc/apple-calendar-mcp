@@ -4,8 +4,10 @@ Status: `0.2.2` source candidate implements the harmless probe and local SDK cle
 source review, local synthetic tests, signed-binary wire checks and full CI on `ea4c5ea`
 pass. Installed `0.2.2` verified September 15; the native probe returned `canceled` and
 follow-up diagnostics succeeded. The human confirmed no form appeared. Signed `0.2.3`
-corrects the root-schema incompatibility identified below; installation and native human
-verification remain. No human approval round trip has been demonstrated. Canonical gate: [implementation plan §6](IMPLEMENTATION-PLAN.md#6-the-write-surface--redesigned-2026-08-20), BACKLOG #24b.
+corrects the root-schema incompatibility identified below and is now installed. After the
+human confirmed full reopen on September 16, native acceptance with `confirm: false` was
+correctly refused; non-response timed out and following diagnostics succeeded. A valid
+affirmative round trip and remaining UI cleanup observations are still required. Canonical gate: [implementation plan §6](IMPLEMENTATION-PLAN.md#6-the-write-surface--redesigned-2026-08-20), BACKLOG #24b.
 
 ## Native cancellation investigation (2026-09-15)
 
@@ -46,6 +48,10 @@ approval settings, remove the required checkbox, or add a server restart loop fo
 
 ### Installation handoff
 
+**Completed September 16:** installed version/hash verified and the human confirmed full
+quit/reopen. The commands below describe the completed handoff, not another required step.
+The native client now returns form content; no further install or refresh is indicated.
+
 The signed candidate is `.build/release/apple-calendar-mcp`, version `0.2.3`, SHA-256
 `8e52a1ef7537c10d2a336ad3d628a4f0dc7d29837538e24912318d73e5509ff9`.
 Its strict signature passes and its designated requirement matches installed `0.2.2`.
@@ -70,7 +76,7 @@ valid answer does not arrive. The experiment must never read or mutate EventKit 
 append to the mutation journal, mint a reusable approval token, or enable a write tool.
 Read connection evidence is sufficient to start this work: Codex was measured natively,
 Cowork visibility is user-confirmed, and Claude Code registration was reported successful.
-Approval behavior remains unmeasured in all three clients.
+Valid human approval remains unproved in all three clients.
 
 Implement and test request cleanup first. A promptly returned timeout is not enough if it
 leaves a suspended task or pending continuation behind. No normal refusal or timeout may
