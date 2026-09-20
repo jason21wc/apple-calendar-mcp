@@ -30,6 +30,18 @@ struct MCPRequestLifecycleTests {
             let first = Attempt(server: fixture.server, timeout: .milliseconds(100))
             let old = try await fixture.transport.elicitation()
             await #expect(throws: Server.RequestLifecycleError.timedOut) { try await first.result() }
+            // Local timeout alone does not prove cancellation reached the synthetic peer.
+            try await Self.eventually {
+                await fixture.transport.messages.contains { $0.method == "notifications/cancelled" }
+            }
+            let cancellation = try #require(await fixture.transport.messages.first {
+                $0.method == "notifications/cancelled"
+            })
+            #expect(cancellation.jsonrpc == "2.0")
+            #expect(cancellation.id == nil)
+            let params = try #require(cancellation.params?.objectValue)
+            // Value equality preserves the string/number distinction on the wire.
+            #expect(params["requestId"] == (try Value(old.id)))
             try await fixture.assertSettled()
             try await fixture.assertReadable()
             let second = Attempt(server: fixture.server)
@@ -410,8 +422,10 @@ struct MCPRequestLifecycleTests {
     }
 
     private struct Envelope: Decodable, Sendable {
+        let jsonrpc: String?
         let id: ID?
         let method: String?
+        let params: Value?
         let result: Value?
     }
 

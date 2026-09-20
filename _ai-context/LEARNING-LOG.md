@@ -12,6 +12,12 @@
 
 ## Active Lessons
 
+**2026-09-19 — A source-supported diagnosis preceded broad duplicate research.** A matching
+upstream issue existed, and best-effort emission did not prove native client receipt.
+**Rule:** search the symptom and related fixes before proposing a report; distinguish source
+plausibility, wire emission, receiver handling and visible cleanup, then test the first
+unobserved boundary.
+
 **2026-09-19 — An unnamed app update pointed the human toward the wrong component.**
 “Open the app menu” was understood as Apple Calendar/macOS while the defect concerned ChatGPT.
 **Rule:** name the affected application and verified menu location; distinguish checking

@@ -60,7 +60,11 @@ was captured. See the [reviewable upstream report](CODEX-ELICITATION-ISSUE.md) f
 chain, reproduction and evidence boundaries. Research found existing upstream issue #40390;
 the draft is now a potential follow-up, not a new issue. A healthy synthetic connection
 verified the installed server emits the matching cancellation; native receipt remains
-untraced, so exact incident attribution is still an inference. Nothing has been submitted.
+untraced, so exact incident attribution is still an inference. September 20's isolated
+app-server test independently confirms client cancellation processing and reproduces
+missing frontend resolution during a two-second observation; the answered control passes.
+It uses no Calendar server or native renderer and does not exercise code-mode pause release.
+The normal Swift suite now asserts cancellation envelope/ID/type. Nothing has been submitted.
 
 Do not repeat identical timeout probes or change server deadlines/restart behavior to mask
 this host defect. Keep Gate 1 open. Normal reads remain available. Any alternative approval

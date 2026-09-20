@@ -4,6 +4,64 @@ Status: **not submitted** to OpenAI or GitHub. Research found an existing matchi
 report, [openai/codex #40390](https://github.com/openai/codex/issues/40390). Prefer a qualified
 follow-up there, with human authorization, over creating a duplicate issue.
 
+## Automated backend reproduction (2026-09-20)
+
+The bundled `0.155.0-alpha.9.2` backend reproduces the missing frontend resolution using
+an isolated stdio app-server, temporary configuration, and a synthetic MCP server.
+`scripts/reproduce-codex-elicitation.py` uses the direct `mcpServer/tool/call` API, following
+the [tagged app-server integration test](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/app-server/tests/suite/v2/mcp_tool.rs#L634).
+It uses no model turn, account credentials, native UI, Calendar connection or network listener.
+Deliberately unusable `file:` service endpoints prevent startup HTTP calls; this is fixture
+isolation, not recommended end-user configuration. The host's configuration is unchanged.
+
+| Case | MCP response from Codex | Tool result | Matching frontend resolution |
+|------|-------------------------|-------------|------------------------------|
+| Control: synthetic frontend decline | `decline` | Delivered | Observed normally |
+| Server cancellation after frontend request observed | `cancel` | Delivered | Absent during the two-second observation |
+| Late synthetic decline after that observation | Request already canceled | Already delivered | Observed 0.878 ms after sending the late response |
+
+The MCP request ID is the string `synthetic-form-1`; the frontend request ID is integer `0`
+in each fresh process. Matching resolution requires both the frontend ID and the thread ID.
+The synthetic server sends the tool result only after receiving Codex's `cancel` response:
+**this establishes client processing of cancellation, not merely notification emission.**
+The answered control establishes that the event reader can observe frontend resolution.
+The late-response timing is an observed ordering, not proof that no other scheduling race
+is possible or that resolution could never occur after a longer wait.
+
+This independently reproduces the backend lifecycle gap without our Calendar server. It
+does not retrospectively trace earlier native incidents, inspect actual desktop rendering,
+or exercise the separate code-mode timeout-pause path. Gate 1 remains open.
+
+To reproduce, run `python3 scripts/reproduce-codex-elicitation.py --codex /absolute/path/to/codex`.
+Use the app-bundled executable when comparing desktop versions. Exit zero means the fixture
+completed with a valid control; inspect `cleanup_gap_reproduced` in the cancellation case
+to distinguish a reproduced gap from timely cleanup. The script is opt-in, not normal CI.
+Our normal Swift suite now also checks cancellation envelope version, absent notification ID,
+and exact originating request ID/type on timeout. No installed server rebuild is needed.
+
+### Proposed comment on existing issue #40390 (not posted)
+
+Reproduced the remaining frontend-cleanup symptom with the backend bundled in ChatGPT
+desktop 26.915.31945: Codex 0.155.0-alpha.9.2. This build includes #44238; the tool result
+now returns promptly, but frontend resolution can remain pending after server cancellation.
+
+An isolated stdio app-server reproduction uses `mcpServer/tool/call` with a synthetic MCP
+server. After observing `mcpServer/elicitation/request`, the fixture sends a cancellation
+targeting the original MCP request. Codex responds to that request with `action: cancel`;
+only then does the fixture return the tool result. The app-server delivers that result,
+but emits no matching `serverRequest/resolved` during a two-second observation. A later
+synthetic frontend decline is followed by that resolution notification. A separate answered
+control resolves normally. MCP and frontend IDs are tracked separately.
+
+The tagged source [drops the internal response route](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/codex-mcp/src/elicitation.rs#L106)
+on cancellation while its [separate app-server response task](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/app-server/src/bespoke_event_handling.rs#L1713)
+still awaits the frontend receiver before emitting resolution. This suggests cancellation
+needs to resolve both lifetimes.
+
+This reproduction does not run the desktop renderer or the model/code-mode path. No
+Calendar data, personal paths, credentials, or real approvals are involved. The reproduction
+script is [available here](https://github.com/jason21wc/apple-calendar-mcp/blob/main/scripts/reproduce-codex-elicitation.py).
+
 ## Research and assumption review (2026-09-19)
 
 - **Closest existing report:** #40390 was opened August 24 and remains open when checked.
@@ -46,22 +104,23 @@ prove receipt by Codex during the earlier native incidents.
 
 The server's notification is deliberately best-effort (`Server.swift:639`): one occupied
 notification slot suppresses another notice, send failures are ignored, and sending has a
-100 ms budget. Existing lifecycle tests establish refusal and late-answer isolation but
-do not assert the outgoing cancellation's ID. Thus undelivered cancellation remains an
+100 ms budget. At the September 19 review, lifecycle tests established refusal and
+late-answer isolation but did not yet assert the outgoing cancellation's ID. Thus undelivered cancellation remains an
 alternative explanation for an individual native run. Also, frontend response ID `8` is
 not the MCP elicitation ID; their mapping was not captured.
 
-**Revised conclusion:** the client lifetime gap is source-supported and is the leading
+**September 19 conclusion (before the automated reproduction above):** the client lifetime gap is source-supported and is the leading
 explanation, corroborated by an existing report. Exact attribution of our native incidents
 remains unproved. An independent review reached that distinction; its findings were checked
 against our server, tests, tagged client source, and the protocol.
 
-**Next discriminating verification:** an automated, isolated app-server reproduction using
+**Verification selected on September 19 and now completed above:** an automated, isolated app-server reproduction using
 a harmless synthetic server should capture the MCP cancellation arriving and require a
 matching `serverRequest/resolved` before any human response. It must map the MCP and
 frontend IDs separately. This tests the suspected propagation gap without another manual
 timeout trial. A permanent server regression should additionally assert cancellation ID
-and type on the healthy path. Neither test has been added or executed in this research pass.
+and type on the healthy path. Both checks were subsequently implemented and passed on
+September 20; the app-server check reproduces the gap rather than a repair.
 
 ## Environment
 

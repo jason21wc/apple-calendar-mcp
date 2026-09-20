@@ -1,13 +1,24 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # Session State
 
-**Last Updated:** 2026-09-19
+**Last Updated:** 2026-09-20
 **Memory Type:** Working (transient)
 **Lifecycle:** Current position only; decisions and history live in the other memory files.
 
 ## Where things stand
 
-- **Research correction:** an existing open report, [openai/codex #40390](https://github.com/openai/codex/issues/40390),
+- **Automated backend reproduction now establishes cancellation processing.** The bundled
+  `0.155.0-alpha.9.2` app-server acknowledged the synthetic MCP cancellation with `cancel`
+  and delivered the tool result, but emitted no matching frontend resolution during a
+  two-second observation. Resolution followed a late synthetic decline; a fresh answered
+  control resolved normally. IDs/thread correlation are explicit. This isolates the
+  backend lifetime gap without Calendar, real approval UI, or a model service. It does not
+  retrospectively trace the previous native incidents or test code-mode pause release.
+  `scripts/reproduce-codex-elicitation.py` is the opt-in reproduction; the normal Swift
+  lifecycle suite now also checks outgoing cancellation ID/type. No production code or
+  installed binary changed. See the prepared follow-up in `docs/CODEX-ELICITATION-ISSUE.md`.
+
+- **September 19 research correction (before the automated check):** an existing open report, [openai/codex #40390](https://github.com/openai/codex/issues/40390),
   already describes canceled MCP forms remaining open. Prefer a qualified follow-up, not
   a duplicate issue. PR #44238 addresses internal cancellation; current upstream source
   `5c5308fc9a9ee789049d646ef11e5400384b9c6f` retains the separate frontend-response wait.
@@ -158,6 +169,18 @@
 
 ## Validation
 
+- September 20 boundary check and updated Swift suite pass locally, using the established
+  `ServerLifecycleTests` desktop sandbox exclusion. Review tightened ID/thread correlation,
+  bounded-observation wording, child environment isolation, diagnostics and teardown.
+  The journal analysis for checkpoint `ee3befd0e7aa45d6ba70f84ef7429cb1` was consumed:
+  accepted the prior CI checkpoint and research lesson; its proposed deferred regression
+  is now implemented in this turn. Receipt returned `accepted: false, state_unavailable`;
+  memory updates are applied, but hook acknowledgment is not established.
+
+- Documentation checkpoint `fc6f371` passed full macOS CI (build, shell checks, test suite):
+  https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35491364654.
+  That checkpoint did not establish native cancellation receipt or frontend cleanup.
+
 - September 19 research correction: independent five-file documentation review passed.
   Local `./scripts/test.sh --disable-sandbox --skip ServerLifecycleTests`, shell syntax,
   and whitespace checks passed; the lifecycle exclusion is the established desktop
@@ -208,11 +231,10 @@
 
 ## Next actions, in order
 
-1. **Isolate cancellation propagation with an automated app-server boundary test.**
-   `docs/CODEX-ELICITATION-ISSUE.md` records existing issue #40390, exact source, a passing
-   synthetic server-emission check, and the remaining native-receipt uncertainty. Correlate
-   MCP and frontend IDs; do not repeat identical human probes or alter server deadlines.
-   Any external follow-up belongs on #40390 and still requires explicit authorization.
+1. **Review the verified follow-up for existing issue #40390; obtain authorization to post.**
+   `docs/CODEX-ELICITATION-ISSUE.md` includes the automated reproduction, positive control,
+   exact source and remaining evidence limits. Backend cancellation processing is now
+   observed in isolation. Do not repeat identical human probes or alter server deadlines.
 2. After the cleanup gap is resolved or a relevant host change is verified, retest UI
    cleanup, late-answer isolation and affirmative approval on that version. Submitting a
    report alone is not a reason to repeat a probe. Verify each client before enabling writes.

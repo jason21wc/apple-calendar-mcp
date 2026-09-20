@@ -22,6 +22,20 @@
 
 ## Cancellation diagnosis review (2026-09-19)
 
+**September 20 update:** the automated app-server reproduction now proves the bundled
+backend processes cancellation yet leaves frontend resolution pending during a two-second
+observation. The synthetic server waits for Codex's `cancel` response before returning its
+tool result; both arrive without a frontend answer. A late synthetic decline is followed by
+resolution, while the fresh answered control resolves normally. This isolates the backend
+path independently of Apple Calendar. It neither inspects native rendering nor exercises
+code-mode result pauses, and does not reconstruct earlier native incidents. Keep the write
+gate open; the next external action is a qualified follow-up on #40390 with authorization.
+The normal Swift suite now verifies cancellation envelope/ID/type. No production source or
+installed binary changed. Details and opt-in script: `docs/CODEX-ELICITATION-ISSUE.md`.
+Governance `gov-223f092f5c2d` (PROCEED); applied `meta-quality-verification-validation`
+and `meta-safety-transparent-limitations` by adding a positive control, explicit request
+correlation, and a bounded negative observation rather than claiming an infinite wait.
+
 Research found existing [openai/codex #40390](https://github.com/openai/codex/issues/40390):
 prefer a qualified follow-up with authorization, not a new duplicate. The installed backend
 contains PR #44238's internal cancellation fix; the separate frontend-response wait remains
@@ -32,8 +46,8 @@ cancellation receipt in Codex was not measured, and its frontend ID differs from
 
 A synthetic client of installed `0.2.3` verified the matching string-ID cancellation frame
 before the timeout result, successful subsequent ping, and clean EOF shutdown. This narrows
-the server-side concern without proving the prior native delivery. Next verification should
-be an automated app-server boundary reproduction, not another human timeout trial. Keep
+the server-side concern without proving the prior native delivery. The next verification
+selected then was the automated app-server reproduction completed above. Keep
 the client-neutral server, local expiry/late-response safeguards, and current write gate.
 No auto-restart, deadline extension, or weakened confirmation is justified by this finding.
 See `docs/CODEX-ELICITATION-ISSUE.md` for evidence, alternative causes, and test criteria.
