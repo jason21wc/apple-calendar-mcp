@@ -1,10 +1,11 @@
 # Approval probe: bounded request lifecycle before live measurement
 
-Status: installed `0.2.3` has demonstrated a valid native affirmative response in Codex,
-and the human confirmed seeing the form. Unchecked acceptance is refused. The human then
-chose **Skip without checking the request**; Codex logged `decline`, but the probe returned
-`timed_out`. Gate 1 remains open for refusal delivery, timeout cleanup and late-answer
-isolation. No Calendar content changed and no write tool exists. See the current evidence
+Status: installed `0.2.3` has demonstrated valid affirmative approval on the previous Codex
+host, and timely native decline plus non-response refusal on the September 19 updated host.
+The unanswered result returned in 30.040 seconds with healthy follow-up diagnostics.
+Human-observed timeout form dismissal and late-answer isolation remain open; affirmative
+approval also needs confirmation on this host version. No Calendar content changed and no
+write tool exists. See the current evidence
 below and [implementation plan §6](IMPLEMENTATION-PLAN.md#6-the-write-surface--redesigned-2026-08-20).
 
 ## Updated host verification (2026-09-19)
@@ -26,15 +27,24 @@ fix `3436cad5abbe9199c061880421b16d96a9ba702b` by ancestry. Specifically:
 Native permission diagnostics remain healthy (`fullAccess`, `disclaimed-child`, form support
 declared). This is a verified relevant host change, not proof of live UI behavior.
 
-After the human said ready, the September 19 attended probe returned `invalid_response`.
-The desktop response at `2026-09-20T03:20:01.873Z` was `action: accept` with `confirm: false`;
-the server correctly refused it. Follow-up permission diagnostics stayed healthy. The
-updated installed UI still maps Skip directly to decline without checkbox validation;
-Continue submits accept. Source and logs do not establish which control the human used.
-Their button observation has been requested and is pending. Do not count this attempt as
-native Skip verification or run another form before resolving that observation. No Calendar
-content changed. Gate 1 remains open for native decline/cancel delivery, unattended timeout
-dismissal and late-answer isolation. No further update check or server reinstall is indicated.
+The initial September 19 probe returned `invalid_response`. The desktop response at
+`2026-09-20T03:20:01.873Z` was `action: accept` with `confirm: false`; the server correctly
+refused it. **The human later clarified they were elsewhere and did not see that form.**
+Do not attribute its protocol response to a human action. Updated UI source still maps Skip
+directly to decline, while Continue submits accept; the cause of the unseen response is unknown.
+
+At the human's request, the next attended retry returned `declined` in 12.5 seconds.
+Desktop response ID 78 at `2026-09-20T03:32:55.231Z` records `action: decline`, `content: null`.
+Follow-up native diagnostics succeeded. The immediately following unanswered probe returned
+`timed_out` with measured tool-call elapsed time **30,040 ms**, and another native diagnostic
+succeeded. This establishes timely refusal/result delivery on the updated host without a
+restart. No additional form response appeared in the inspected desktop log for that timeout.
+Human confirmation that the second form disappeared or became inactive without intervention
+has been requested and is pending; tool completion alone does not prove visual dismissal.
+Late-answer isolation remains distinct. Affirmative human approval was proved on the prior
+host version, so verify it on the updated host before closing Gate 1. No Calendar content
+changed; no update, reinstall or restart is indicated. Stay in the conversation during an
+attended test: the server's 30-second request deadline does not pause when the user leaves.
 
 ## Native Skip and timeout investigation (2026-09-16)
 

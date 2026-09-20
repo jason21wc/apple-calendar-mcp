@@ -7,16 +7,21 @@
 
 ## Where things stand
 
-- **September 19 host update verified:** installed ChatGPT `26.915.31945` bundles Codex
-  `0.155.0-alpha.9.2`; the human reports the updater says current. Exact tagged source includes
-  the ordinary-form cancellation fix. Native permission diagnostics remain healthy with
-  `fullAccess` / `disclaimed-child`. An attended probe after the human said ready returned
-  `invalid_response`: desktop log shows accept with `confirm: false`. The updated UI source
-  still maps Skip directly to decline. Human button observation is pending; do not infer it
-  from the response or repeat the test yet. Follow-up diagnostics stayed healthy.
-  Do not request another update check or Calendar-server reinstall.
+- **Updated-host decline and timeout delivery now pass.** ChatGPT `26.915.31945` bundles
+  Codex `0.155.0-alpha.9.2`. At the human's request, attended retry returned `declined` in
+  12.5 seconds; desktop response ID 78 logged decline at `2026-09-20T03:32:55.231Z`.
+  The following unanswered probe returned `timed_out` in measured 30,040 ms. Native
+  diagnostics after each remain `fullAccess` / `disclaimed-child`; no restart was needed.
+- **Human-observed timeout dismissal is pending.** The human has been asked whether the
+  second form disappeared/became inactive without intervention. Do not infer UI dismissal
+  from result delivery. Late-answer isolation and affirmative approval on this updated host
+  remain; acceptance on the earlier host is historical evidence.
+- **Previous unseen response clarified:** the human was elsewhere and did not see the form
+  that yielded accept/confirm false and `invalid_response`. It establishes refusal of
+  non-affirmative content, not a human action. The cause of that host response is unknown.
+  Stay in this conversation for attended tests; the 30-second server deadline keeps running.
 
-- **Affirmative form verified; unchecked Skip correctly chosen but returned timeout.**
+- **Earlier host checkpoint: affirmative form verified; Skip returned timeout.**
   The human saw the successful form, then explicitly chose Skip without checking the request.
   Installed UI source maps Skip directly to decline, independent of checkbox state; desktop
   logs confirm decline. The native probe instead returned `timed_out`. No Calendar changed.
@@ -30,8 +35,8 @@
   decline and timeout-result delivery are 1 ms apart. This fits a held timeout result,
   but exact wire/physical-click timing was not captured. Post-dismissal diagnostics prove
   connection health, not unattended cleanup. See `docs/APPROVAL-PROBE-DESIGN.md`.
-- **Gate 1 stays open.** The updated backend source now includes the fix. Actual native
-  refusal delivery, unattended dismissal and late-answer isolation remain unmeasured on it.
+- **Gate 1 stays open for the remaining UI/approval observations above.** No Calendar
+  content changed and no write tool exists. Do not request another updater check or restart.
 
 - Implementation `fd1292b` passed full macOS CI, including lifecycle tests:
   https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35058103638.
@@ -172,13 +177,11 @@
 
 ## Next actions, in order
 
-1. **Await the human's description of the latest form action (Skip or Continue).** The
-   attended result was `invalid_response`, with host acceptance of unchecked content.
-   This proves refusal of non-affirmative content, not deliberate native Skip delivery.
-   Do not repeat a probe or prescribe another refresh before resolving the observation.
-2. Measure unattended prompt dismissal and late-answer isolation after native refusal
-   delivery. Acceptance and human visibility already passed on the previous host.
-   Repeat approval verification per client before enabling writes there.
+1. **Await the timeout form observation:** did the unanswered second form disappear or
+   become inactive on its own? No further probe until that observation is resolved.
+2. Verify late-answer isolation and affirmative approval on the updated host; prior host
+   acceptance is not a measurement of this version. Keep the remaining Gate 1 conditions
+   explicit. Repeat approval verification per client before enabling writes there.
 3. Before any mutating caller, connect acknowledged journal storage and define outcome-error
    reconciliation. Do not retry a future write merely because recording its outcome failed.
    Implement the typed snapshot/field matrix and disposable-calendar round trip before delete.
@@ -334,3 +337,9 @@ record the preceding CI result and the lesson to name the affected application e
 No Reference Library proposal was made.
 The main-agent `applied` journal receipt returned `accepted: false, reason: state_unavailable`;
 the checkpoint was analyzed and proposals applied, but acknowledgement remains unavailable.
+
+Attended retry: `gov-e29bbd5a7e46`; unanswered test/documentation: `gov-ce39be942a35`
+(REVIEW, no required modifications). `meta-core-informational-readiness` and
+`meta-quality-verification-validation`: distinguish human observation, response semantics,
+actual elapsed delivery and post-test connection health. Previous checkpoint `633ca42`
+passed full CI: https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35486423266.

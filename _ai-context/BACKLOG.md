@@ -30,9 +30,10 @@
   probe timed out and following diagnostics succeeded. Attended affirmative approval and form
   visibility subsequently passed. Human-selected unchecked Skip logged decline but returned
   timeout on the older host. The September 19 installed desktop/backend update includes
-  the cancellation fix in matching source. Next run an attended Skip test, then verify
-  unattended timeout/UI cleanup; do not request another updater check.
-  Observe prompt dismissal and late-answer isolation; local cleanup does not prove UI cleanup.
+  the cancellation fix in matching source. Attended retry now returns `declined`; unanswered
+  probing returns `timed_out` in measured 30.040 seconds; follow-up diagnostics stay healthy.
+  Await human-observed timeout dismissal, check late-answer isolation and affirmative approval
+  on this host version. No updater check, reinstall or restart is indicated.
   #24a capability discovery is complete in Codex. Cowork visibility is user-confirmed;
   Claude Code registration is reported, native CLI behavior remains unmeasured.
   Repeat approval verification before enabling writes in each client. No synthetic result,

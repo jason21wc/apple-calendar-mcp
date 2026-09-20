@@ -120,7 +120,7 @@ lacks reload support. Do not automate private IPC or restart loops to work aroun
 
 | Client | Read connection evidence | Approval evidence |
 |---|---|---|
-| Codex desktop | Installed `0.2.3`, full reopen user-confirmed; native diagnostics healthy, prior bounded reads passed | Valid affirmative response and form visibility verified. Unchecked acceptance refused. Human-selected Skip logged decline but returned timeout on the older host. Updated desktop `26.915.31945` / backend `0.155.0-alpha.9.2` includes the fix in matching source; diagnostics remain healthy. Native refusal delivery and unattended cleanup still need retesting; see [probe investigation](APPROVAL-PROBE-DESIGN.md#updated-host-verification-2026-09-19) |
+| Codex desktop | Installed `0.2.3`, full reopen user-confirmed; native diagnostics healthy, prior bounded reads passed | Valid affirmative response and form visibility verified. Unchecked acceptance refused. Human-selected Skip logged decline but returned timeout on the older host. Updated desktop `26.915.31945` / backend `0.155.0-alpha.9.2` now returns timely decline and unanswered timeout, with healthy diagnostics. Timeout form dismissal, late-answer isolation and current-version affirmative approval remain; see [probe investigation](APPROVAL-PROBE-DESIGN.md#updated-host-verification-2026-09-19) |
 | Claude Cowork | User confirms the calendar is visible; exact connection route and capability payload not supplied | Not measured |
 | Claude Code CLI | User reports successful user-scope registration of the installed path with `--read-only`; native call not yet reported | Not measured |
 
