@@ -40,8 +40,11 @@
   now proves client cancellation processing and reproduces missing frontend resolution
   during a bounded observation; its answered control passes. Prior native receipt remains
   untraced. The permanent server regression now checks the cancellation ID/type as well.
-  Both are complete; review the qualified upstream follow-up before another human trial.
-  No identical timeout retry, updater check, reinstall or restart is indicated. Late-answer
+  The systemic extension also measures stale waiting-on-approval state after cancellation
+  and disconnect, with bounded late-answer isolation. Turn cleanup is a source-confirmed
+  fallback; the direct-call fixture does not establish normal-turn duration. See the report
+  for the complete cleanup contract. Review the qualified follow-up before another human trial.
+  No identical timeout retry, updater check, reinstall or restart is indicated. Native late-answer
   isolation and current-version affirmative approval remain open.
   #24a capability discovery is complete in Codex. Cowork visibility is user-confirmed;
   Claude Code registration is reported, native CLI behavior remains unmeasured.

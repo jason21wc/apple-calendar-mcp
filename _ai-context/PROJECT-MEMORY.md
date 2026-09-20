@@ -22,6 +22,23 @@
 
 ## Cancellation diagnosis review (2026-09-19)
 
+**September 20 systemic review supersedes the narrower account below.** Synthetic direct
+calls now show stale `waitingOnApproval` as well as absent frontend resolution for ten
+seconds after acknowledged server cancellation **and** MCP transport loss. Answered
+controls return to idle; a late old acceptance did not settle a newer request in the
+bounded check. Source separates internal request lifetime from frontend callback/guard
+lifetime; turn start/completion/interruption can eventually clear the latter. Thus the
+outside-turn reproduction does not prove an indefinite normal-chat hang. Replay and idle
+unload consequences remain source-supported, unmeasured. Current-main inspection at
+`a2de8fedcc3abe3cdde09b43515db820fb6b95b5` retains the relevant source gap.
+Recommend a qualified follow-up on #40390 describing complete per-request state cleanup;
+no issue/comment is posted. Do not solve this with auto-restart, a longer deadline or a
+visual-only dismissal. Keep Gate 1 open and verify the native path after an upstream fix.
+Governance `gov-fd34841f41bf` (PROCEED): `meta-core-systemic-thinking`,
+`meta-quality-verification-validation`, `meta-safety-transparent-limitations` informed
+terminal-path tests, state observations and explicit limits. Full evidence and repair
+criteria live in `docs/CODEX-ELICITATION-ISSUE.md`, not duplicated across memory.
+
 **September 20 update:** the automated app-server reproduction now proves the bundled
 backend processes cancellation yet leaves frontend resolution pending during a two-second
 observation. The synthetic server waits for Codex's `cancel` response before returning its

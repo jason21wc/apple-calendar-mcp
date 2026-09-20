@@ -7,28 +7,22 @@
 
 ## Where things stand
 
-- **Automated backend reproduction now establishes cancellation processing.** The bundled
-  `0.155.0-alpha.9.2` app-server acknowledged the synthetic MCP cancellation with `cancel`
-  and delivered the tool result, but emitted no matching frontend resolution during a
-  two-second observation. Resolution followed a late synthetic decline; a fresh answered
-  control resolved normally. IDs/thread correlation are explicit. This isolates the
-  backend lifetime gap without Calendar, real approval UI, or a model service. It does not
-  retrospectively trace the previous native incidents or test code-mode pause release.
-  `scripts/reproduce-codex-elicitation.py` is the opt-in reproduction; the normal Swift
-  lifecycle suite now also checks outgoing cancellation ID/type. No production code or
-  installed binary changed. See the prepared follow-up in `docs/CODEX-ELICITATION-ISSUE.md`.
-
-- **September 19 research correction (before the automated check):** an existing open report, [openai/codex #40390](https://github.com/openai/codex/issues/40390),
-  already describes canceled MCP forms remaining open. Prefer a qualified follow-up, not
-  a duplicate issue. PR #44238 addresses internal cancellation; current upstream source
-  `5c5308fc9a9ee789049d646ef11e5400384b9c6f` retains the separate frontend-response wait.
-  An independent assumption review and a fresh installed-binary synthetic check confirm
-  the server emits cancellation with the matching string ID on a healthy connection
-  (30,023 ms, timeout result, subsequent ping, clean EOF). Native cancellation receipt was
-  not captured: best-effort sending can fail, and frontend/MCP IDs differ. The source gap
-  remains the leading explanation, not a fully traced incident cause. Detailed research
-  and a proposed automated boundary test are in `docs/CODEX-ELICITATION-ISSUE.md`.
-  No issue/comment was posted, no new human probe ran, and no Calendar content was accessed.
+- **Systemic review completed; qualified upstream follow-up is ready, not submitted.**
+  Existing issue [#40390](https://github.com/openai/codex/issues/40390) remains the closest
+  report. The isolated direct-call fixture now reproduces missing frontend resolution
+  **and** stale `waitingOnApproval` for ten seconds after acknowledged server cancellation
+  and after MCP disconnect. Normal answers and late answers return the thread to idle;
+  a late old acceptance did not settle a newer form in the bounded check.
+  Source shows split ownership: internal cancellation ends the MCP request, while frontend
+  callbacks/approval guards normally finish on a reply or broader turn/thread cleanup.
+  Turn transitions can mask the missing per-request path; the direct test runs outside a
+  model turn and does not prove an indefinite normal-chat hang. Replay/idle eviction effects
+  are source-supported, unmeasured. Current-main source still has the gap at inspected
+  `a2de8fedcc3abe3cdde09b43515db820fb6b95b5`. See `docs/CODEX-ELICITATION-ISSUE.md` for
+  research, results, limits and the proposed comment. `--extended` runs the new scenarios.
+  No production code, installed binary, live configuration or Calendar data changed.
+  **Next action:** human decision on submitting the qualified comment to #40390. No further
+  identical native probe, restart or deadline change is justified. Gate 1 remains open.
 
 - **Updated-host decline and timeout delivery now pass.** ChatGPT `26.915.31945` bundles
   Codex `0.155.0-alpha.9.2`. At the human's request, attended retry returned `declined` in
@@ -168,6 +162,14 @@
   refresh/recovery is needed. `docs/CLIENT-LIFECYCLE.md` records this host-specific limit.
 
 ## Validation
+
+- September 20 systemic review: extended synthetic scenarios pass their controls and
+  reproduce the cleanup gap described above. Local Swift suite passes with the established
+  `ServerLifecycleTests` sandbox exclusion. Independent review of the final diff found no
+  blocking correctness or privacy issue; shell syntax, Python parsing and diff checks pass.
+  The preceding reproduction checkpoint
+  `f591a4b` passed full macOS CI:
+  https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35493565346.
 
 - September 20 boundary check and updated Swift suite pass locally, using the established
   `ServerLifecycleTests` desktop sandbox exclusion. Review tightened ID/thread correlation,

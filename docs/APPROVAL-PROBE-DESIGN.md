@@ -62,7 +62,10 @@ the draft is now a potential follow-up, not a new issue. A healthy synthetic con
 verified the installed server emits the matching cancellation; native receipt remains
 untraced, so exact incident attribution is still an inference. September 20's isolated
 app-server test independently confirms client cancellation processing and reproduces
-missing frontend resolution during a two-second observation; the answered control passes.
+missing frontend resolution and stale waiting-on-approval state for ten seconds after
+cancellation and MCP disconnect; answered controls return to idle. Turn transitions can
+clear callbacks as a fallback, so this outside-turn fixture does not prove an indefinite
+normal-chat hang. Its late old acceptance did not settle a newer form in the bounded check.
 It uses no Calendar server or native renderer and does not exercise code-mode pause release.
 The normal Swift suite now asserts cancellation envelope/ID/type. Nothing has been submitted.
 

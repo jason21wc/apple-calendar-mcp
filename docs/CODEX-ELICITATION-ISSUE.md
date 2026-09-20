@@ -1,4 +1,4 @@
-# Research and draft follow-up: expired MCP elicitation form remains interactive
+# Research and draft follow-up: MCP elicitation request cleanup
 
 Status: **not submitted** to OpenAI or GitHub. Research found an existing matching symptom
 report, [openai/codex #40390](https://github.com/openai/codex/issues/40390). Prefer a qualified
@@ -14,25 +14,30 @@ It uses no model turn, account credentials, native UI, Calendar connection or ne
 Deliberately unusable `file:` service endpoints prevent startup HTTP calls; this is fixture
 isolation, not recommended end-user configuration. The host's configuration is unchanged.
 
-| Case | MCP response from Codex | Tool result | Matching frontend resolution |
-|------|-------------------------|-------------|------------------------------|
-| Control: synthetic frontend decline | `decline` | Delivered | Observed normally |
-| Server cancellation after frontend request observed | `cancel` | Delivered | Absent during the two-second observation |
-| Late synthetic decline after that observation | Request already canceled | Already delivered | Observed 0.878 ms after sending the late response |
+| Case | Protocol outcome | Frontend resolution and thread status |
+|------|------------------|---------------------------------------|
+| Normal synthetic decline | MCP `decline`; tool result delivered | One resolution; thread idle |
+| Cancellation, no later answer | MCP `cancel`; tool result delivered | No resolution over ten seconds; active / waitingOnApproval |
+| Late synthetic decline after cancellation | Internal request already canceled | One frontend resolution; thread returns to idle |
+| MCP fixture disconnect while form pending | Tool error delivered | No resolution over ten seconds; active / waitingOnApproval |
+| New form followed by old form's late acceptance | Old request stays canceled; new request's own decline completes it | No new-form settlement during one-second negative observation; one resolution per form; final idle |
 
-The MCP request ID is the string `synthetic-form-1`; the frontend request ID is integer `0`
-in each fresh process. Matching resolution requires both the frontend ID and the thread ID.
+The first MCP request ID is string `synthetic-form-1`; its frontend ID is integer `0`
+in each fresh process. The successive case uses `synthetic-form-2` and frontend ID `1`.
+Matching resolution requires both the frontend ID and the thread ID.
 The synthetic server sends the tool result only after receiving Codex's `cancel` response:
 **this establishes client processing of cancellation, not merely notification emission.**
 The answered control establishes that the event reader can observe frontend resolution.
-The late-response timing is an observed ordering, not proof that no other scheduling race
-is possible or that resolution could never occur after a longer wait.
+The observations are bounded, not proof of infinite retention or every possible race.
+The first two-second baseline check is retained; `--extended` adds the ten-second silent
+cancellation/disconnect observations and newer-request isolation. Results describe the
+installed backend; future builds can legitimately report timely cleanup instead.
 
 This independently reproduces the backend lifecycle gap without our Calendar server. It
 does not retrospectively trace earlier native incidents, inspect actual desktop rendering,
 or exercise the separate code-mode timeout-pause path. Gate 1 remains open.
 
-To reproduce, run `python3 scripts/reproduce-codex-elicitation.py --codex /absolute/path/to/codex`.
+To reproduce, run `python3 scripts/reproduce-codex-elicitation.py --codex /absolute/path/to/codex --extended`.
 Use the app-bundled executable when comparing desktop versions. Exit zero means the fixture
 completed with a valid control; inspect `cleanup_gap_reproduced` in the cancellation case
 to distinguish a reproduced gap from timely cleanup. The script is opt-in, not normal CI.
@@ -41,26 +46,109 @@ and exact originating request ID/type on timeout. No installed server rebuild is
 
 ### Proposed comment on existing issue #40390 (not posted)
 
-Reproduced the remaining frontend-cleanup symptom with the backend bundled in ChatGPT
-desktop 26.915.31945: Codex 0.155.0-alpha.9.2. This build includes #44238; the tool result
-now returns promptly, but frontend resolution can remain pending after server cancellation.
+Related remaining cleanup failure on Codex `0.155.0-alpha.9.2`, bundled in ChatGPT desktop
+`26.915.31945`. This build includes #44238. Unlike the original report, the synthetic tool
+result returns promptly; the frontend request and waiting-on-approval status remain pending.
 
-An isolated stdio app-server reproduction uses `mcpServer/tool/call` with a synthetic MCP
-server. After observing `mcpServer/elicitation/request`, the fixture sends a cancellation
-targeting the original MCP request. Codex responds to that request with `action: cancel`;
-only then does the fixture return the tool result. The app-server delivers that result,
-but emits no matching `serverRequest/resolved` during a two-second observation. A later
-synthetic frontend decline is followed by that resolution notification. A separate answered
-control resolves normally. MCP and frontend IDs are tracked separately.
+An isolated stdio app-server fixture calls `mcpServer/tool/call` outside a model turn.
+After observing `mcpServer/elicitation/request`, it cancels the original MCP request and
+waits for Codex's `action: cancel` before returning the tool result. The result arrives,
+but no matching `serverRequest/resolved` appears over ten seconds without a frontend reply;
+`thread/read` still reports `active` with `waitingOnApproval`. Terminating the MCP fixture
+while its form is pending similarly delivers a tool error but leaves resolution absent
+and the same approval status over ten seconds.
 
-The tagged source [drops the internal response route](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/codex-mcp/src/elicitation.rs#L106)
-on cancellation while its [separate app-server response task](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/app-server/src/bespoke_event_handling.rs#L1713)
-still awaits the frontend receiver before emitting resolution. This suggests cancellation
-needs to resolve both lifetimes.
+Controls: a normal decline resolves and returns the thread to idle. A late decline after
+cancellation also clears the stale frontend request and returns it to idle. With a newer
+form pending, a late acceptance for the old frontend ID did not settle the new request
+during a one-second observation; its own decline then settled it exactly once. MCP and
+frontend IDs are correlated separately. This test found no cross-request approval failure.
 
-This reproduction does not run the desktop renderer or the model/code-mode path. No
-Calendar data, personal paths, credentials, or real approvals are involved. The reproduction
-script is [available here](https://github.com/jason21wc/apple-calendar-mcp/blob/main/scripts/reproduce-codex-elicitation.py).
+The tagged source [drops the internal responder](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/codex-mcp/src/elicitation.rs#L106),
+while the [frontend task and approval guard](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/app-server/src/bespoke_event_handling.rs#L1713)
+have a separate lifetime. [Turn transitions](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/app-server/src/bespoke_event_handling.rs#L155)
+can clear callbacks, so this direct-call reproduction does **not** establish an indefinite
+hang during an ordinary chat turn. It isolates a missing per-request termination path.
+A fix should retire the callback, waiter, approval guard and replay eligibility together,
+and emit resolution once, including registration/cancellation/answer races.
+
+Reproduction: run [this script](https://github.com/jason21wc/apple-calendar-mcp/blob/main/scripts/reproduce-codex-elicitation.py)
+with `--codex /absolute/path/to/codex --extended`. It uses temporary configuration and a
+synthetic server, without a model service, account credentials, Calendar or real approvals.
+The native renderer, model/code-mode path and reconnect replay are not tested here.
+
+## Systemic review (2026-09-20)
+
+**Recommendation:** add a qualified follow-up to #40390, with the reproduction and the
+request-lifetime finding. The report should ask for complete per-request cleanup, not merely
+hiding a form. Do not change this Calendar server's restart behavior or approval deadline.
+
+The source exposes two lifetimes for one elicitation. MCP cancellation ends the internal
+request; a separately registered app-server callback waits for a frontend response. That
+callback's task also owns the approval-status guard. The existing cleanup at
+[turn start/completion](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/app-server/src/bespoke_event_handling.rs#L155)
+and [interruption](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/app-server/src/bespoke_event_handling.rs#L1204)
+can eventually clear it. This is a mismatch between request lifetime and turn lifetime.
+
+That distinction corrects an important assumption in the first draft: the direct API test
+runs outside a model turn. It shares the elicitation response handler, but has no turn
+completion to trigger the fallback. It establishes a per-request cleanup gap, not an
+infinite hang in an ordinary chat turn. We have not reproduced the full native renderer or
+code-mode execution path. The earlier native incident remains consistent with this cause,
+not conclusively attributed to it.
+
+State beyond the visible form matters. Source shows pending callbacks remain eligible for
+[replay](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/app-server/src/outgoing_message.rs#L446),
+while the retained permission guard contributes to
+[waiting-on-approval status](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/app-server/src/thread_status.rs#L443).
+[Idle unloading](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/app-server/src/request_processors/thread_lifecycle.rs#L56)
+requires an inactive thread. Replay and unload consequences are source-supported risks,
+not runtime measurements or a demonstrated memory leak. Other approval handlers use similar
+callback machinery, but this does not establish that they have the same defect: their
+lifetime can legitimately belong to the enclosing turn.
+
+### Broader duplicate and fix search
+
+The closest report remains #40390, open with no comments when checked on September 20.
+Its older Streamable HTTP reproduction held both the form and the tool result; our newer
+stdio result returns. Report a related remaining failure, not an identical full symptom set.
+
+- [PR #44238](https://github.com/openai/codex/pull/44238) changed RMCP cancellation,
+  shutdown and reconnect handling. It is present in the installed backend and addresses
+  the lower-level wait. It did not modify the app-server frontend callback lifetime.
+- [PR #43708](https://github.com/openai/codex/pull/43708) adds TUI user-verification request
+  bookkeeping; [PR #43925](https://github.com/openai/codex/pull/43925) cancels native
+  verification operations separately. They illustrate distinct operation owners, but do
+  not establish a fix for ordinary form cleanup.
+- [#39149](https://github.com/openai/codex/issues/39149) concerns a host with no approval
+  surface; [#39346](https://github.com/openai/codex/issues/39346) concerns missing mobile
+  approval controls. Neither demonstrates the same cancellation path.
+- [#39426](https://github.com/openai/codex/issues/39426) requests paired human-input lifecycle
+  events, and [#37995](https://github.com/openai/codex/issues/37995) requests structured
+  cross-thread answers. Those are related feature requests, not duplicates of this bug.
+
+Targeted issue and PR searches covered elicitation, cancellation, disconnect, stale approval
+and `serverRequest/resolved`. Inspected upstream main
+`a2de8fedcc3abe3cdde09b43515db820fb6b95b5` retains the
+[internal responder-only drop](https://github.com/openai/codex/blob/a2de8fedcc3abe3cdde09b43515db820fb6b95b5/codex-rs/codex-mcp/src/elicitation.rs#L121)
+and [separate frontend wait](https://github.com/openai/codex/blob/a2de8fedcc3abe3cdde09b43515db820fb6b95b5/codex-rs/app-server/src/bespoke_event_handling.rs#L1713).
+No closer report or applicable later fix was found in this bounded search. This is not a
+claim that every build or unmerged change was inspected.
+
+### Repair contract and remaining verification
+
+When an originating elicitation ends, retire its associated frontend registration,
+callback/waiter, approval guard and replay eligibility exactly once. Notify the frontend
+through the normal resolution path. A display-only notification could leave the other
+state behind. Preserve routed identity across reconnects; an old response must not affect
+another request that reused an MCP number.
+
+An upstream repair should test cancellation before/after frontend registration, cancellation
+racing an answer, transport loss, and a newer concurrent request. Also test cancellation
+*during* a model turn followed by turn completion, so the broad fallback cannot hide missing
+per-request cleanup. These are repair acceptance criteria; this project's synthetic test
+does not claim coverage of every race. A frontend reconnect/replay check and native UI
+verification would establish those additional boundaries after a fix is available.
 
 ## Research and assumption review (2026-09-19)
 
@@ -69,7 +157,8 @@ script is [available here](https://github.com/jason21wc/apple-calendar-mcp/blob/
   cancellation, using backend `0.149.0-alpha.4.3` and Streamable HTTP. Its author reports
   matching cancellation IDs and working cancellation in Claude Code. Those are the
   reporter's observations, not measurements of this installation. Our stdio reproduction
-  now differs: the tool result returns promptly, while the form remains editable.
+  now differs: the tool result returns promptly, while frontend resolution remains pending.
+  The editable native form is a separate human observation.
 - **Relevant merged fix:** [PR #44238](https://github.com/openai/codex/pull/44238), merged
   September 9, fixes internal form/URL cancellation and timeout-pause release. Its presence
   in our installed backend was verified earlier. It does not establish desktop cleanup.
@@ -166,15 +255,18 @@ propagate through the separate frontend-request lifetime:
    awaits that frontend receiver before calling the resolver that
    [emits serverRequest/resolved](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/app-server/src/request_processors/thread_lifecycle.rs#L849).
 
+Turn start/completion/interruption and thread teardown can also remove the callback and
+wake its receiver. The source chain above describes missing per-request propagation, not
+the absence of every cleanup path.
+
 The installed frontend handles `serverRequest/resolved` by removing the pending request
 and rendering completed history. The source gap fits the observed result/UI split; a full
 runtime notification trace was not captured, so exact runtime attribution remains an inference.
 
 ## Suggested fix and regression
 
-Propagate internal elicitation cancellation to its associated frontend request, remove the
-pending callback and emit `serverRequest/resolved` without waiting for a human response.
-Test the complete app-server flow: server cancellation → tool result released → frontend
-request resolved → late response cannot revive that request or settle a newer request.
-The existing ordinary-form cancellation regression covers internal route/pause release,
-but does not establish desktop prompt cleanup.
+Use the repair contract in the systemic review above. Resolve the linked request state
+on originating-request termination, with exactly-once handling of cancellation/answer races.
+Test both direct calls and model turns, plus late response isolation. The existing RMCP
+regression establishes internal route/pause release; it does not establish app-server
+status, replay or native prompt cleanup.

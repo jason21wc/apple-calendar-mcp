@@ -12,6 +12,11 @@
 
 ## Active Lessons
 
+**2026-09-20 — A stale form hid split request and turn lifetimes.** Cancellation ended the
+internal request while a frontend callback retained approval status; turn cleanup could mask
+that gap. **Rule:** trace owners and every terminal path, measure retained state as well as
+visible output, and distinguish direct-call tests from ordinary turns before proposing a fix.
+
 **2026-09-19 — A source-supported diagnosis preceded broad duplicate research.** A matching
 upstream issue existed, and best-effort emission did not prove native client receipt.
 **Rule:** search the symptom and related fixes before proposing a report; distinguish source
