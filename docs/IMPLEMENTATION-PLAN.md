@@ -386,8 +386,10 @@ was refused; an attended valid affirmative response and human-observed form subs
 passed. Human-selected unchecked Skip logged decline but returned timeout. Installed host
 source at that checkpoint had an ordinary-form cancellation defect. The September 19 host
 update includes the fix in matching backend source. Attended native decline and timely
-non-response refusal now pass with healthy diagnostics. Human-observed timeout dismissal,
-late-answer isolation and affirmative approval on the updated host remain required.
+non-response refusal now pass with healthy diagnostics. Native UI cleanup fails: the human
+confirms editable expired controls. A separate app-server resolution gap is source-supported;
+see the [draft upstream report](CODEX-ELICITATION-ISSUE.md). Late-answer isolation and
+current-version affirmative approval remain required.
 
 **A capability declaration is not a human.** It says the client claims support. Require
 confirmed human interaction and valid affirmative content, not `.accept` alone. Even a
@@ -704,9 +706,9 @@ a root schema title rejected by Codex before UI dispatch; regression and client-
 checks pass. Installation and full reopen are complete; native unchecked acceptance was
 refused, and attended valid affirmative approval with visible form subsequently passed.
 Unchecked Skip was correctly chosen, logged decline, and returned timeout on the older host.
-After the September 19 host update, attended Skip and timely timeout delivery pass. Next
-obtain the timeout form dismissal observation and verify late-answer isolation and affirmative
-approval on this host version. See [the current evidence](APPROVAL-PROBE-DESIGN.md#updated-host-verification-2026-09-19).
+After the September 19 host update, attended Skip and timely timeout delivery pass, but the
+expired form remains editable. Report/resolve the identified app-server UI cleanup gap before
+repeating native verification. Late-answer isolation and current-version affirmation remain. See [the current evidence](APPROVAL-PROBE-DESIGN.md#updated-host-verification-2026-09-19).
 Synthetic tests do not clear the approval gate.
 
 **Then, and only after §6 Gate 1 is answered:** `calendar_create_event` →

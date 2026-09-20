@@ -12,10 +12,21 @@
   12.5 seconds; desktop response ID 78 logged decline at `2026-09-20T03:32:55.231Z`.
   The following unanswered probe returned `timed_out` in measured 30,040 ms. Native
   diagnostics after each remain `fullAccess` / `disclaimed-child`; no restart was needed.
-- **Human-observed timeout dismissal is pending.** The human has been asked whether the
-  second form disappeared/became inactive without intervention. Do not infer UI dismissal
-  from result delivery. Late-answer isolation and affirmative approval on this updated host
-  remain; acceptance on the earlier host is historical evidence.
+- **Timeout observation retry:** at the human's “Try again” request, the unanswered probe
+  again returned `timed_out` in measured 30,042 ms. Follow-up diagnostics at
+  `2026-09-19T22:42:44-06:00` remain `fullAccess` / `disclaimed-child`. No Calendar data
+  changed. This is additional delivery evidence, not visual dismissal evidence.
+  Governance `gov-69e1df9bba36` (PROCEED); the observation is recorded below.
+- **Human confirms expired controls remained editable:** the checkbox and Continue/Skip
+  buttons remained visible and editable after timeout. This is not merely completed history.
+  The human then reported needing Skip “to get the prompt window”; whether that means the
+  normal chat composer has been asked explicitly. Desktop log records a late decline at
+  `2026-09-20T04:44:00.975Z` (request ID 8), after timeout delivery; diagnostics afterward
+  remain healthy. No new probe was opened. Native UI cleanup is not passing; keep Gate 1 open.
+  Exact tagged source shows internal cancellation removes its response route but the separate
+  app-server frontend task awaits a human response before emitting `serverRequest/resolved`.
+  This fits the observation; no runtime notification trace was captured. The concrete report
+  is `docs/CODEX-ELICITATION-ISSUE.md`, prepared but not submitted.
 - **Previous unseen response clarified:** the human was elsewhere and did not see the form
   that yielded accept/confirm false and `invalid_response`. It establishes refusal of
   non-affirmative content, not a human action. The cause of that host response is unknown.
@@ -177,11 +188,13 @@
 
 ## Next actions, in order
 
-1. **Await the timeout form observation:** did the unanswered second form disappear or
-   become inactive on its own? No further probe until that observation is resolved.
-2. Verify late-answer isolation and affirmative approval on the updated host; prior host
-   acceptance is not a measurement of this version. Keep the remaining Gate 1 conditions
-   explicit. Repeat approval verification per client before enabling writes there.
+1. **Review/submit the prepared host bug report with explicit human authorization.**
+   `docs/CODEX-ELICITATION-ISSUE.md` records the reproduction and exact tagged-source gap.
+   No issue has been submitted. Do not repeat identical probes or alter server deadlines.
+   The report's source diagnosis is distinct from a captured runtime notification trace.
+2. After the cleanup gap is resolved or a relevant host change is verified, retest UI
+   cleanup, late-answer isolation and affirmative approval on that version. Submitting a
+   report alone is not a reason to repeat a probe. Verify each client before enabling writes.
 3. Before any mutating caller, connect acknowledged journal storage and define outcome-error
    reconciliation. Do not retry a future write merely because recording its outcome failed.
    Implement the typed snapshot/field matrix and disposable-calendar round trip before delete.
@@ -343,3 +356,25 @@ Attended retry: `gov-e29bbd5a7e46`; unanswered test/documentation: `gov-ce39be94
 `meta-quality-verification-validation`: distinguish human observation, response semantics,
 actual elapsed delivery and post-test connection health. Previous checkpoint `633ca42`
 passed full CI: https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35486423266.
+
+Retained-form observation: `gov-7c328a9b3bff` (REVIEW, no required modifications); retrieved
+financial-retention guidance is unrelated and was not applied. Preserve the distinction
+between server expiry, visible form retention and control interactivity.
+Installed frontend source distinguishes pending forms from completed history: handling
+`serverRequest/resolved` removes the pending request and creates `completed: true`,
+`action: null` history; its completed renderer shows “Completed request” / “Completed”
+without the editable panel. Thus a retained completed card is compatible with cleanup.
+That source inspection alone did not establish the observed form's state; the subsequent
+human report confirmed that controls remained editable.
+
+Editable-form investigation: `gov-5357021b6488` (PROCEED). The Calendar SDK removes the
+pending request before returning timeout and sends standard `notifications/cancelled`.
+`MCPRequestLifecycleTests.silenceAndLateResponses` exercises old/duplicate acceptance
+against a newer different-ID attempt; that synthetic guarantee does not prove host UI cleanup.
+User evidence supersedes the earlier unknown control-state note.
+
+Cleanup-gap report/documentation: `gov-3220758c2378` (REVIEW, no required modifications).
+`uiux-interaction-ix4-error-handling-and-recovery`: classify retained editable controls as
+a host recovery defect, preserve safe server refusal, and give a concrete upstream repair
+target. Issue submission requires explicit user authorization. Previous documentation
+checkpoint `0b7bee3` passed full CI: https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35487012696.

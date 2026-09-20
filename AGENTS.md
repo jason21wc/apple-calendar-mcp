@@ -18,9 +18,9 @@ A subprocess test measures its supplied MCP capabilities, not the enclosing app'
 > **The write surface remains blocked on approval lifecycle verification.** Installed
 > `0.2.3` demonstrated valid affirmative approval in Codex with human-confirmed form visibility.
 > After the September 19 host update, attended Skip returns decline and an unanswered form
-> returns timeout in 30 seconds; subsequent diagnostics remain healthy. Human-observed form
-> dismissal, late-answer isolation and affirmative approval on the updated host remain open.
-> Finish those observations before write implementation; no server reinstall or restart is needed
+> returns timeout in 30 seconds; diagnostics remain healthy. **Expired form controls remain
+> editable:** a separate app-server UI cleanup gap is source-supported and an upstream report
+> is drafted, not submitted. Keep Gate 1 open; do not repeat identical probes or reinstall
 > (plan §6 Gate 1; `docs/APPROVAL-PROBE-DESIGN.md`).
 > The permission model itself is decided — reads
 > silent, every write confirmed, refuse only what EventKit cannot express (plan §4a).

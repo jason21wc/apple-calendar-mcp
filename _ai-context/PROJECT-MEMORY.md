@@ -79,8 +79,12 @@ cancellation fix and regression coverage. Native diagnostics remain healthy. A r
 returns `declined`; the following unanswered request returns `timed_out` in measured
 30.040 seconds with healthy diagnostics afterward. The human did not see the earlier
 `invalid_response` form, so its host acceptance is not evidence of human action. Await
-human-observed timeout dismissal and late-answer isolation; confirm affirmative approval
-on this version before closing the gate. Details and
+late-answer isolation and current-version affirmative approval. Timeout UI cleanup has now
+failed: the human confirms editable expired controls and reports using Skip. Exact tagged
+source leaves a separate frontend-response task pending after internal cancellation; it
+emits resolution only after the frontend responds. This fits the observation without a full
+runtime notification trace. A local upstream report is prepared, not submitted; do not repeat
+identical probes or change server restart behavior to mask the host defect. Details and
 source links live in `docs/APPROVAL-PROBE-DESIGN.md`; no server reinstall is indicated.
 
 **2026-09-16 — Native form response and non-response refusal measured after refresh.**

@@ -3,8 +3,9 @@
 Status: installed `0.2.3` has demonstrated valid affirmative approval on the previous Codex
 host, and timely native decline plus non-response refusal on the September 19 updated host.
 The unanswered result returned in 30.040 seconds with healthy follow-up diagnostics.
-Human-observed timeout form dismissal and late-answer isolation remain open; affirmative
-approval also needs confirmation on this host version. No Calendar content changed and no
+Native UI cleanup has failed: the human confirms the expired form retained editable controls.
+The backend-to-frontend resolution gap is documented below. Late-answer isolation and
+current-version affirmative approval remain open. No Calendar content changed and no
 write tool exists. See the current evidence
 below and [implementation plan §6](IMPLEMENTATION-PLAN.md#6-the-write-surface--redesigned-2026-08-20).
 
@@ -39,12 +40,28 @@ Follow-up native diagnostics succeeded. The immediately following unanswered pro
 `timed_out` with measured tool-call elapsed time **30,040 ms**, and another native diagnostic
 succeeded. This establishes timely refusal/result delivery on the updated host without a
 restart. No additional form response appeared in the inspected desktop log for that timeout.
-Human confirmation that the second form disappeared or became inactive without intervention
-has been requested and is pending; tool completion alone does not prove visual dismissal.
+A repeated unanswered test returned in 30,042 ms. The human confirmed that its checkbox
+and Continue/Skip controls remained editable, then reported using Skip. A late decline
+was logged at `2026-09-20T04:44:00.975Z`; subsequent diagnostics stayed healthy. This is a
+failed UI-cleanup observation, not merely a retained completed transcript card.
 Late-answer isolation remains distinct. Affirmative human approval was proved on the prior
 host version, so verify it on the updated host before closing Gate 1. No Calendar content
 changed; no update, reinstall or restart is indicated. Stay in the conversation during an
 attended test: the server's 30-second request deadline does not pause when the user leaves.
+
+### Remaining app-server cleanup gap
+
+Exact tagged source separates internal cancellation from frontend request resolution.
+Dropping the internal elicitation removes its responder and releases tool delivery, but
+the separately spawned app-server handler still waits for a frontend response before emitting
+`serverRequest/resolved`. The installed frontend would remove pending controls on that
+notification. This source gap fits the observed retained form; no runtime notification trace
+was captured. See the [reviewable upstream report](CODEX-ELICITATION-ISSUE.md) for the source
+chain, reproduction and evidence boundaries. The report has not been submitted.
+
+Do not repeat identical timeout probes or change server deadlines/restart behavior to mask
+this host defect. Keep Gate 1 open. Normal reads remain available. Any alternative approval
+mechanism would require its own verified contract; no bypass is selected here.
 
 ## Native Skip and timeout investigation (2026-09-16)
 

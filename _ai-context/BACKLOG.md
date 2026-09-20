@@ -32,8 +32,11 @@
   timeout on the older host. The September 19 installed desktop/backend update includes
   the cancellation fix in matching source. Attended retry now returns `declined`; unanswered
   probing returns `timed_out` in measured 30.040 seconds; follow-up diagnostics stay healthy.
-  Await human-observed timeout dismissal, check late-answer isolation and affirmative approval
-  on this host version. No updater check, reinstall or restart is indicated.
+  **UI cleanup failed:** the human confirms editable expired controls and later used Skip.
+  Exact backend source has a separate frontend-resolution gap. A report is drafted in
+  `docs/CODEX-ELICITATION-ISSUE.md`; obtain approval before submitting it externally.
+  No identical timeout retry, updater check, reinstall or restart is indicated. Late-answer
+  isolation and current-version affirmative approval remain open.
   #24a capability discovery is complete in Codex. Cowork visibility is user-confirmed;
   Claude Code registration is reported, native CLI behavior remains unmeasured.
   Repeat approval verification before enabling writes in each client. No synthetic result,
