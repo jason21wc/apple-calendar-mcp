@@ -7,7 +7,7 @@
 
 ## Where things stand
 
-- **Systemic review completed; qualified upstream follow-up is ready, not submitted.**
+- **Systemic review completed; [upstream follow-up posted](https://github.com/openai/codex/issues/40390#issuecomment-5753315747).**
   Existing issue [#40390](https://github.com/openai/codex/issues/40390) remains the closest
   report. The isolated direct-call fixture now reproduces missing frontend resolution
   **and** stale `waitingOnApproval` for ten seconds after acknowledged server cancellation
@@ -19,10 +19,14 @@
   model turn and does not prove an indefinite normal-chat hang. Replay/idle eviction effects
   are source-supported, unmeasured. Current-main source still has the gap at inspected
   `a2de8fedcc3abe3cdde09b43515db820fb6b95b5`. See `docs/CODEX-ELICITATION-ISSUE.md` for
-  research, results, limits and the proposed comment. `--extended` runs the new scenarios.
+  research, results, limits and the submitted comment. `--extended` runs the new scenarios.
   No production code, installed binary, live configuration or Calendar data changed.
-  **Next action:** human decision on submitting the qualified comment to #40390. No further
-  identical native probe, restart or deadline change is justified. Gate 1 remains open.
+  User authorized posting on September 20; the exact posted body was verified by readback.
+  **Next recommendation:** a focused upstream Codex repair and regression, a separate
+  cross-repository contribution not yet authorized. After a relevant fix reaches the host,
+  verify native cleanup, late-answer isolation and current-version affirmative approval.
+  No monitor is scheduled. No identical native probe, restart or deadline change is justified.
+  Gate 1 remains open; write code waits for it under plan §6/§15.
 
 - **Updated-host decline and timeout delivery now pass.** ChatGPT `26.915.31945` bundles
   Codex `0.155.0-alpha.9.2`. At the human's request, attended retry returned `declined` in
@@ -43,7 +47,7 @@
   Exact tagged source shows internal cancellation removes its response route but the separate
   app-server frontend task awaits a human response before emitting `serverRequest/resolved`.
   This fits the observation; no runtime notification trace was captured. The concrete report
-  is `docs/CODEX-ELICITATION-ISSUE.md`, prepared but not submitted.
+  is `docs/CODEX-ELICITATION-ISSUE.md`; its qualified follow-up is now posted (link above).
 - **Previous unseen response clarified:** the human was elsewhere and did not see the form
   that yielded accept/confirm false and `invalid_response`. It establishes refusal of
   non-affirmative content, not a human action. The cause of that host response is unknown.
@@ -163,13 +167,16 @@
 
 ## Validation
 
+- Journal checkpoint `4d8ed0342cda4d179414bed46cf10d57` was analyzed and its missing CI
+  checkpoint applied. Main-agent receipt returned `accepted: false, state_unavailable`;
+  the memory update is applied, but hook acknowledgment is not established.
+
 - September 20 systemic review: extended synthetic scenarios pass their controls and
   reproduce the cleanup gap described above. Local Swift suite passes with the established
   `ServerLifecycleTests` sandbox exclusion. Independent review of the final diff found no
   blocking correctness or privacy issue; shell syntax, Python parsing and diff checks pass.
-  The preceding reproduction checkpoint
-  `f591a4b` passed full macOS CI:
-  https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35493565346.
+  Systemic review checkpoint `fb93e9d6e4785895176de2ff5bef8e3d56d1a89a` is published and
+  passed full macOS CI: https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35525806556.
 
 - September 20 boundary check and updated Swift suite pass locally, using the established
   `ServerLifecycleTests` desktop sandbox exclusion. Review tightened ID/thread correlation,
@@ -233,10 +240,10 @@
 
 ## Next actions, in order
 
-1. **Review the verified follow-up for existing issue #40390; obtain authorization to post.**
-   `docs/CODEX-ELICITATION-ISSUE.md` includes the automated reproduction, positive control,
-   exact source and remaining evidence limits. Backend cancellation processing is now
-   observed in isolation. Do not repeat identical human probes or alter server deadlines.
+1. **The #40390 follow-up is posted and verified; do not post it again.** Next recommended
+   work is a focused upstream Codex repair and regression, separately scoped from this
+   posting authorization. The report contains its cleanup contract and evidence limits.
+   Do not repeat identical human probes or alter server deadlines while the gap remains.
 2. After the cleanup gap is resolved or a relevant host change is verified, retest UI
    cleanup, late-answer isolation and affirmative approval on that version. Submitting a
    report alone is not a reason to repeat a probe. Verify each client before enabling writes.

@@ -20,7 +20,8 @@ A subprocess test measures its supplied MCP capabilities, not the enclosing app'
 > After the September 19 host update, attended Skip returns decline and an unanswered form
 > returns timeout in 30 seconds; diagnostics remain healthy. **Expired form controls remain
 > editable:** a separate app-server UI cleanup gap is source-supported and an upstream report
-> is drafted, not submitted. Keep Gate 1 open; do not repeat identical probes or reinstall
+> is posted on openai/codex #40390 (link in the report). Keep Gate 1 open; do not repeat
+> identical probes or reinstall
 > (plan §6 Gate 1; `docs/APPROVAL-PROBE-DESIGN.md`).
 > The permission model itself is decided — reads
 > silent, every write confirmed, refuse only what EventKit cannot express (plan §4a).

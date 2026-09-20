@@ -58,7 +58,7 @@ the separately spawned app-server handler still waits for a frontend response be
 notification. This source gap fits the observed retained form; no runtime notification trace
 was captured. See the [reviewable upstream report](CODEX-ELICITATION-ISSUE.md) for the source
 chain, reproduction and evidence boundaries. Research found existing upstream issue #40390;
-the draft is now a potential follow-up, not a new issue. A healthy synthetic connection
+the reviewed follow-up is now posted there (link in the report). A healthy synthetic connection
 verified the installed server emits the matching cancellation; native receipt remains
 untraced, so exact incident attribution is still an inference. September 20's isolated
 app-server test independently confirms client cancellation processing and reproduces
@@ -67,7 +67,8 @@ cancellation and MCP disconnect; answered controls return to idle. Turn transiti
 clear callbacks as a fallback, so this outside-turn fixture does not prove an indefinite
 normal-chat hang. Its late old acceptance did not settle a newer form in the bounded check.
 It uses no Calendar server or native renderer and does not exercise code-mode pause release.
-The normal Swift suite now asserts cancellation envelope/ID/type. Nothing has been submitted.
+The normal Swift suite now asserts cancellation envelope/ID/type. The user authorized the
+September 20 submission; its exact body was verified after posting.
 
 Do not repeat identical timeout probes or change server deadlines/restart behavior to mask
 this host defect. Keep Gate 1 open. Normal reads remain available. Any alternative approval

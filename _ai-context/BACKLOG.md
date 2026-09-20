@@ -33,9 +33,9 @@
   the cancellation fix in matching source. Attended retry now returns `declined`; unanswered
   probing returns `timed_out` in measured 30.040 seconds; follow-up diagnostics stay healthy.
   **UI cleanup failed:** the human confirms editable expired controls and later used Skip.
-  Exact backend source has a separate frontend-resolution gap. A report is drafted in
-  `docs/CODEX-ELICITATION-ISSUE.md`. Research found existing upstream issue #40390; prefer
-  a qualified follow-up with approval, not a duplicate. Healthy synthetic stdio verifies
+  Exact backend source has a separate frontend-resolution gap. The reviewed follow-up is
+  posted on #40390; `docs/CODEX-ELICITATION-ISSUE.md` records the comment link and exact text.
+  Healthy synthetic stdio verifies
   matching cancellation emission. The September 20 automated app-server boundary test
   now proves client cancellation processing and reproduces missing frontend resolution
   during a bounded observation; its answered control passes. Prior native receipt remains
@@ -43,7 +43,8 @@
   The systemic extension also measures stale waiting-on-approval state after cancellation
   and disconnect, with bounded late-answer isolation. Turn cleanup is a source-confirmed
   fallback; the direct-call fixture does not establish normal-turn duration. See the report
-  for the complete cleanup contract. Review the qualified follow-up before another human trial.
+  for the complete cleanup contract. Next recommended scope is a focused upstream repair;
+  repeat native verification after a relevant fix reaches the host, not an unchanged trial.
   No identical timeout retry, updater check, reinstall or restart is indicated. Native late-answer
   isolation and current-version affirmative approval remain open.
   #24a capability discovery is complete in Codex. Cowork visibility is user-confirmed;

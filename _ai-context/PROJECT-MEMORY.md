@@ -22,6 +22,13 @@
 
 ## Cancellation diagnosis review (2026-09-19)
 
+**September 20 submission:** the human authorized posting the reviewed follow-up to
+[#40390](https://github.com/openai/codex/issues/40390#issuecomment-5753315747); the exact published body was verified by readback. This supersedes
+historical "not submitted" and authorization-pending statements below. Gate 1 remains open.
+The next recommendation is an upstream fix and regression; that cross-repository work is
+separate scope, not authorized merely by permission to post. Governance `gov-ff81344cf9f2`
+(PROCEED); `mrag-verification-v3-source-fidelity` informed exact-body verification.
+
 **September 20 systemic review supersedes the narrower account below.** Synthetic direct
 calls now show stale `waitingOnApproval` as well as absent frontend resolution for ten
 seconds after acknowledged server cancellation **and** MCP transport loss. Answered

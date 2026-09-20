@@ -388,7 +388,7 @@ source at that checkpoint had an ordinary-form cancellation defect. The Septembe
 update includes the fix in matching backend source. Attended native decline and timely
 non-response refusal now pass with healthy diagnostics. Native UI cleanup fails: the human
 confirms editable expired controls. A separate app-server resolution gap is source-supported;
-see the [draft upstream report](CODEX-ELICITATION-ISSUE.md). Late-answer isolation and
+see the [submitted upstream report](CODEX-ELICITATION-ISSUE.md). Late-answer isolation and
 current-version affirmative approval remain required.
 
 **A capability declaration is not a human.** It says the client claims support. Require

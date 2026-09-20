@@ -1,8 +1,8 @@
-# Research and draft follow-up: MCP elicitation request cleanup
+# Research and submitted follow-up: MCP elicitation request cleanup
 
-Status: **not submitted** to OpenAI or GitHub. Research found an existing matching symptom
-report, [openai/codex #40390](https://github.com/openai/codex/issues/40390). Prefer a qualified
-follow-up there, with human authorization, over creating a duplicate issue.
+Status: **submitted September 20, 2026**, with explicit human authorization, as a
+[comment on openai/codex #40390](https://github.com/openai/codex/issues/40390#issuecomment-5753315747). The posted body was read back and verified against
+the reviewed text below. No duplicate issue was created.
 
 ## Automated backend reproduction (2026-09-20)
 
@@ -44,7 +44,7 @@ to distinguish a reproduced gap from timely cleanup. The script is opt-in, not n
 Our normal Swift suite now also checks cancellation envelope version, absent notification ID,
 and exact originating request ID/type on timeout. No installed server rebuild is needed.
 
-### Proposed comment on existing issue #40390 (not posted)
+### Submitted comment on existing issue #40390
 
 Related remaining cleanup failure on Codex `0.155.0-alpha.9.2`, bundled in ChatGPT desktop
 `26.915.31945`. This build includes #44238. Unlike the original report, the synthetic tool
@@ -79,8 +79,8 @@ The native renderer, model/code-mode path and reconnect replay are not tested he
 
 ## Systemic review (2026-09-20)
 
-**Recommendation:** add a qualified follow-up to #40390, with the reproduction and the
-request-lifetime finding. The report should ask for complete per-request cleanup, not merely
+**Recommendation, now submitted:** provide #40390 with the reproduction and the
+request-lifetime finding. The report asks for complete per-request cleanup, not merely
 hiding a form. Do not change this Calendar server's restart behavior or approval deadline.
 
 The source exposes two lifetimes for one elicitation. MCP cancellation ends the internal
