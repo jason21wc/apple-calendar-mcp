@@ -24,10 +24,17 @@ fix `3436cad5abbe9199c061880421b16d96a9ba702b` by ancestry. Specifically:
   still waits for pending elicitations to clear, so native cleanup must still be measured.
 
 Native permission diagnostics remain healthy (`fullAccess`, `disclaimed-child`, form support
-declared). This is a verified relevant host change, not proof of live UI behavior. No new
-probe has run yet. Next: with the human ready, test **Skip with the checkbox unchecked**,
-then separately measure unattended timeout dismissal and late-answer isolation. Keep Gate 1
-open until those observations pass. No further update check or server reinstall is indicated.
+declared). This is a verified relevant host change, not proof of live UI behavior.
+
+After the human said ready, the September 19 attended probe returned `invalid_response`.
+The desktop response at `2026-09-20T03:20:01.873Z` was `action: accept` with `confirm: false`;
+the server correctly refused it. Follow-up permission diagnostics stayed healthy. The
+updated installed UI still maps Skip directly to decline without checkbox validation;
+Continue submits accept. Source and logs do not establish which control the human used.
+Their button observation has been requested and is pending. Do not count this attempt as
+native Skip verification or run another form before resolving that observation. No Calendar
+content changed. Gate 1 remains open for native decline/cancel delivery, unattended timeout
+dismissal and late-answer isolation. No further update check or server reinstall is indicated.
 
 ## Native Skip and timeout investigation (2026-09-16)
 

@@ -10,8 +10,10 @@
 - **September 19 host update verified:** installed ChatGPT `26.915.31945` bundles Codex
   `0.155.0-alpha.9.2`; the human reports the updater says current. Exact tagged source includes
   the ordinary-form cancellation fix. Native permission diagnostics remain healthy with
-  `fullAccess` / `disclaimed-child`. No new approval probe has run yet. Wait for human readiness
-  for a targeted unchecked Skip test, then measure unattended timeout and late-answer isolation.
+  `fullAccess` / `disclaimed-child`. An attended probe after the human said ready returned
+  `invalid_response`: desktop log shows accept with `confirm: false`. The updated UI source
+  still maps Skip directly to decline. Human button observation is pending; do not infer it
+  from the response or repeat the test yet. Follow-up diagnostics stayed healthy.
   Do not request another update check or Calendar-server reinstall.
 
 - **Affirmative form verified; unchecked Skip correctly chosen but returned timeout.**
@@ -128,6 +130,10 @@
 
 ## Validation
 
+- September 19 documentation checkpoint `5c81a39` passed full macOS CI (build, shell checks
+  and test suite): https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35484093529.
+  This does not establish native refusal delivery or prompt cleanup.
+
 - September 16 Skip investigation changes documentation only. Local suite passes with the
   established `ServerLifecycleTests` sandbox exclusion; shell syntax, diff whitespace and
   public-repository privacy review pass. No executable, host setting or Calendar data changed.
@@ -166,9 +172,10 @@
 
 ## Next actions, in order
 
-1. **With the human ready, run a targeted unchecked Skip test on the updated host.**
-   The relevant cancellation fix is verified in matching backend source. The user has been
-   asked for readiness because the probe expires after 30 seconds; no new probe has run yet.
+1. **Await the human's description of the latest form action (Skip or Continue).** The
+   attended result was `invalid_response`, with host acceptance of unchecked content.
+   This proves refusal of non-affirmative content, not deliberate native Skip delivery.
+   Do not repeat a probe or prescribe another refresh before resolving the observation.
 2. Measure unattended prompt dismissal and late-answer isolation after native refusal
    delivery. Acceptance and human visibility already passed on the previous host.
    Repeat approval verification per client before enabling writes there.
@@ -318,3 +325,12 @@ and live refusal/cleanup evidence separate. Local suite passes with the establis
 sandbox exclusion; no production code changed. Context index was stale; current files were
 read directly for authoritative state. Prior documentation CI passed on `34237de`:
 https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35184482219.
+
+Updated-host attended test: `gov-23de0608c39d` (PROCEED); memory/journal closeout:
+`gov-01b8c1e97eab` (REVIEW). `coding-context-session-state-continuity`: preserve observed
+protocol outcome separately from pending human button observation; no Calendar writes.
+Journal checkpoint `1298d79dbc7a48db9890141c648051a5` analysis completed; accepted proposals
+record the preceding CI result and the lesson to name the affected application explicitly.
+No Reference Library proposal was made.
+The main-agent `applied` journal receipt returned `accepted: false, reason: state_unavailable`;
+the checkpoint was analyzed and proposals applied, but acknowledgement remains unavailable.

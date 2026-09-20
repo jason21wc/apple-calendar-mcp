@@ -12,6 +12,11 @@
 
 ## Active Lessons
 
+**2026-09-19 — An unnamed app update pointed the human toward the wrong component.**
+“Open the app menu” was understood as Apple Calendar/macOS while the defect concerned ChatGPT.
+**Rule:** name the affected application and verified menu location; distinguish checking
+update availability from knowing an available release contains the fix.
+
 **2026-09-15 — SDK acceptance did not imply client-schema acceptance.** The Swift SDK
 encoded a root form title that Codex's typed boundary rejects, producing cancellation before
 UI. **Rule:** validate encoded elicitation requests against the actual consumer schema;
