@@ -72,6 +72,14 @@ plan §5 for timeout and cancellation behavior.
 
 ## Key Decisions
 
+**2026-09-19 — Updated host contains the identified cancellation fix in matching source.**
+Installed ChatGPT `26.915.31945` bundles Codex `0.155.0-alpha.9.2`; the human reports the
+updater considers it current. Exact tagged source includes the upstream ordinary-form
+cancellation fix and regression coverage. Native diagnostics remain healthy. This clears
+source availability uncertainty, not the live refusal/cleanup gate. Next measure attended
+unchecked Skip, then unattended timeout dismissal and late-answer isolation. Details and
+source links live in `docs/APPROVAL-PROBE-DESIGN.md`; no server reinstall is indicated.
+
 **2026-09-16 — Native form response and non-response refusal measured after refresh.**
 The human confirmed full quit/reopen with installed `0.2.3`. Codex's desktop response log
 records `accept` with `confirm: false`; the server correctly returned `invalid_response`.

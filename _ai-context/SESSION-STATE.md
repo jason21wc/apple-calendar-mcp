@@ -1,11 +1,18 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # Session State
 
-**Last Updated:** 2026-09-16
+**Last Updated:** 2026-09-19
 **Memory Type:** Working (transient)
 **Lifecycle:** Current position only; decisions and history live in the other memory files.
 
 ## Where things stand
+
+- **September 19 host update verified:** installed ChatGPT `26.915.31945` bundles Codex
+  `0.155.0-alpha.9.2`; the human reports the updater says current. Exact tagged source includes
+  the ordinary-form cancellation fix. Native permission diagnostics remain healthy with
+  `fullAccess` / `disclaimed-child`. No new approval probe has run yet. Wait for human readiness
+  for a targeted unchecked Skip test, then measure unattended timeout and late-answer isolation.
+  Do not request another update check or Calendar-server reinstall.
 
 - **Affirmative form verified; unchecked Skip correctly chosen but returned timeout.**
   The human saw the successful form, then explicitly chose Skip without checking the request.
@@ -15,15 +22,14 @@
   Calendar grant, or blind restart is needed. Acceptance with `confirm: false` was correctly
   refused; attended `confirm: true` passed and visibility was human-confirmed.
 - **Host cancellation defect identified; runtime explanation remains an inference.**
-  Desktop `26.908.70816` / backend `0.154.0-alpha.6.2` excludes ordinary forms from
+  The earlier desktop `26.908.70816` / backend `0.154.0-alpha.6.2` excludes ordinary forms from
   cancellation handling and waits for pending forms before delivering code-mode results.
   Explicit Skip's transcript spans over 15 minutes despite a reported 30-second duration;
   decline and timeout-result delivery are 1 ms apart. This fits a held timeout result,
   but exact wire/physical-click timing was not captured. Post-dismissal diagnostics prove
   connection health, not unattended cleanup. See `docs/APPROVAL-PROBE-DESIGN.md`.
-- **Gate 1 stays open.** OpenAI has an upstream cancellation fix; availability in a desktop
-  update is unverified. Check the supported updater, then inspect its bundled backend before
-  another targeted test. No new probe was run during this investigation.
+- **Gate 1 stays open.** The updated backend source now includes the fix. Actual native
+  refusal delivery, unattended dismissal and late-answer isolation remain unmeasured on it.
 
 - Implementation `fd1292b` passed full macOS CI, including lifecycle tests:
   https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35058103638.
@@ -160,11 +166,11 @@
 
 ## Next actions, in order
 
-1. **Check desktop update availability (Menu → Check for Updates).** Verify the offered or
-   installed backend includes the identified cancellation fix; version numbering alone is
-   insufficient. The current user action is fully understood; do not ask them to repeat it.
-2. Once a relevant host change is verified, measure refusal delivery, unattended prompt
-   dismissal and late-answer isolation. Acceptance and human visibility already passed.
+1. **With the human ready, run a targeted unchecked Skip test on the updated host.**
+   The relevant cancellation fix is verified in matching backend source. The user has been
+   asked for readiness because the probe expires after 30 seconds; no new probe has run yet.
+2. Measure unattended prompt dismissal and late-answer isolation after native refusal
+   delivery. Acceptance and human visibility already passed on the previous host.
    Repeat approval verification per client before enabling writes there.
 3. Before any mutating caller, connect acknowledged journal storage and define outcome-error
    reconciliation. Do not retry a future write merely because recording its outcome failed.
@@ -304,3 +310,11 @@ and correct earlier claims of complete timeout cleanup. No server or app configu
 Documentation publication: `gov-4039591994b3` (REVIEW, no required modifications).
 `meta-core-single-source-of-truth`: canonical probe evidence owns the investigation;
 plan and memory summaries point to it without claiming the host update is available.
+
+Updated-host verification: `gov-d29d206e4859`; documentation checkpoint: `gov-8743b6e2ecdd`
+(REVIEW, no required modifications). `coding-process-validation-gates` and
+`coding-context-session-state-continuity`: keep source inclusion, native connection health,
+and live refusal/cleanup evidence separate. Local suite passes with the established lifecycle
+sandbox exclusion; no production code changed. Context index was stale; current files were
+read directly for authoritative state. Prior documentation CI passed on `34237de`:
+https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35184482219.

@@ -384,7 +384,8 @@ read succeeded. The `0.2.3` candidate removes the root schema title that Codex r
 before UI dispatch and is now installed. After full reopen, acceptance with `confirm: false`
 was refused; an attended valid affirmative response and human-observed form subsequently
 passed. Human-selected unchecked Skip logged decline but returned timeout. Installed host
-source has an ordinary-form cancellation defect; update availability is unverified. Refusal
+source at that checkpoint had an ordinary-form cancellation defect. The September 19 host
+update includes the fix in matching backend source; native retesting remains. Refusal
 delivery, unattended UI cleanup and late-answer isolation remain required.
 
 **A capability declaration is not a human.** It says the client claims support. Require
@@ -701,9 +702,9 @@ The earlier `0.2.2` native test returned cancellation without UI. The correction
 a root schema title rejected by Codex before UI dispatch; regression and client-schema
 checks pass. Installation and full reopen are complete; native unchecked acceptance was
 refused, and attended valid affirmative approval with visible form subsequently passed.
-Unchecked Skip was correctly chosen, logged decline, and returned timeout. Verify whether
-an available desktop update includes the identified host cancellation fix before another
-refusal/UI cleanup test. See [the current evidence](APPROVAL-PROBE-DESIGN.md#native-skip-and-timeout-investigation-2026-09-16).
+Unchecked Skip was correctly chosen, logged decline, and returned timeout on the older host.
+The September 19 installed host update includes the fix in matching source. Next measure
+attended unchecked Skip and unattended timeout/UI cleanup on that updated host. See [the current evidence](APPROVAL-PROBE-DESIGN.md#updated-host-verification-2026-09-19).
 Synthetic tests do not clear the approval gate.
 
 **Then, and only after §6 Gate 1 is answered:** `calendar_create_event` →

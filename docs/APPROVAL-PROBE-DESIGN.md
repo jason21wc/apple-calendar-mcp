@@ -7,6 +7,28 @@ chose **Skip without checking the request**; Codex logged `decline`, but the pro
 isolation. No Calendar content changed and no write tool exists. See the current evidence
 below and [implementation plan §6](IMPLEMENTATION-PLAN.md#6-the-write-surface--redesigned-2026-08-20).
 
+## Updated host verification (2026-09-19)
+
+The human reports the ChatGPT updater says `26.915.31945` is the newest available version.
+The installed bundle matches that version and its Codex backend reports `0.155.0-alpha.9.2`.
+The [matching source tag](https://github.com/openai/codex/tree/rust-v0.155.0-alpha.9.2)
+resolves to `4607249e430dac1c961df4dc615beae88e33cec8` and includes upstream cancellation
+fix `3436cad5abbe9199c061880421b16d96a9ba702b` by ancestry. Specifically:
+
+- [Cancellation registration and both wait branches](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/rmcp-client/src/elicitation_client_service.rs#L145)
+  now apply to ordinary forms; notification handling no longer requires user-verification support.
+- [Regression coverage](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/rmcp-client/src/user_verification_cancellation_tests.rs#L155)
+  checks ordinary form/URL cancellation and release of pending responses and timeout pauses.
+  This upstream test was inspected, not executed locally.
+- [Code-mode delivery](https://github.com/openai/codex/blob/rust-v0.155.0-alpha.9.2/codex-rs/core/src/tools/code_mode/execute_handler.rs#L145)
+  still waits for pending elicitations to clear, so native cleanup must still be measured.
+
+Native permission diagnostics remain healthy (`fullAccess`, `disclaimed-child`, form support
+declared). This is a verified relevant host change, not proof of live UI behavior. No new
+probe has run yet. Next: with the human ready, test **Skip with the checkbox unchecked**,
+then separately measure unattended timeout dismissal and late-answer isolation. Keep Gate 1
+open until those observations pass. No further update check or server reinstall is indicated.
+
 ## Native Skip and timeout investigation (2026-09-16)
 
 Observed on desktop `26.908.70816`, bundled Codex backend `0.154.0-alpha.6.2`:
@@ -37,9 +59,8 @@ request. This fits the logs and source; exact on-wire ordering remains unmeasure
 
 OpenAI's [upstream cancellation fix](https://github.com/openai/codex/commit/3436cad5abbe9199c061880421b16d96a9ba702b)
 removes these guards and adds ordinary-form cancellation regression coverage. Its presence
-in an available desktop release is **not verified**; do not infer inclusion from a version
-number alone. Next check the supported desktop updater (**Menu → Check for Updates**),
-then verify the offered/installed backend before another targeted test. The
+in a desktop release was unverified at that checkpoint; the September 19 source verification
+above now supersedes that uncertainty. The
 [official update instructions](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex)
 establish the update control, not fix availability. No Calendar-server reinstall, deadline
 extension, checkbox weakening, or server restart loop is indicated by these findings.

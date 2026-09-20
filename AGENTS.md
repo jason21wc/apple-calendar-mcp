@@ -18,8 +18,8 @@ A subprocess test measures its supplied MCP capabilities, not the enclosing app'
 > **The write surface remains blocked on approval lifecycle verification.** Installed
 > `0.2.3` demonstrated valid affirmative approval in Codex with human-confirmed form visibility.
 > Unchecked Skip was correctly chosen and logged as decline, but returned a timeout.
-> The installed host has an ordinary-form cancellation defect; an upstream fix exists,
-> but its desktop availability is unverified. Resolve refusal delivery and timeout/UI cleanup
+> The September 19 host update includes the matching cancellation fix in its tagged backend
+> source; native behavior still needs retesting. Resolve refusal delivery and timeout/UI cleanup
 > before write implementation; do not repeat server installation or blind restarts
 > (plan §6 Gate 1; `docs/APPROVAL-PROBE-DESIGN.md`).
 > The permission model itself is decided — reads

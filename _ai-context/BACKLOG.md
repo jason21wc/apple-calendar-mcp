@@ -29,8 +29,9 @@
   verified. Native acceptance with `confirm: false` returned `invalid_response`; another
   probe timed out and following diagnostics succeeded. Attended affirmative approval and form
   visibility subsequently passed. Human-selected unchecked Skip logged decline but returned
-  timeout; installed Codex source has a matching cancellation defect. Check desktop update
-  availability and verify the bundled fix before repeating refusal/UI cleanup tests.
+  timeout on the older host. The September 19 installed desktop/backend update includes
+  the cancellation fix in matching source. Next run an attended Skip test, then verify
+  unattended timeout/UI cleanup; do not request another updater check.
   Observe prompt dismissal and late-answer isolation; local cleanup does not prove UI cleanup.
   #24a capability discovery is complete in Codex. Cowork visibility is user-confirmed;
   Claude Code registration is reported, native CLI behavior remains unmeasured.
