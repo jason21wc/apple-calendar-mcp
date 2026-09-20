@@ -7,6 +7,18 @@
 
 ## Where things stand
 
+- **Research correction:** an existing open report, [openai/codex #40390](https://github.com/openai/codex/issues/40390),
+  already describes canceled MCP forms remaining open. Prefer a qualified follow-up, not
+  a duplicate issue. PR #44238 addresses internal cancellation; current upstream source
+  `5c5308fc9a9ee789049d646ef11e5400384b9c6f` retains the separate frontend-response wait.
+  An independent assumption review and a fresh installed-binary synthetic check confirm
+  the server emits cancellation with the matching string ID on a healthy connection
+  (30,023 ms, timeout result, subsequent ping, clean EOF). Native cancellation receipt was
+  not captured: best-effort sending can fail, and frontend/MCP IDs differ. The source gap
+  remains the leading explanation, not a fully traced incident cause. Detailed research
+  and a proposed automated boundary test are in `docs/CODEX-ELICITATION-ISSUE.md`.
+  No issue/comment was posted, no new human probe ran, and no Calendar content was accessed.
+
 - **Updated-host decline and timeout delivery now pass.** ChatGPT `26.915.31945` bundles
   Codex `0.155.0-alpha.9.2`. At the human's request, attended retry returned `declined` in
   12.5 seconds; desktop response ID 78 logged decline at `2026-09-20T03:32:55.231Z`.
@@ -146,6 +158,14 @@
 
 ## Validation
 
+- September 19 research correction: independent five-file documentation review passed.
+  Local `./scripts/test.sh --disable-sandbox --skip ServerLifecycleTests`, shell syntax,
+  and whitespace checks passed; the lifecycle exclusion is the established desktop
+  sandbox limitation. The separate installed-binary synthetic cancellation check passed
+  as described above. No application or server source changed.
+  Publication review `gov-6c10f1f78450` (REVIEW, no required modifications) reinforced
+  `meta-safety-transparent-limitations`: retain the native-receipt uncertainty explicitly.
+
 - September 19 documentation checkpoint `5c81a39` passed full macOS CI (build, shell checks
   and test suite): https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35484093529.
   This does not establish native refusal delivery or prompt cleanup.
@@ -188,10 +208,11 @@
 
 ## Next actions, in order
 
-1. **Review/submit the prepared host bug report with explicit human authorization.**
-   `docs/CODEX-ELICITATION-ISSUE.md` records the reproduction and exact tagged-source gap.
-   No issue has been submitted. Do not repeat identical probes or alter server deadlines.
-   The report's source diagnosis is distinct from a captured runtime notification trace.
+1. **Isolate cancellation propagation with an automated app-server boundary test.**
+   `docs/CODEX-ELICITATION-ISSUE.md` records existing issue #40390, exact source, a passing
+   synthetic server-emission check, and the remaining native-receipt uncertainty. Correlate
+   MCP and frontend IDs; do not repeat identical human probes or alter server deadlines.
+   Any external follow-up belongs on #40390 and still requires explicit authorization.
 2. After the cleanup gap is resolved or a relevant host change is verified, retest UI
    cleanup, late-answer isolation and affirmative approval on that version. Submitting a
    report alone is not a reason to repeat a probe. Verify each client before enabling writes.

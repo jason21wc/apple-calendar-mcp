@@ -20,6 +20,30 @@
 | Implement | In progress | 2026-08-22 | Phases 1-4 complete, published, in daily use. Five read-only tools; **no write tool exists**. Phase 5 substrate (`Journal.swift`) built with no caller |
 | Validate | In progress | 2026-08-26 | Read-surface contract and security audits are closed. Journal tests now use owned temporary roots and repeated full runs add no live-state lines. Journal tail reads and cross-month recovery lookup were hardened 2026-09-13; write approval and the restore implementation remain gates before a mutating caller. Test counts are deliberately not recorded — they drifted to four different numbers across four files |
 
+## Cancellation diagnosis review (2026-09-19)
+
+Research found existing [openai/codex #40390](https://github.com/openai/codex/issues/40390):
+prefer a qualified follow-up with authorization, not a new duplicate. The installed backend
+contains PR #44238's internal cancellation fix; the separate frontend-response wait remains
+in inspected upstream main `5c5308fc9a9ee789049d646ef11e5400384b9c6f`.
+The leading explanation remains incomplete propagation between internal and frontend
+request lifetimes. Do not call the native incident conclusively traced: best-effort
+cancellation receipt in Codex was not measured, and its frontend ID differs from the MCP ID.
+
+A synthetic client of installed `0.2.3` verified the matching string-ID cancellation frame
+before the timeout result, successful subsequent ping, and clean EOF shutdown. This narrows
+the server-side concern without proving the prior native delivery. Next verification should
+be an automated app-server boundary reproduction, not another human timeout trial. Keep
+the client-neutral server, local expiry/late-response safeguards, and current write gate.
+No auto-restart, deadline extension, or weakened confirmation is justified by this finding.
+See `docs/CODEX-ELICITATION-ISSUE.md` for evidence, alternative causes, and test criteria.
+
+Governance `gov-250021d3fde2` and `gov-d4c6e6c99d9c` (PROCEED).
+Applied `meta-quality-verification-validation`, `meta-safety-transparent-limitations`,
+`meta-core-systemic-thinking`, and `coding-context-context-engineering-discipline`:
+verify the protocol boundary, separate observation from inference, and correct persistent
+recommendations when duplicate research changes the next action.
+
 ## Founding Context
 
 **Goal.** A local MCP server that lets Claude Code and Codex work with the current macOS

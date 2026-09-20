@@ -34,7 +34,10 @@
   probing returns `timed_out` in measured 30.040 seconds; follow-up diagnostics stay healthy.
   **UI cleanup failed:** the human confirms editable expired controls and later used Skip.
   Exact backend source has a separate frontend-resolution gap. A report is drafted in
-  `docs/CODEX-ELICITATION-ISSUE.md`; obtain approval before submitting it externally.
+  `docs/CODEX-ELICITATION-ISSUE.md`. Research found existing upstream issue #40390; prefer
+  a qualified follow-up with approval, not a duplicate. Healthy synthetic stdio verifies
+  matching cancellation emission; native receipt remains untraced. Isolate client
+  propagation with an automated app-server boundary test before another human trial.
   No identical timeout retry, updater check, reinstall or restart is indicated. Late-answer
   isolation and current-version affirmative approval remain open.
   #24a capability discovery is complete in Codex. Cowork visibility is user-confirmed;

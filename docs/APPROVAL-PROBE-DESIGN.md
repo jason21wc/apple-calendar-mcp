@@ -57,7 +57,10 @@ the separately spawned app-server handler still waits for a frontend response be
 `serverRequest/resolved`. The installed frontend would remove pending controls on that
 notification. This source gap fits the observed retained form; no runtime notification trace
 was captured. See the [reviewable upstream report](CODEX-ELICITATION-ISSUE.md) for the source
-chain, reproduction and evidence boundaries. The report has not been submitted.
+chain, reproduction and evidence boundaries. Research found existing upstream issue #40390;
+the draft is now a potential follow-up, not a new issue. A healthy synthetic connection
+verified the installed server emits the matching cancellation; native receipt remains
+untraced, so exact incident attribution is still an inference. Nothing has been submitted.
 
 Do not repeat identical timeout probes or change server deadlines/restart behavior to mask
 this host defect. Keep Gate 1 open. Normal reads remain available. Any alternative approval
