@@ -50,6 +50,33 @@ No integration/configuration changed. Governance `gov-5f5598e3fad5` (PROCEED);
 `meta-quality-verification-validation` and `meta-safety-transparent-limitations` informed
 source checking and the bounded absence claim.
 
+### Broader Apple connections checked (2026-09-20)
+
+Follow-up research beyond MCP identified four useful, documented options:
+
+- [Shortcuts CLI](https://support.apple.com/guide/shortcuts-mac/apd455c82f02/mac):
+  `shortcuts run` accepts input and returns output for saved workflows. First candidate
+  for a specific cross-app action missing from native adapters; action availability and
+  output must be tested per workflow. Interactive steps pause execution. It does not
+  expose Siri's general tool catalog or repair the Codex approval lifecycle.
+- [Mail scripting](https://support.apple.com/guide/mail/mlhlp1120/mac) and
+  [Scripting Bridge](https://developer.apple.com/documentation/scriptingbridge): supported
+  automation through an app's scripting interface. Useful for the Mail project, subject
+  to its dictionary and permissions; that project's existing backend was not audited here.
+- [macOS 27 fm CLI / Foundation Models Python SDK](https://developer.apple.com/videos/play/wwdc2026/334/):
+  Apple documents a preinstalled CLI and a Python SDK for model workflows and structured
+  output. Potential extraction/classification helper; model access alone grants no
+  Calendar/Mail/Contacts access. Local availability was not tested.
+- [iCloud third-party account authorization](https://support.apple.com/en-ae/121539):
+  a real supported-app connection for iCloud Mail, Calendar and Contacts, with revocation.
+  The support article does not establish self-service developer onboarding for our server;
+  iCloud access also does not cover every account aggregated in the Mac's apps.
+
+Recommendation: retain EventKit, consider Shortcuts when a concrete cross-app gap arises,
+and consider fm only for a model-processing requirement. No integration was installed,
+configured or exercised on personal data. Governance `gov-b10a1e9572f7` (REVIEW, no
+required modifications); documentation establishes capability, not local verification.
+
 ## Cancellation diagnosis review (2026-09-19)
 
 **September 20 submission:** the human authorized posting the reviewed follow-up to

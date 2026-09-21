@@ -12,6 +12,10 @@
   Calendar/Mail/Contacts/Reminders. Siri App Intents/App Toolbox and Foundation Models access
   are distinct from third-party MCP access. Keep the EventKit server and approval gate;
   sources and bounded uncertainty are in PROJECT-MEMORY's Apple platform research entry.
+  Broader follow-up also verified Shortcuts CLI, Mail scripting, macOS 27's fm CLI/Python
+  SDK and supported iCloud account authorization. Shortcuts is the first candidate for
+  specific cross-app gaps; none establishes a replacement for EventKit or the approval
+  lifecycle fix. These are documentation findings, not local integration tests.
   No upstream patch, app configuration or Calendar data changed during this research.
 
 - **Systemic review completed; [upstream follow-up posted](https://github.com/openai/codex/issues/40390#issuecomment-5753315747).**
