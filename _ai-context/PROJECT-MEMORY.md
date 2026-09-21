@@ -20,6 +20,36 @@
 | Implement | In progress | 2026-08-22 | Phases 1-4 complete, published, in daily use. Five read-only tools; **no write tool exists**. Phase 5 substrate (`Journal.swift`) built with no caller |
 | Validate | In progress | 2026-08-26 | Read-surface contract and security audits are closed. Journal tests now use owned temporary roots and repeated full runs add no live-state lines. Journal tail reads and cross-month recovery lookup were hardened 2026-09-13; write approval and the restore implementation remain gates before a mutating caller. Test counts are deliberately not recorded — they drifted to four different numbers across four files |
 
+## Apple platform MCP research (2026-09-20)
+
+The human asked whether macOS 27/Siri AI makes this server redundant. Primary-source
+research, independently cross-checked, found **no documented public Apple MCP connection
+contract for Calendar, Mail, Contacts or Reminders**. This is a bounded documentation
+finding, not proof that Apple has no private internal MCP services. Siri's own description
+is not sufficient evidence of an externally usable endpoint.
+
+Apple documents external-client MCP access for
+[Xcode](https://developer.apple.com/documentation/xcode/giving-external-agents-access-to-xcode)
+(`xcrun mcpbridge`) and [Safari 27](https://webkit.org/blog/18325/webkit-features-for-safari-27-0/)
+(`/usr/bin/safaridriver --mcp`). These are development tools, not system personal-data APIs.
+[WWDC26 App Schemas](https://developer.apple.com/videos/play/wwdc2026/240/) describes apps
+exposing their own actions/content to Siri through App Intents. Apple's
+[September 14 announcement](https://www.apple.com/newsroom/2026/09/siri-ai-a-profoundly-more-capable-and-personal-assistant-is-here/)
+describes Siri's on-device orchestrator, Spotlight index and App Toolbox; it does not
+publish those as an MCP service for arbitrary clients. Access to Foundation Models or
+Siri's ChatGPT extension does not establish access to Siri's app tools/permissions.
+
+Recommendation: retain the client-neutral EventKit adapter and the unresolved approval
+gate. A replacement needs a verified public transport/launch command, tool contract and
+permission model, not a model-provider announcement. EventKit remains Apple's documented
+[Calendar/Reminders API](https://developer.apple.com/documentation/eventkit); Contacts has
+its [own framework](https://developer.apple.com/documentation/contacts). MailKit is an
+[extension framework](https://developer.apple.com/documentation/mailkit), not a general
+mailbox MCP service. Public Xcode/Safari MCPs may help other development projects separately.
+No integration/configuration changed. Governance `gov-5f5598e3fad5` (PROCEED);
+`meta-quality-verification-validation` and `meta-safety-transparent-limitations` informed
+source checking and the bounded absence claim.
+
 ## Cancellation diagnosis review (2026-09-19)
 
 **September 20 submission:** the human authorized posting the reviewed follow-up to

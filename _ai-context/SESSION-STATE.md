@@ -7,6 +7,13 @@
 
 ## Where things stand
 
+- **Apple platform alternative checked before continuing.** September 20 primary-source
+  research found public Xcode/Safari MCP support but no documented Apple MCP endpoint for
+  Calendar/Mail/Contacts/Reminders. Siri App Intents/App Toolbox and Foundation Models access
+  are distinct from third-party MCP access. Keep the EventKit server and approval gate;
+  sources and bounded uncertainty are in PROJECT-MEMORY's Apple platform research entry.
+  No upstream patch, app configuration or Calendar data changed during this research.
+
 - **Systemic review completed; [upstream follow-up posted](https://github.com/openai/codex/issues/40390#issuecomment-5753315747).**
   Existing issue [#40390](https://github.com/openai/codex/issues/40390) remains the closest
   report. The isolated direct-call fixture now reproduces missing frontend resolution
@@ -166,6 +173,9 @@
   refresh/recovery is needed. `docs/CLIENT-LIFECYCLE.md` records this host-specific limit.
 
 ## Validation
+
+- Submission-status checkpoint `ef9f891442cbf39a4f76f415616e48ee2c45730e` passed full CI:
+  https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35543654358.
 
 - Journal checkpoint `4d8ed0342cda4d179414bed46cf10d57` was analyzed and its missing CI
   checkpoint applied. Main-agent receipt returned `accepted: false, state_unavailable`;
