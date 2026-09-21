@@ -79,6 +79,16 @@ required modifications); documentation establishes capability, not local verific
 
 ## Cancellation diagnosis review (2026-09-19)
 
+**September 21 repair preparation:** the human authorized proceeding, but a fresh checkout
+at `3483294596ea86edd1fdc30bf360b8951b9d7022` exposed a missing prerequisite in our
+recommendation: [upstream contribution policy](https://github.com/openai/codex/blob/3483294596ea86edd1fdc30bf360b8951b9d7022/docs/contributing.md)
+rejects external code contributions/PRs and asks for reports, root-cause analyses and design
+discussion. The report already covers these. Source still shows responder-only removal
+in `codex-mcp/src/elicitation.rs` and the separate app-server frontend wait. A local patch
+would be experimental evidence, not a fix installed in the desktop host. Recommended
+against maintaining a custom build solely for this dependency; the human's choice about
+an experiment is pending. No source patch, host replacement or new post was made.
+
 **September 20 submission:** the human authorized posting the reviewed follow-up to
 [#40390](https://github.com/openai/codex/issues/40390#issuecomment-5753315747); the exact published body was verified by readback. This supersedes
 historical "not submitted" and authorization-pending statements below. Gate 1 remains open.

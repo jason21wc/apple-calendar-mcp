@@ -43,7 +43,9 @@
   The systemic extension also measures stale waiting-on-approval state after cancellation
   and disconnect, with bounded late-answer isolation. Turn cleanup is a source-confirmed
   fallback; the direct-call fixture does not establish normal-turn duration. See the report
-  for the complete cleanup contract. Next recommended scope is a focused upstream repair;
+  for the complete cleanup contract. September 21 repair preparation found that upstream
+  rejects external code/PRs; the report is the supported contribution route. An experimental
+  local patch is pending the human's decision and would not update the installed app;
   repeat native verification after a relevant fix reaches the host, not an unchanged trial.
   No identical timeout retry, updater check, reinstall or restart is indicated. Native late-answer
   isolation and current-version affirmative approval remain open.

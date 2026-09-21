@@ -12,6 +12,11 @@
 
 ## Active Lessons
 
+**2026-09-21 — An upstream repair recommendation missed the contribution policy.** Codex
+accepts reports and analysis but explicitly rejects external code/PRs. **Rule:** verify the
+maintainer's current contribution path and how a fix reaches the installed product before
+recommending cross-repository implementation; a local patch alone does not unblock that host.
+
 **2026-09-20 — A stale form hid split request and turn lifetimes.** Cancellation ended the
 internal request while a frontend callback retained approval status; turn cleanup could mask
 that gap. **Rule:** trace owners and every terminal path, measure retained state as well as

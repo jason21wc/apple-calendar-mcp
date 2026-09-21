@@ -1,11 +1,23 @@
 <!-- scaffold: code/standard template-v2.65.0 2026-08-17 -->
 # Session State
 
-**Last Updated:** 2026-09-20
+**Last Updated:** 2026-09-21
 **Memory Type:** Working (transient)
 **Lifecycle:** Current position only; decisions and history live in the other memory files.
 
 ## Where things stand
+
+- **Upstream repair preparation found a contribution-policy constraint.** The human
+  authorized proceeding September 21. Fresh upstream source at
+  `3483294596ea86edd1fdc30bf360b8951b9d7022` still has the separate MCP/frontend lifetimes,
+  but `docs/contributing.md` explicitly rejects external code contributions and PRs;
+  it accepts reports, root-cause analysis and design discussion. The existing #40390
+  report already supplies that evidence and the repair contract; no duplicate was posted.
+  Recommend against maintaining a custom build merely to unblock this project. A question
+  is pending on whether the human still wants an experimental local patch. No patch or
+  build was made; a separate clean source clone exists in this task's local artifact area.
+  Reads remain usable; Gate 1 and installed software are unchanged. Governance tools were
+  unavailable; context search/index refresh and direct source checks were performed.
 
 - **Apple platform alternative checked before continuing.** September 20 primary-source
   research found public Xcode/Safari MCP support but no documented Apple MCP endpoint for
@@ -33,8 +45,8 @@
   research, results, limits and the submitted comment. `--extended` runs the new scenarios.
   No production code, installed binary, live configuration or Calendar data changed.
   User authorized posting on September 20; the exact posted body was verified by readback.
-  **Next recommendation:** a focused upstream Codex repair and regression, a separate
-  cross-repository contribution not yet authorized. After a relevant fix reaches the host,
+  **September 21 supersedes the repair recommendation:** work was authorized, then the
+  upstream no-external-PR policy was verified (above). After a relevant fix reaches the host,
   verify native cleanup, late-answer isolation and current-version affirmative approval.
   No monitor is scheduled. No identical native probe, restart or deadline change is justified.
   Gate 1 remains open; write code waits for it under plan §6/§15.
@@ -178,6 +190,19 @@
 
 ## Validation
 
+- September 21 documentation checkpoint: local checks pass using the established
+  `./scripts/test.sh --disable-sandbox --skip ServerLifecycleTests` invocation; shell
+  syntax, diff and added-content privacy checks pass. No Codex build or runtime repair
+  was tested. The first invocation failed before compilation because nested SwiftPM
+  sandboxing is unavailable in this host.
+- Apple research checkpoints `6b1809a` and `2f2313f` passed full macOS CI:
+  [MCP/Siri research](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35551396196),
+  [broader connections](https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35552061953).
+  This validates the repository, not local availability of those integrations or approval.
+- Journal checkpoint `27cc7703f6334f179fa8611e12e5179d` analysis completed. Its CI-memory
+  proposal was accepted; the main-agent receipt attempt reported `accepted: false`,
+  `state_unavailable`. Hook acknowledgment is not established.
+
 - Submission-status checkpoint `ef9f891442cbf39a4f76f415616e48ee2c45730e` passed full CI:
   https://github.com/jason21wc/apple-calendar-mcp/actions/runs/35543654358.
 
@@ -254,9 +279,10 @@
 
 ## Next actions, in order
 
-1. **The #40390 follow-up is posted and verified; do not post it again.** Next recommended
-   work is a focused upstream Codex repair and regression, separately scoped from this
-   posting authorization. The report contains its cleanup contract and evidence limits.
+1. **The #40390 follow-up is posted and verified; do not post it again.** Upstream does not
+   accept external code/PRs. A local experiment would not update the installed desktop app;
+   the pending human decision is whether that experiment is still worth pursuing. Otherwise
+   use the existing report and await a relevant host fix; no monitor is scheduled.
    Do not repeat identical human probes or alter server deadlines while the gap remains.
 2. After the cleanup gap is resolved or a relevant host change is verified, retest UI
    cleanup, late-answer isolation and affirmative approval on that version. Submitting a
